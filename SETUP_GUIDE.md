@@ -1,70 +1,170 @@
-# Roman Empire Game - Quick Setup Guide
+# Roman Empire Game - Setup Guide 🎮🏛️
 
-## Step 1: Open Project
-1. Double-click `RomanEmpireGame.uproject`
-2. Wait for Unreal Editor to compile C++ code
-3. If asked about missing modules, click "Yes" to rebuild
+Un prototipo de Unreal Engine 5 que combina **Total War**, **Age of Empires**, y **Counter-Strike**.
 
-## Step 2: Create Blueprints (Automatic)
-1. In Unreal Editor: **Tools > Execute Python Script**
-2. Navigate to: `Content/Scripts/CreateBlueprints.py`
-3. Click Open - blueprints will be created automatically
+---
 
-Created Blueprints:
-- `/Game/Blueprints/UI/WBP_MainHUD`
-- `/Game/Blueprints/Units/BP_Legionary`
-- `/Game/Blueprints/Buildings/BP_Barracks`
-- `/Game/Blueprints/Core/BP_GameMode`
-- `/Game/Blueprints/Core/BP_PlayerController`
-- `/Game/Blueprints/Core/BP_SeamlessCamera`
+## 🚀 Quick Start (3 pasos)
 
-## Step 3: Create Audio Assets
-1. **Tools > Execute Python Script**
-2. Navigate to: `Content/Scripts/CreateAudioAssets.py`
-3. Sound cues will be created in `/Game/Audio/`
+### 1. Abrir Proyecto
+```
+Double-click: RomanEmpireGame.uproject
+```
+Espera a que compile el código C++.
 
-## Step 4: Import Audio Files
-1. Download or create .wav files matching `Content/Audio/AudioConfig.json`
-2. Drag .wav files into corresponding folders in Content Browser
-3. Connect imported sounds to the Sound Cue assets
+### 2. Ejecutar Script de Setup
+```
+Tools > Execute Python Script > Content/Scripts/MasterSetup.py
+```
+¡Esto crea TODOS los assets automáticamente!
 
-## Step 5: Configure Game Mode
-1. Open **Edit > Project Settings > Maps & Modes**
-2. Set Default GameMode to: `BP_GameMode`
-3. Open `BP_GameMode` and set:
+### 3. Configurar y Jugar
+```
+Edit > Project Settings > Maps & Modes > Default GameMode: BP_GameMode
+Press Play
+```
+
+---
+
+## 📜 Scripts de Python (UE Editor)
+
+| Script | Qué Crea |
+|--------|----------|
+| `MasterSetup.py` | **TODO** (ejecutar este) |
+| `CreateBlueprints.py` | 13 Blueprints |
+| `CreateMaterials.py` | 13 Materiales |
+| `CreateAudioAssets.py` | 28 Sound Cues |
+
+Para ejecutar: **Tools > Execute Python Script** > seleccionar archivo
+
+---
+
+## 🎨 Blueprints Generados
+
+### Core
+- `BP_GameMode` - Modo de juego principal
+- `BP_PlayerController` - Control de input
+- `BP_SeamlessCamera` - Cámara con zoom continuo
+- `BP_AudioManager` - Sistema de audio
+- `BP_MaterialManager` - Colores de facciones
+
+### UI
+- `WBP_MainHUD` - HUD completo con recursos, minimapa, menús
+
+### Units
+- `BP_Legionary` - Soldado romano con gladius, pilum, scutum
+- `BP_UnitBase` - Base para todas las unidades
+
+### Buildings
+- `BP_Barracks` - Entrena infantería
+- `BP_BuildingBase` - Base para edificios
+
+### World
+- `BP_Territory` - Regiones conquistables
+- `BP_WorldMapManager` - Mapa del Mediterráneo
+- `BP_CampaignManager` - Turnos y victoria
+- `BP_FactionManager` - Roma, Cartago, Galia
+
+---
+
+## 🔊 Audio Assets
+
+**28 Sound Cues** organizados en:
+
+| Categoría | Sonidos |
+|-----------|---------|
+| Combat | SwordSwing, SwordHit, ShieldBlock, Death, Charge |
+| Building | BuildStart, BuildProgress, BuildComplete |
+| UI | ButtonClick, MenuOpen, TurnEnd, Victory |
+| Ambient | BattleAmbience, CityAmbience, MarchingLoop |
+| Music | MainMenuTheme, BattleTheme, CampaignTheme |
+
+**Para agregar audio:**
+1. Importa archivos `.wav` a `Content/Audio/`
+2. Abre el Sound Cue correspondiente
+3. Conecta el Wave Player al Output
+
+Ver `Content/Audio/AudioConfig.json` para especificaciones técnicas.
+
+---
+
+## 📁 Archivos de Diseño (.design.json)
+
+Estos archivos describen la estructura visual de cada Blueprint:
+
+- `WBP_MainHUD.design.json` - Layout del HUD completo
+- `BP_Legionary.design.json` - Equipo y animaciones del soldado
+- `BP_Barracks.design.json` - Configuración del cuartel
+
+Úsalos como referencia al editar Blueprints en el editor.
+
+---
+
+## ⚙️ Configuración Detallada
+
+### Game Mode Setup
+1. **Edit > Project Settings > Maps & Modes**
+2. Set Default GameMode: `BP_GameMode`
+3. Abre `BP_GameMode` y configura:
    - Default Pawn Class: `BP_SeamlessCamera`
    - Player Controller Class: `BP_PlayerController`
    - HUD Class: `RomanEmpireHUD`
 
-## Step 6: Setup Main Level
-1. Create new level: **File > New Level > Empty Level**
+### Level Setup
+1. **File > New Level > Empty Level**
 2. Save as `/Game/Maps/MainMap`
-3. Add to level:
+3. Agrega al nivel:
    - `BP_AudioManager`
    - `BP_MaterialManager`
-   - Directional Light
-   - Sky Sphere
-   - Landscape (optional)
+   - Directional Light + Sky
 
-## Step 7: Test!
-1. Press **Play** in Editor
-2. Use mouse wheel to zoom
-3. Press **B** for building menu
-4. Select units with left-click
-5. Press **F** to enter FPS mode
+---
 
-## Controls
-| Key | Action |
-|-----|--------|
-| Mouse Wheel | Zoom in/out |
-| Left Click | Select |
-| Right Click | Move/Command |
-| B | Building menu |
-| F | Enter/Exit FPS |
-| WASD | Move (FPS) |
-| Escape | Exit FPS |
+## 🎮 Controles
 
-## Troubleshooting
-- **Compile Error**: Check Output Log, rebuild solution in VS
-- **Missing Classes**: Ensure C++ compilation succeeded
-- **No Sound**: Check audio device, verify sound cue setup
+| Tecla | Acción |
+|-------|--------|
+| 🖱️ Scroll | Zoom in/out |
+| 🖱️ Click Izq | Seleccionar |
+| 🖱️ Click Der | Mover/Atacar |
+| `B` | Menú de edificios |
+| `F` | Entrar modo FPS |
+| `WASD` | Moverse (FPS) |
+| `ESC` | Salir FPS |
+
+---
+
+## ❓ Troubleshooting
+
+| Problema | Solución |
+|----------|----------|
+| Error de compilación | Ver Output Log, recompilar en VS |
+| Clases no encontradas | Asegurar que C++ compiló correctamente |
+| Sin sonido | Verificar device, revisar Sound Cue setup |
+| Python script falla | Habilitar Python Editor Script Plugin |
+
+---
+
+## 📂 Estructura del Proyecto
+
+```
+RomanEmpireGame/
+├── Config/              # Configuración UE5
+├── Content/
+│   ├── Audio/           # Sound Cues + AudioConfig.json
+│   ├── Blueprints/      # BP generados + .design.json
+│   └── Scripts/         # Python scripts para UE Editor
+├── Source/
+│   └── RomanEmpireGame/
+│       ├── Core/        # GameMode, Controller, HUD
+│       ├── Camera/      # SeamlessZoomCamera
+│       ├── Faction/     # FactionManager
+│       ├── Building/    # BuildingBase, Barracks
+│       ├── Units/       # UnitBase, Legionary
+│       ├── World/       # Territory, Campaign
+│       ├── UI/          # Widgets
+│       ├── Audio/       # AudioManager
+│       └── Assets/      # Materials, Meshes
+├── README.md
+└── SETUP_GUIDE.md       # ← Estás aquí
+```
