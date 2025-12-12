@@ -1,0 +1,71 @@
+{
+    "BlueprintName": "BP_Legionary",
+    "ParentClass": "/Script/RomanEmpireGame.Legionary",
+    "Description": "Roman Legionary - Heavy infantry soldier",
+    "Components": {
+        "SkeletalMesh": {
+            "Mesh": "/Game/Characters/Legionary/SK_Legionary",
+            "AnimBlueprint": "/Game/Characters/Legionary/ABP_Legionary"
+        },
+        "CapsuleCollider": {
+            "Radius": 42,
+            "HalfHeight": 96
+        }
+    },
+    "DefaultValues": {
+        "UnitData": {
+            "UnitType": "Legionary",
+            "Category": "Infantry",
+            "DisplayName": "Legionary",
+            "BaseStats": {
+                "MaxHealth": 120,
+                "MeleeAttack": 12,
+                "RangedAttack": 8,
+                "MeleeDefense": 10,
+                "RangedDefense": 8,
+                "Armor": 5,
+                "Speed": 280,
+                "Morale": 60,
+                "Stamina": 100
+            },
+            "GoldCost": 150,
+            "FoodCost": 50,
+            "TrainingTime": 15.0,
+            "AttackRange": 150
+        }
+    },
+    "EquipmentSlots": {
+        "PrimaryWeapon": {
+            "Mesh": "/Game/Weapons/Gladius/SM_Gladius",
+            "Socket": "weapon_r"
+        },
+        "SecondaryWeapon": {
+            "Mesh": "/Game/Weapons/Pilum/SM_Pilum",
+            "Socket": "back_weapon"
+        },
+        "Shield": {
+            "Mesh": "/Game/Weapons/Scutum/SM_Scutum",
+            "Socket": "shield_l"
+        },
+        "Helmet": {
+            "Mesh": "/Game/Armor/Roman/SM_GaleaHelmet",
+            "Socket": "head"
+        }
+    },
+    "AnimationMontages": {
+        "Attack_Sword": "/Game/Characters/Legionary/AM_SwordAttack",
+        "Attack_Pilum": "/Game/Characters/Legionary/AM_PilumThrow",
+        "Block": "/Game/Characters/Legionary/AM_ShieldBlock",
+        "Death": "/Game/Characters/Legionary/AM_Death",
+        "Testudo_Enter": "/Game/Characters/Legionary/AM_TestudoEnter",
+        "Testudo_Exit": "/Game/Characters/Legionary/AM_TestudoExit"
+    },
+    "Sounds": {
+        "Attack": "SC_SwordSwing",
+        "Hit": "SC_SwordHit",
+        "Block": "SC_ShieldBlock",
+        "Death": "SC_Death",
+        "Select": "SC_UnitSelect",
+        "Move": "SC_MarchingFootsteps"
+    }
+}

@@ -1,0 +1,246 @@
+{
+    "AudioConfiguration": "Roman Empire Game Sound Library",
+    "Version": "1.0",
+    "Description": "Audio asset configuration - import .wav files matching these specifications",
+    "SoundCategories": {
+        "Combat": {
+            "Directory": "/Game/Audio/Combat",
+            "Sounds": [
+                {
+                    "Name": "SwordSwing",
+                    "File": "sword_swing.wav",
+                    "Description": "Gladius sword swing through air",
+                    "Duration": "0.3-0.5s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "SwordHit",
+                    "File": "sword_hit.wav",
+                    "Description": "Metal sword hitting armor/flesh",
+                    "Duration": "0.2-0.4s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "ShieldBlock",
+                    "File": "shield_block.wav",
+                    "Description": "Weapon hitting Roman scutum shield",
+                    "Duration": "0.3-0.5s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "ArrowFire",
+                    "File": "arrow_fire.wav",
+                    "Description": "Bow string release and arrow flight start",
+                    "Duration": "0.2-0.3s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "ArrowHit",
+                    "File": "arrow_hit.wav",
+                    "Description": "Arrow impact on target",
+                    "Duration": "0.1-0.2s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "PilumThrow",
+                    "File": "pilum_throw.wav",
+                    "Description": "Heavy javelin throw grunt and whoosh",
+                    "Duration": "0.4-0.6s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "Death",
+                    "File": "death_cry.wav",
+                    "Description": "Soldier death cry/grunt",
+                    "Duration": "0.5-1.0s",
+                    "Specs": "44.1kHz, 16bit, Mono"
+                },
+                {
+                    "Name": "Charge",
+                    "File": "battle_charge.wav",
+                    "Description": "Roman battle cry for charging",
+                    "Duration": "1.0-2.0s",
+                    "Specs": "44.1kHz, 16bit, Stereo"
+                }
+            ]
+        },
+        "Building": {
+            "Directory": "/Game/Audio/Building",
+            "Sounds": [
+                {
+                    "Name": "BuildStart",
+                    "File": "construction_start.wav",
+                    "Description": "Initial construction sound - hammering begins",
+                    "Duration": "1.0-1.5s"
+                },
+                {
+                    "Name": "BuildProgress",
+                    "File": "construction_loop.wav",
+                    "Description": "Looping construction sounds - hammering, sawing",
+                    "Duration": "3.0-5.0s",
+                    "Loop": true
+                },
+                {
+                    "Name": "BuildComplete",
+                    "File": "construction_complete.wav",
+                    "Description": "Triumphant completion fanfare",
+                    "Duration": "1.5-2.0s"
+                },
+                {
+                    "Name": "BuildingDamaged",
+                    "File": "building_damage.wav",
+                    "Description": "Stone/wood cracking and breaking",
+                    "Duration": "0.5-1.0s"
+                },
+                {
+                    "Name": "BuildingDestroyed",
+                    "File": "building_collapse.wav",
+                    "Description": "Full building collapse rumble",
+                    "Duration": "2.0-3.0s"
+                }
+            ]
+        },
+        "UI": {
+            "Directory": "/Game/Audio/UI",
+            "Sounds": [
+                {
+                    "Name": "ButtonClick",
+                    "File": "ui_click.wav",
+                    "Description": "Clean UI button click",
+                    "Duration": "0.1s"
+                },
+                {
+                    "Name": "ButtonHover",
+                    "File": "ui_hover.wav",
+                    "Description": "Subtle hover sound",
+                    "Duration": "0.05s"
+                },
+                {
+                    "Name": "MenuOpen",
+                    "File": "menu_open.wav",
+                    "Description": "Menu sliding open",
+                    "Duration": "0.2-0.3s"
+                },
+                {
+                    "Name": "MenuClose",
+                    "File": "menu_close.wav",
+                    "Description": "Menu closing",
+                    "Duration": "0.2s"
+                },
+                {
+                    "Name": "Error",
+                    "File": "error_buzz.wav",
+                    "Description": "Error/invalid action sound",
+                    "Duration": "0.3s"
+                },
+                {
+                    "Name": "VictoryFanfare",
+                    "File": "victory_fanfare.wav",
+                    "Description": "Triumphant Roman brass fanfare",
+                    "Duration": "3.0-5.0s"
+                },
+                {
+                    "Name": "DefeatSound",
+                    "File": "defeat_tone.wav",
+                    "Description": "Somber defeat music sting",
+                    "Duration": "2.0-3.0s"
+                },
+                {
+                    "Name": "TurnEnd",
+                    "File": "turn_end.wav",
+                    "Description": "Turn completion chime",
+                    "Duration": "0.5s"
+                }
+            ]
+        },
+        "Ambient": {
+            "Directory": "/Game/Audio/Ambient",
+            "Sounds": [
+                {
+                    "Name": "CrowdCheer",
+                    "File": "crowd_cheer.wav",
+                    "Description": "Roman crowd cheering",
+                    "Duration": "5.0-10.0s",
+                    "Loop": true
+                },
+                {
+                    "Name": "BattleAmbience",
+                    "File": "battle_ambience.wav",
+                    "Description": "Distant battle sounds - clashing, shouting",
+                    "Duration": "30.0s",
+                    "Loop": true
+                },
+                {
+                    "Name": "CityAmbience",
+                    "File": "city_ambience.wav",
+                    "Description": "Roman city sounds - crowds, carts, animals",
+                    "Duration": "30.0s",
+                    "Loop": true
+                },
+                {
+                    "Name": "NatureAmbience",
+                    "File": "nature_ambience.wav",
+                    "Description": "Mediterranean nature - birds, wind, crickets",
+                    "Duration": "30.0s",
+                    "Loop": true
+                },
+                {
+                    "Name": "MarchingFootsteps",
+                    "File": "marching_loop.wav",
+                    "Description": "Legion marching in formation",
+                    "Duration": "5.0s",
+                    "Loop": true
+                }
+            ]
+        },
+        "Music": {
+            "Directory": "/Game/Audio/Music",
+            "Tracks": [
+                {
+                    "Name": "MainMenuTheme",
+                    "File": "music_main_menu.wav",
+                    "Description": "Epic orchestral Roman theme",
+                    "Duration": "120-180s",
+                    "Loop": true,
+                    "BPM": 80
+                },
+                {
+                    "Name": "BattleTheme",
+                    "File": "music_battle.wav",
+                    "Description": "Intense combat music with drums and brass",
+                    "Duration": "180-240s",
+                    "Loop": true,
+                    "BPM": 140
+                },
+                {
+                    "Name": "CampaignTheme",
+                    "File": "music_campaign.wav",
+                    "Description": "Strategic map music - thoughtful, majestic",
+                    "Duration": "180-240s",
+                    "Loop": true,
+                    "BPM": 60
+                },
+                {
+                    "Name": "VictoryTheme",
+                    "File": "music_victory.wav",
+                    "Description": "Glorious victory celebration",
+                    "Duration": "60-90s",
+                    "Loop": false
+                }
+            ]
+        }
+    },
+    "AudioSettings": {
+        "MasterVolume": 1.0,
+        "MusicVolume": 0.5,
+        "SFXVolume": 1.0,
+        "AmbientVolume": 0.7,
+        "VoiceVolume": 1.0
+    },
+    "Notes": [
+        "All sound files should be in WAV format for best quality",
+        "Compress to OGG for final build if needed",
+        "Ensure ambient loops have smooth crossfade points",
+        "Music should be mastered to -14 LUFS for consistency"
+    ]
+}

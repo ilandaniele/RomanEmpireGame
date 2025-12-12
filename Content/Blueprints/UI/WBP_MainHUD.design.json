@@ -1,0 +1,357 @@
+{
+    "WidgetName": "WBP_MainHUD",
+    "ParentClass": "/Script/RomanEmpireGame.RomanEmpireMainWidget",
+    "Description": "Main HUD widget for Roman Empire Game",
+    "DesignSize": {
+        "Width": 1920,
+        "Height": 1080
+    },
+    "WidgetTree": {
+        "RootCanvas": {
+            "Type": "CanvasPanel",
+            "Name": "RootCanvas",
+            "Children": [
+                {
+                    "Type": "HorizontalBox",
+                    "Name": "ResourceBar",
+                    "Slot": {
+                        "Anchors": "Top-Stretch",
+                        "Position": {
+                            "X": 0,
+                            "Y": 0
+                        },
+                        "Size": {
+                            "Width": 0,
+                            "Height": 40
+                        },
+                        "Alignment": {
+                            "X": 0.5,
+                            "Y": 0
+                        }
+                    },
+                    "Style": {
+                        "Background": "BlackTranslucent",
+                        "Padding": 10
+                    },
+                    "Children": [
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Gold",
+                            "TextBinding": "GoldText"
+                        },
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Food",
+                            "TextBinding": "FoodText"
+                        },
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Iron",
+                            "TextBinding": "IronText"
+                        },
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Wood",
+                            "TextBinding": "WoodText"
+                        },
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Stone",
+                            "TextBinding": "StoneText"
+                        },
+                        {
+                            "Type": "ResourceItem",
+                            "Icon": "Icon_Population",
+                            "TextBinding": "PopulationText"
+                        }
+                    ]
+                },
+                {
+                    "Type": "VerticalBox",
+                    "Name": "BuildingMenuPanel",
+                    "Slot": {
+                        "Anchors": "Left-Stretch",
+                        "Position": {
+                            "X": 10,
+                            "Y": 60
+                        },
+                        "Size": {
+                            "Width": 250,
+                            "Height": 0
+                        }
+                    },
+                    "Style": {
+                        "Background": "PanelBackground",
+                        "Padding": 5
+                    },
+                    "Visibility": "Collapsed",
+                    "Children": [
+                        {
+                            "Type": "Text",
+                            "Text": "Buildings",
+                            "Style": "Header"
+                        },
+                        {
+                            "Type": "HorizontalBox",
+                            "Name": "CategoryTabs",
+                            "Children": [
+                                {
+                                    "Type": "Button",
+                                    "Name": "MilitaryTabButton",
+                                    "Text": "⚔️"
+                                },
+                                {
+                                    "Type": "Button",
+                                    "Name": "EconomicTabButton",
+                                    "Text": "💰"
+                                },
+                                {
+                                    "Type": "Button",
+                                    "Name": "CivilTabButton",
+                                    "Text": "🏛️"
+                                },
+                                {
+                                    "Type": "Button",
+                                    "Name": "DefenseTabButton",
+                                    "Text": "🛡️"
+                                }
+                            ]
+                        },
+                        {
+                            "Type": "VerticalBox",
+                            "Name": "MilitaryBuildingsBox",
+                            "Children": [
+                                {
+                                    "Type": "BuildingButton",
+                                    "Building": "Barracks",
+                                    "Cost": "400G 200W"
+                                },
+                                {
+                                    "Type": "BuildingButton",
+                                    "Building": "Archery Range",
+                                    "Cost": "350G 250W"
+                                },
+                                {
+                                    "Type": "BuildingButton",
+                                    "Building": "Stable",
+                                    "Cost": "500G 300W"
+                                }
+                            ]
+                        },
+                        {
+                            "Type": "VerticalBox",
+                            "Name": "EconomicBuildingsBox",
+                            "Visibility": "Collapsed"
+                        },
+                        {
+                            "Type": "VerticalBox",
+                            "Name": "CivilBuildingsBox",
+                            "Visibility": "Collapsed"
+                        },
+                        {
+                            "Type": "VerticalBox",
+                            "Name": "DefenseBuildingsBox",
+                            "Visibility": "Collapsed"
+                        }
+                    ]
+                },
+                {
+                    "Type": "HorizontalBox",
+                    "Name": "UnitPanel",
+                    "Slot": {
+                        "Anchors": "Bottom-Center",
+                        "Position": {
+                            "X": 0,
+                            "Y": -10
+                        },
+                        "Size": {
+                            "Width": 600,
+                            "Height": 120
+                        },
+                        "Alignment": {
+                            "X": 0.5,
+                            "Y": 1
+                        }
+                    },
+                    "Style": {
+                        "Background": "PanelBackground"
+                    },
+                    "Visibility": "Collapsed",
+                    "Children": [
+                        {
+                            "Type": "Image",
+                            "Name": "UnitPortrait",
+                            "Size": {
+                                "Width": 100,
+                                "Height": 100
+                            }
+                        },
+                        {
+                            "Type": "VerticalBox",
+                            "Children": [
+                                {
+                                    "Type": "TextBlock",
+                                    "Name": "UnitNameText",
+                                    "Style": "UnitName"
+                                },
+                                {
+                                    "Type": "ProgressBar",
+                                    "Name": "UnitHealthBar",
+                                    "FillColor": "Green"
+                                },
+                                {
+                                    "Type": "HorizontalBox",
+                                    "Name": "UnitActions"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Type": "Border",
+                    "Name": "MinimapContainer",
+                    "Slot": {
+                        "Anchors": "Bottom-Right",
+                        "Position": {
+                            "X": -10,
+                            "Y": -10
+                        },
+                        "Size": {
+                            "Width": 200,
+                            "Height": 200
+                        },
+                        "Alignment": {
+                            "X": 1,
+                            "Y": 1
+                        }
+                    },
+                    "Style": {
+                        "BorderColor": "Gold",
+                        "BorderWidth": 2
+                    },
+                    "Children": [
+                        {
+                            "Type": "Image",
+                            "Name": "MinimapImage"
+                        }
+                    ]
+                },
+                {
+                    "Type": "CanvasPanel",
+                    "Name": "FPSOverlay",
+                    "Slot": {
+                        "Anchors": "Full"
+                    },
+                    "Visibility": "Collapsed",
+                    "Children": [
+                        {
+                            "Type": "Image",
+                            "Name": "CrosshairImage",
+                            "Slot": {
+                                "Anchors": "Center",
+                                "Alignment": {
+                                    "X": 0.5,
+                                    "Y": 0.5
+                                }
+                            },
+                            "Size": {
+                                "Width": 32,
+                                "Height": 32
+                            }
+                        },
+                        {
+                            "Type": "ProgressBar",
+                            "Name": "HealthBar",
+                            "Slot": {
+                                "Anchors": "Bottom-Left",
+                                "Position": {
+                                    "X": 50,
+                                    "Y": -50
+                                }
+                            },
+                            "Size": {
+                                "Width": 200,
+                                "Height": 20
+                            },
+                            "FillColor": "Red"
+                        },
+                        {
+                            "Type": "ProgressBar",
+                            "Name": "StaminaBar",
+                            "Slot": {
+                                "Anchors": "Bottom-Left",
+                                "Position": {
+                                    "X": 50,
+                                    "Y": -80
+                                }
+                            },
+                            "Size": {
+                                "Width": 200,
+                                "Height": 15
+                            },
+                            "FillColor": "Yellow"
+                        }
+                    ]
+                },
+                {
+                    "Type": "CanvasPanel",
+                    "Name": "StrategicOverlay",
+                    "Slot": {
+                        "Anchors": "Full"
+                    },
+                    "Visibility": "Visible",
+                    "Children": [
+                        {
+                            "Type": "TextBlock",
+                            "Name": "TurnText",
+                            "Slot": {
+                                "Anchors": "Top-Right",
+                                "Position": {
+                                    "X": -20,
+                                    "Y": 10
+                                }
+                            },
+                            "Text": "Turn 1",
+                            "Style": "TurnCounter"
+                        },
+                        {
+                            "Type": "Button",
+                            "Name": "EndTurnButton",
+                            "Slot": {
+                                "Anchors": "Top-Right",
+                                "Position": {
+                                    "X": -20,
+                                    "Y": 50
+                                }
+                            },
+                            "Text": "End Turn",
+                            "Style": "EndTurnButton"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "Styles": {
+        "Header": {
+            "FontSize": 24,
+            "Color": "White",
+            "FontWeight": "Bold"
+        },
+        "UnitName": {
+            "FontSize": 18,
+            "Color": "White"
+        },
+        "TurnCounter": {
+            "FontSize": 20,
+            "Color": "Gold"
+        },
+        "PanelBackground": {
+            "Color": "rgba(0, 0, 0, 0.7)",
+            "CornerRadius": 5
+        },
+        "BlackTranslucent": {
+            "Color": "rgba(0, 0, 0, 0.8)"
+        }
+    }
+}

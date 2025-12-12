@@ -1,0 +1,92 @@
+{
+    "BlueprintName": "BP_Barracks",
+    "ParentClass": "/Script/RomanEmpireGame.Barracks",
+    "Description": "Roman Barracks - Trains infantry units",
+    "Components": {
+        "RootScene": {
+            "Type": "SceneComponent"
+        },
+        "BuildingMesh": {
+            "Type": "StaticMeshComponent",
+            "Mesh": "/Game/Buildings/Barracks/SM_Barracks",
+            "Materials": [
+                "/Game/Materials/M_RomanStone"
+            ]
+        },
+        "ConstructionScaffolding": {
+            "Type": "StaticMeshComponent",
+            "Mesh": "/Game/Buildings/Common/SM_Scaffolding",
+            "Visible": false
+        },
+        "CollisionBox": {
+            "Type": "BoxComponent",
+            "Extent": {
+                "X": 200,
+                "Y": 150,
+                "Z": 150
+            }
+        },
+        "SpawnPoint": {
+            "Type": "ArrowComponent",
+            "RelativeLocation": {
+                "X": 300,
+                "Y": 0,
+                "Z": 0
+            },
+            "Note": "Where trained units spawn"
+        },
+        "RallyPoint": {
+            "Type": "ArrowComponent",
+            "RelativeLocation": {
+                "X": 500,
+                "Y": 0,
+                "Z": 0
+            },
+            "Note": "Where trained units move to"
+        }
+    },
+    "DefaultValues": {
+        "BuildingData": {
+            "BuildingType": "Barracks",
+            "Category": "Military",
+            "DisplayName": "Barracks",
+            "Description": "Trains infantry units for your armies",
+            "MaxHealth": 1500,
+            "Armor": 5,
+            "FootprintSize": {
+                "X": 4,
+                "Y": 4
+            },
+            "ConstructionTime": 30,
+            "Cost": {
+                "Gold": 400,
+                "Wood": 200,
+                "Stone": 100
+            },
+            "TrainableUnits": [
+                "BP_Legionary",
+                "BP_Velites",
+                "BP_Triarii"
+            ]
+        },
+        "MaxQueueSize": 5,
+        "TrainingTime": 10.0
+    },
+    "Materials": {
+        "ValidPlacement": "/Game/Materials/M_GhostValid",
+        "InvalidPlacement": "/Game/Materials/M_GhostInvalid",
+        "Construction": "/Game/Materials/M_Construction",
+        "Complete": "/Game/Materials/M_RomanStone"
+    },
+    "Sounds": {
+        "ConstructionStart": "SC_BuildStart",
+        "ConstructionLoop": "SC_BuildProgress",
+        "ConstructionComplete": "SC_BuildComplete",
+        "TrainingComplete": "SC_UnitAcknowledge",
+        "Selected": "SC_ButtonClick"
+    },
+    "Effects": {
+        "ConstructionDust": "/Game/Effects/P_ConstructionDust",
+        "CompletionFlash": "/Game/Effects/P_BuildComplete"
+    }
+}

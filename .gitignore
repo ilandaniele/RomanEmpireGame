@@ -1,0 +1,70 @@
+# Unreal Engine 5 - Roman Empire Game .gitignore
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Compiled assets
+*.uasset
+*.umap
+
+# But keep our Content folder structure
+!Content/**/.gitkeep
+
+# Platform-specific
+*.pdb
+*.lib
+*.dll
+*.exe
+
+# Mac
+.DS_Store
+*.xcworkspace
+*.xcuserdata
+
+# Linux
+*.o
+*.so
+
+# JetBrains IDEs
+.idea/
+
+# Backup files
+*~
+*.bak
+*.swp
+
+# Generated files
+*.generated.h
+*.generated.cpp
+
+# Package files
+*.pak
+
+# Logs
+*.log
+Logs/
+
+# Crash reports
+CrashReportClient/
+
+# Hot reload
+/Plugins/*/Intermediate/
+
+# Automation
+/Automation/
+
+# Note: We ARE including .uproject, Config/, Source/, and Content/Scripts
+# These are the core project files that should be version controlled
