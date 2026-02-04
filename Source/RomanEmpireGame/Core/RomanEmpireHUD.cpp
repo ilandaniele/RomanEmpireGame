@@ -1,8 +1,8 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireHUD.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/UI/RomanEmpireMainWidget.h"
+#include "../RomanEmpireGame.h"
+#include "../UI/RomanEmpireMainWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -122,3 +122,4 @@ void ARomanEmpireHUD::UpdateUIVisibility()
 	MainWidget->SetTacticalUIVisible(bShowTacticalUI);
 	MainWidget->SetFPSUIVisible(bShowFPSUI);
 }
+

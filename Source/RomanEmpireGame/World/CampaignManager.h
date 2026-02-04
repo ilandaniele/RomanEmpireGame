@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "../Faction/FactionData.h"
 #include "CampaignManager.generated.h"
 
 class AFactionManager;
@@ -109,3 +109,4 @@ private:
 	void ProcessAIFactions();
 	void CheckAllVictoryConditions();
 };
+

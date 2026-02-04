@@ -1,8 +1,8 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "WorldMapManager.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/World/TerritoryRegion.h"
+#include "../RomanEmpireGame.h"
+#include "../World/TerritoryRegion.h"
 #include "Kismet/GameplayStatics.h"
 
 AWorldMapManager::AWorldMapManager()
@@ -210,3 +210,4 @@ bool AWorldMapManager::AreTerritoriesAdjacent(ATerritoryRegion* Territory1, ATer
 	// Adjacent if within 1.5 territory sizes (allows for diagonal)
 	return Distance <= TerritorySize * 1.5f;
 }
+

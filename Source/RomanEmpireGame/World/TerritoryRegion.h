@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "../Faction/FactionData.h"
 #include "TerritoryRegion.generated.h"
 
 class ABuildingBase;
@@ -150,3 +150,4 @@ protected:
 	UPROPERTY(BlueprintAssignable, Category = "Territory|Events")
 	FOnSettlementFounded OnSettlementFounded;
 };
+

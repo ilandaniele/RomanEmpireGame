@@ -397,3 +397,4 @@ void AProceduralMeshGenerators::AddQuad(TArray<FVector>& Vertices, TArray<int32>
 	Triangles.Add(StartIndex + 2);
 	Triangles.Add(StartIndex + 3);
 }
+

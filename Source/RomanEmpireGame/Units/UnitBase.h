@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "RomanEmpireGame/Units/UnitTypes.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "UnitTypes.h"
+#include "../Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
 class UCapsuleComponent;
@@ -172,3 +172,4 @@ protected:
 	virtual void OnDeath();
 	float CalculateDamageReduction(float RawDamage, bool bIsRanged) const;
 };
+

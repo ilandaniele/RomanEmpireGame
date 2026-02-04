@@ -1,13 +1,15 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpirePlayerController.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Units/UnitBase.h"
-#include "RomanEmpireGame/Building/BuildingBase.h"
-#include "RomanEmpireGame/Building/BuildingPlacementComponent.h"
+#include "RomanEmpireGameMode.h"
+#include "../RomanEmpireGame.h"
+#include "../Units/UnitBase.h"
+#include "../Building/BuildingBase.h"
+#include "../Building/BuildingPlacementComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Kismet/GameplayStatics.h"
+
 
 ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 {
@@ -414,3 +416,4 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 	}
 	return nullptr;
 }
+

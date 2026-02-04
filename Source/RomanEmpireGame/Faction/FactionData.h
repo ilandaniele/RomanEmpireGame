@@ -177,3 +177,4 @@ struct FDiplomaticRelation
 		, RelationshipScore(0)
 	{}
 };
+

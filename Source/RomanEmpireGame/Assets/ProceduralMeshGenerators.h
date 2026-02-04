@@ -54,3 +54,4 @@ private:
 	static void AddQuad(TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, 
 		FVector V0, FVector V1, FVector V2, FVector V3, FVector Normal);
 };
+

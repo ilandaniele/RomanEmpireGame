@@ -1,8 +1,8 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingPlacementComponent.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Building/BuildingBase.h"
+#include "../RomanEmpireGame.h"
+#include "../Building/BuildingBase.h"
 #include "Kismet/GameplayStatics.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
@@ -231,3 +231,4 @@ bool UBuildingPlacementComponent::ValidatePlacement()
 
 	return true;
 }
+

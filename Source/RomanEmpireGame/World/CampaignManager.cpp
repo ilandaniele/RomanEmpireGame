@@ -1,10 +1,10 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "CampaignManager.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Faction/FactionManager.h"
-#include "RomanEmpireGame/World/WorldMapManager.h"
-#include "RomanEmpireGame/World/TerritoryRegion.h"
+#include "../RomanEmpireGame.h"
+#include "../Faction/FactionManager.h"
+#include "../World/WorldMapManager.h"
+#include "../World/TerritoryRegion.h"
 #include "Kismet/GameplayStatics.h"
 
 ACampaignManager::ACampaignManager()
@@ -236,3 +236,4 @@ void ACampaignManager::LoadCampaign(const FString& SaveName)
 	// TODO: Implement load system
 	UE_LOG(LogRomanEmpire, Log, TEXT("Loading campaign: %s"), *SaveName);
 }
+

@@ -1,8 +1,8 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Barracks.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Units/UnitBase.h"
+#include "../RomanEmpireGame.h"
+#include "../Units/UnitBase.h"
 
 ABarracks::ABarracks()
 {
@@ -139,3 +139,4 @@ void ABarracks::StartNextInQueue()
 		TrainingProgress = 0.0f;
 	}
 }
+

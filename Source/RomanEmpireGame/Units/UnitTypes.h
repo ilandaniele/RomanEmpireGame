@@ -202,3 +202,4 @@ struct FUnitData
 		, bHasShield(true)
 	{}
 };
+

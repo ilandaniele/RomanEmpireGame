@@ -1,9 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "MinimapWidget.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/World/WorldMapManager.h"
-#include "RomanEmpireGame/World/TerritoryRegion.h"
+#include "../RomanEmpireGame.h"
+#include "../World/WorldMapManager.h"
+#include "../World/TerritoryRegion.h"
 #include "Components/Image.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -186,3 +186,4 @@ void UMinimapWidget::UpdateUnitMarkers()
 		}
 	}
 }
+

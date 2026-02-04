@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "AudioManager.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
@@ -280,3 +280,4 @@ FSoundEffectData* AAudioManager::GetSoundData(ESoundEffect SoundEffect)
 {
 	return SoundEffectLibrary.Find(SoundEffect);
 }
+

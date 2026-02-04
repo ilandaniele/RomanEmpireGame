@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "UnitBase.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -371,3 +371,4 @@ void AUnitBase::OnDeath()
 	// Destroy after delay
 	SetLifeSpan(5.0f);
 }
+

@@ -59,3 +59,4 @@ protected:
 private:
 	void CreateTerritory(FName ID, const FText& Name, const FVector& Location, EFactionID StartingOwner);
 };
+

@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "MaterialManager.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
@@ -153,3 +153,4 @@ AMaterialManager* AMaterialManager::GetMaterialManager(UObject* WorldContextObje
 	}
 	return nullptr;
 }
+

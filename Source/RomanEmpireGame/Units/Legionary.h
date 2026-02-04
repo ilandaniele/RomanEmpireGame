@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RomanEmpireGame/Units/UnitBase.h"
+#include "UnitBase.h"
 #include "Legionary.generated.h"
 
 /**
@@ -56,3 +56,4 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Legionary")
 	float PilumRange;
 };
+

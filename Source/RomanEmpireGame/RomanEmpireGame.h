@@ -33,3 +33,4 @@ namespace RomanEmpireConstants
 	constexpr float MELEE_RANGE = 200.0f;
 	constexpr float RANGED_MAX_DISTANCE = 5000.0f;
 }
+

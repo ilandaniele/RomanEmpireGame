@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Building/BuildingTypes.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "BuildingTypes.h"
+#include "../Faction/FactionData.h"
 #include "BuildingBase.generated.h"
 
 class UBoxComponent;
@@ -147,3 +147,4 @@ protected:
 private:
 	void UpdateVisuals();
 };
+

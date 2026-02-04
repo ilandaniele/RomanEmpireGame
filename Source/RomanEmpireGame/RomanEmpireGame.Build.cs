@@ -7,6 +7,9 @@ public class RomanEmpireGame : ModuleRules
 	public RomanEmpireGame(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		
+		// Enable IWYU for cleaner includes
+		bEnforceIWYU = false;
 
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core", 
@@ -16,19 +19,18 @@ public class RomanEmpireGame : ModuleRules
 			"EnhancedInput",
 			"AIModule",
 			"NavigationSystem",
-			"GameplayTasks",
-			"UMG",
-			"Slate",
-			"SlateCore",
-			"ProceduralMeshComponent"
+			"GameplayTasks"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"Landscape",
-			"PhysicsCore",
-			"RenderCore"
+			"Slate",
+			"SlateCore",
+			"UMG"
 		});
 
+		// Uncomment if using procedural mesh
+		// PublicDependencyModuleNames.Add("ProceduralMeshComponent");
+		
 		// Uncomment if using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 	}

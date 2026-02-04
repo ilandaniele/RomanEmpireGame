@@ -6,3 +6,4 @@
 IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, RomanEmpireGame, "RomanEmpireGame");
 
 DEFINE_LOG_CATEGORY(LogRomanEmpire);
+

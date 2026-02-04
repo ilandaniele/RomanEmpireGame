@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "RomanEmpireGame/Building/BuildingTypes.h"
+#include "../Building/BuildingTypes.h"
 #include "BuildingMenuWidget.generated.h"
 
 class UVerticalBox;
@@ -98,3 +98,4 @@ private:
 	void CreateBuildingButton(EBuildingType BuildingType, const FBuildingData& Data, UVerticalBox* Container);
 	void SetCategoryVisibility(EBuildingCategory Category);
 };
+

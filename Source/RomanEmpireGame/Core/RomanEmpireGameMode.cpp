@@ -1,10 +1,10 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireGameMode.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Faction/FactionManager.h"
-#include "RomanEmpireGame/World/WorldMapManager.h"
-#include "RomanEmpireGame/World/CampaignManager.h"
+#include "../RomanEmpireGame.h"
+#include "../Faction/FactionManager.h"
+#include "../World/WorldMapManager.h"
+#include "../World/CampaignManager.h"
 #include "Kismet/GameplayStatics.h"
 
 ARomanEmpireGameMode::ARomanEmpireGameMode()
@@ -142,3 +142,4 @@ void ARomanEmpireGameMode::InitializeManagers()
 		UE_LOG(LogRomanEmpire, Log, TEXT("Campaign Manager initialized"));
 	}
 }
+

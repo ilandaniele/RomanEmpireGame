@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingBase.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 
@@ -276,3 +276,4 @@ void ABuildingBase::UpdateVisuals()
 		BuildingMesh->SetMaterial(0, MaterialToUse);
 	}
 }
+

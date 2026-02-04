@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RomanEmpireGame/Building/BuildingBase.h"
+#include "BuildingBase.h"
 #include "Barracks.generated.h"
 
 /**
@@ -58,3 +58,4 @@ private:
 	void SpawnTrainedUnit();
 	void StartNextInQueue();
 };
+

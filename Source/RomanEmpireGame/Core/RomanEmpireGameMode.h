@@ -89,3 +89,4 @@ private:
 	void InitializeManagers();
 	EGamePhase DeterminePhaseFromZoom(float ZoomLevel) const;
 };
+

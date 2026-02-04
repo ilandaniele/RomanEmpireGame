@@ -77,3 +77,4 @@ private:
 	void CreateWidgets();
 	void UpdateUIVisibility();
 };
+

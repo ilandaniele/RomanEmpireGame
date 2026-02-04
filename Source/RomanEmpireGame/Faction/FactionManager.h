@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "FactionData.h"
 #include "FactionManager.generated.h"
 
 /**
@@ -93,3 +93,4 @@ private:
 	void InitializeDefaultDiplomacy();
 	void ProcessAIFactionTurn(EFactionID FactionID);
 };
+

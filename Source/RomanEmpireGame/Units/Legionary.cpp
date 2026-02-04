@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Legionary.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ALegionary::ALegionary()
@@ -149,3 +149,4 @@ void ALegionary::ThrowPilum()
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("%s threw pilum (%d remaining)"), *GetName(), PilaCount);
 }
+

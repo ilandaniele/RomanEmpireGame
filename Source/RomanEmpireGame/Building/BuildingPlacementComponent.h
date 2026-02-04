@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "RomanEmpireGame/Building/BuildingTypes.h"
+#include "BuildingTypes.h"
 #include "BuildingPlacementComponent.generated.h"
 
 class ABuildingBase;
@@ -93,3 +93,4 @@ private:
 	FVector SnapToGrid(const FVector& Location) const;
 	bool ValidatePlacement();
 };
+

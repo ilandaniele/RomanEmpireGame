@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingMenuWidget.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Components/VerticalBox.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
@@ -172,3 +172,4 @@ void UBuildingMenuWidget::OnDefenseTabClicked()
 {
 	FilterByCategory(EBuildingCategory::Defense);
 }
+

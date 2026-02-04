@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "../Faction/FactionData.h"
 #include "MaterialManager.generated.h"
 
 class UMaterialParameterCollection;
@@ -104,3 +104,4 @@ private:
 	void InitializeDefaultColors();
 	void InitializeDefaultMaterials();
 };
+

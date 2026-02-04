@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "RomanEmpireGame/Audio/SoundData.h"
+#include "SoundData.h"
 #include "AudioManager.generated.h"
 
 class UAudioComponent;
@@ -104,3 +104,4 @@ private:
 	void InitializeSoundLibrary();
 	FSoundEffectData* GetSoundData(ESoundEffect SoundEffect);
 };
+

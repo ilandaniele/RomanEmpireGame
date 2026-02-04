@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "FactionManager.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 
 AFactionManager::AFactionManager()
 {
@@ -256,3 +256,4 @@ void AFactionManager::ProcessAIFactionTurn(EFactionID FactionID)
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("AI faction %d processed turn, gained %d gold"), 
 		static_cast<int32>(FactionID), Income.Gold);
 }
+

@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "RomanEmpireGame/Core/RomanEmpireGameMode.h"
 #include "InputActionValue.h"
 #include "RomanEmpirePlayerController.generated.h"
 
+class ARomanEmpireGameMode;
 class UInputMappingContext;
 class UInputAction;
 class AUnitBase;
@@ -162,3 +162,4 @@ private:
 	void PerformBoxSelect();
 	AActor* GetActorUnderCursor() const;
 };
+

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RomanEmpireGame/Faction/FactionData.h"
+#include "../Faction/FactionData.h"
 #include "BuildingTypes.generated.h"
 
 /**
@@ -132,3 +132,4 @@ struct FBuildingData
 		, ProductionRate(0)
 	{}
 };
+

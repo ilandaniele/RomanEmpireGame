@@ -1,8 +1,8 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireMainWidget.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
-#include "RomanEmpireGame/Units/UnitBase.h"
+#include "../RomanEmpireGame.h"
+#include "../Units/UnitBase.h"
 #include "Components/CanvasPanel.h"
 #include "Components/HorizontalBox.h"
 #include "Components/VerticalBox.h"
@@ -176,3 +176,4 @@ void URomanEmpireMainWidget::SetupBuildingButtons()
 	// Building buttons would be created dynamically or bound from Blueprint
 	// This sets up click handlers for each building type
 }
+

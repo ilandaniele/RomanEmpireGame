@@ -136,3 +136,4 @@ protected:
 private:
 	void SetupBuildingButtons();
 };
+

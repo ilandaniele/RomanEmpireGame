@@ -158,3 +158,4 @@ private:
 	float GetTargetFOV() const;
 	float GetPanSpeed() const;
 };
+

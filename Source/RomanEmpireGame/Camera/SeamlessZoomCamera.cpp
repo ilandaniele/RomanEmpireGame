@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "SeamlessZoomCamera.h"
-#include "RomanEmpireGame/RomanEmpireGame.h"
+#include "../RomanEmpireGame.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
@@ -300,3 +300,4 @@ float ASeamlessZoomCamera::GetPanSpeed() const
 	// Faster pan when zoomed out, slower when zoomed in
 	return FMath::Lerp(WorldPanSpeed, CityPanSpeed, CurrentZoomLevel);
 }
+

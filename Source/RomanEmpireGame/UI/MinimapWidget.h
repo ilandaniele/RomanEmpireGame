@@ -92,3 +92,4 @@ private:
 	void UpdateTerritoryColors();
 	void UpdateUnitMarkers();
 };
+
