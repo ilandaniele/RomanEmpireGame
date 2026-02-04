@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.4",
+	"EngineAssociation": "5.7",
 	"Category": "Games",
 	"Description": "Roman Empire Strategy Game - Hybrid RTS/FPS prototype",
 	"Modules": [
