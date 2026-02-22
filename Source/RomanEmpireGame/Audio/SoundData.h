@@ -131,8 +131,8 @@ struct FMusicTrackData
 	FMusicTrackData()
 		: FadeInTime(2.0f)
 		, FadeOutTime(2.0f)
-		, bLoop(true)
 		, Track(nullptr)
+		, bLoop(true)
 	{}
 };
 

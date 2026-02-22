@@ -17,7 +17,7 @@ AUnitBase::AUnitBase()
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
 
 	// Configure movement
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = 300.0f;
@@ -56,7 +56,7 @@ void AUnitBase::BeginPlay()
 	CurrentMorale = UnitData.BaseStats.Morale;
 	
 	// Set movement speed from unit data
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed;
@@ -226,7 +226,7 @@ void AUnitBase::StartBlocking()
 	bIsBlocking = true;
 	
 	// Reduce movement speed while blocking
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed * 0.5f;
@@ -238,7 +238,7 @@ void AUnitBase::StopBlocking()
 	bIsBlocking = false;
 	
 	// Restore movement speed
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed;

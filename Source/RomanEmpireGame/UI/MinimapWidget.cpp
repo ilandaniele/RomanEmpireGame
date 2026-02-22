@@ -71,14 +71,14 @@ void UMinimapWidget::AddUnitMarker(AActor* Unit, FLinearColor Color)
 		Marker->SetColorAndOpacity(Color);
 		
 		// Add to canvas
-		UCanvasPanelSlot* Slot = MarkerContainer->AddChildToCanvas(Marker);
-		if (Slot)
+		UCanvasPanelSlot* CanvasSlot = MarkerContainer->AddChildToCanvas(Marker);
+		if (CanvasSlot)
 		{
-			Slot->SetSize(FVector2D(8.0f, 8.0f)); // 8x8 pixel marker
+			CanvasSlot->SetSize(FVector2D(8.0f, 8.0f)); // 8x8 pixel marker
 			
 			// Position marker
 			FVector2D MinimapPos = WorldToMinimap(Unit->GetActorLocation());
-			Slot->SetPosition(MinimapPos - FVector2D(4.0f, 4.0f)); // Center the marker
+			CanvasSlot->SetPosition(MinimapPos - FVector2D(4.0f, 4.0f)); // Center the marker
 		}
 
 		UnitMarkers.Add(Unit, Marker);
@@ -180,9 +180,9 @@ void UMinimapWidget::UpdateUnitMarkers()
 
 		FVector2D MinimapPos = WorldToMinimap(Pair.Key->GetActorLocation());
 		
-		if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Pair.Value->Slot))
+		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Pair.Value->Slot))
 		{
-			Slot->SetPosition(MinimapPos - FVector2D(4.0f, 4.0f));
+			CanvasSlot->SetPosition(MinimapPos - FVector2D(4.0f, 4.0f));
 		}
 	}
 }

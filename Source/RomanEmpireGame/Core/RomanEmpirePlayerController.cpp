@@ -18,7 +18,7 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Default;
 	
-	CurrentSelectionMode = ESelectionMode::None;
+	CurrentSelectionMode = ERomanSelectionMode::None;
 	CurrentZoomLevel = 0.3f; // Start at territory view
 	ZoomSpeed = 2.0f;
 	bIsInFirstPersonMode = false;
@@ -123,7 +123,7 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	UpdateZoom(DeltaSeconds);
 	
 	// Update building placement preview if active
-	if (CurrentSelectionMode == ESelectionMode::BuildingPlacement && BuildingPlacementComponent)
+	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement && BuildingPlacementComponent)
 	{
 		FHitResult HitResult;
 		GetHitResultUnderCursor(ECC_Visibility, true, HitResult);
@@ -172,7 +172,7 @@ void ARomanEmpirePlayerController::StartBuildingPlacement(TSubclassOf<ABuildingB
 {
 	if (BuildingPlacementComponent && BuildingClass)
 	{
-		CurrentSelectionMode = ESelectionMode::BuildingPlacement;
+		CurrentSelectionMode = ERomanSelectionMode::BuildingPlacement;
 		BuildingPlacementComponent->StartPlacement(BuildingClass);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Started building placement"));
 	}
@@ -183,7 +183,7 @@ void ARomanEmpirePlayerController::CancelBuildingPlacement()
 	if (BuildingPlacementComponent)
 	{
 		BuildingPlacementComponent->CancelPlacement();
-		CurrentSelectionMode = ESelectionMode::None;
+		CurrentSelectionMode = ERomanSelectionMode::None;
 		UE_LOG(LogRomanEmpire, Log, TEXT("Cancelled building placement"));
 	}
 }
@@ -252,13 +252,13 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 		return; // In FPS mode, select = attack
 	}
 	
-	if (CurrentSelectionMode == ESelectionMode::BuildingPlacement)
+	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		// Confirm building placement
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
 		{
 			BuildingPlacementComponent->ConfirmPlacement();
-			CurrentSelectionMode = ESelectionMode::None;
+			CurrentSelectionMode = ERomanSelectionMode::None;
 		}
 		return;
 	}
@@ -284,7 +284,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 		return; // In FPS mode, command = block
 	}
 	
-	if (CurrentSelectionMode == ESelectionMode::BuildingPlacement)
+	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		CancelBuildingPlacement();
 		return;

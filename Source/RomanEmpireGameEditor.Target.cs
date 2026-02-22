@@ -8,8 +8,9 @@ public class RomanEmpireGameEditorTarget : TargetRules
 	public RomanEmpireGameEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V4;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_4;
+		DefaultBuildSettings = BuildSettingsVersion.V6;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("RomanEmpireGame");
+		bOverrideBuildEnvironment = true;
 	}
 }

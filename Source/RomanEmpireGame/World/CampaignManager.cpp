@@ -107,14 +107,14 @@ void ACampaignManager::ProcessResourceProduction()
 			continue;
 		}
 
-		EFactionID Owner = Territory->GetOwnerFaction();
-		if (Owner == EFactionID::None)
+		EFactionID TerritoryOwner = Territory->GetOwnerFaction();
+		if (TerritoryOwner == EFactionID::None)
 		{
 			continue;
 		}
 
 		FFactionResources Production = Territory->GetResourceProduction();
-		FactionManager->ModifyFactionResources(Owner, Production);
+		FactionManager->ModifyFactionResources(TerritoryOwner, Production);
 	}
 }
 

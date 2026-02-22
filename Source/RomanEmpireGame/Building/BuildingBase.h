@@ -55,7 +55,7 @@ public:
 
 	// Health
 	UFUNCTION(BlueprintCallable, Category = "Building|Health")
-	void TakeDamage(float Damage, AActor* DamageSource);
+	void ApplyBuildingDamage(float Damage, AActor* DamageSource);
 
 	UFUNCTION(BlueprintCallable, Category = "Building|Health")
 	void Repair(float Amount);

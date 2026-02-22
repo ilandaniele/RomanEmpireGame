@@ -19,7 +19,7 @@ class USeamlessZoomCamera;
  * Selection mode for the player
  */
 UENUM(BlueprintType)
-enum class ESelectionMode : uint8
+enum class ERomanSelectionMode : uint8
 {
 	None,
 	SingleSelect,
@@ -117,7 +117,7 @@ protected:
 	TArray<AUnitBase*> SelectedUnits;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
-	ESelectionMode CurrentSelectionMode;
+	ERomanSelectionMode CurrentSelectionMode;
 
 	// Zoom state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")

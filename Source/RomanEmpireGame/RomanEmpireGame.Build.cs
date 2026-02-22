@@ -8,8 +8,8 @@ public class RomanEmpireGame : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		
-		// Enable IWYU for cleaner includes
-		bEnforceIWYU = false;
+		// Disable IWYU (Include What You Use) enforcement
+		IWYUSupport = IWYUSupport.None;
 
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core", 
@@ -19,17 +19,17 @@ public class RomanEmpireGame : ModuleRules
 			"EnhancedInput",
 			"AIModule",
 			"NavigationSystem",
-			"GameplayTasks"
+			"GameplayTasks",
+			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"Slate",
-			"SlateCore",
-			"UMG"
+			"SlateCore"
 		});
 
 		// Uncomment if using procedural mesh
-		// PublicDependencyModuleNames.Add("ProceduralMeshComponent");
+		PublicDependencyModuleNames.Add("ProceduralMeshComponent");
 		
 		// Uncomment if using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");

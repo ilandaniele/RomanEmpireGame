@@ -206,9 +206,8 @@ void AAudioManager::CrossfadeToMusic(FName NewTrackID, float CrossfadeTime)
 	
 	// Delay playing new track
 	FTimerHandle TimerHandle;
-	FTimerDelegate TimerDelegate;
-	TimerDelegate.BindUFunction(this, FName("PlayMusic"), NewTrackID);
-	GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDelegate, CrossfadeTime * 0.5f, false);
+	FName TrackToPlay = NewTrackID;
+	GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this, TrackToPlay]() { PlayMusic(TrackToPlay); }, CrossfadeTime * 0.5f, false);
 }
 
 void AAudioManager::PlayAmbientLoop(ESoundEffect AmbientSound)

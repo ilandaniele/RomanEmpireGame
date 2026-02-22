@@ -64,7 +64,7 @@ void ALegionary::ActivateTestudo()
 	bInTestudo = true;
 
 	// Testudo greatly increases defense but reduces speed
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed * 0.3f;
@@ -87,7 +87,7 @@ void ALegionary::DeactivateTestudo()
 	bInTestudo = false;
 
 	// Restore normal stats
-	UCharacterMovementComponent* Movement = GetCharacterMovementComponent();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed;

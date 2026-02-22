@@ -145,7 +145,7 @@ void ABuildingBase::OnConstructionFinished()
 		*BuildingData.DisplayName.ToString());
 }
 
-void ABuildingBase::TakeDamage(float Damage, AActor* DamageSource)
+void ABuildingBase::ApplyBuildingDamage(float Damage, AActor* DamageSource)
 {
 	if (CurrentState == EBuildingState::Destroyed)
 	{
