@@ -66,5 +66,9 @@ CrashReportClient/
 # Automation
 /Automation/
 
+# API keys and secrets
+.env
+Tools/.env
+
 # Note: We ARE including .uproject, Config/, Source/, and Content/Scripts
 # These are the core project files that should be version controlled
