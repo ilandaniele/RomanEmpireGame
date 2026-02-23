@@ -266,26 +266,36 @@ void ARomanEmpirePlayerController::HandleEdgeScroll(float DeltaTime)
 	ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
 	if (!CameraPawn) return;
 
+	// Validate viewport
 	int32 SizeX, SizeY;
 	GetViewportSize(SizeX, SizeY);
 	if (SizeX <= 0 || SizeY <= 0) return;
 
+	// Get mouse position - validate it's actually inside the viewport
 	float MouseX, MouseY;
-	GetMousePosition(MouseX, MouseY);
-
-	const float EdgeThreshold = 20.0f;
-	FVector MoveDirection = FVector::ZeroVector;
-	float PanSpeed = FMath::Lerp(10000.0f, 2000.0f, CurrentZoomLevel);
-
-	if (MouseX < EdgeThreshold) MoveDirection.Y -= 1.0f;           // Left
-	if (MouseX > SizeX - EdgeThreshold) MoveDirection.Y += 1.0f;   // Right
-	if (MouseY < EdgeThreshold) MoveDirection.X += 1.0f;            // Up/Forward
-	if (MouseY > SizeY - EdgeThreshold) MoveDirection.X -= 1.0f;    // Down/Backward
-
-	if (!MoveDirection.IsNearlyZero())
+	if (!GetMousePosition(MouseX, MouseY)) return; // Mouse not over window
+	
+	// Additional safety: if mouse is at exactly (0,0) it's likely invalid
+	// Also reject if mouse is outside viewport bounds
+	if ((MouseX <= 1.0f && MouseY <= 1.0f) || 
+		MouseX < 0.0f || MouseY < 0.0f || 
+		MouseX >= SizeX || MouseY >= SizeY)
 	{
-		MoveDirection.Normalize();
-		CameraPawn->AddActorWorldOffset(MoveDirection * PanSpeed * DeltaTime);
+		return;
+	}
+
+	const float EdgeThreshold = 15.0f;
+	FVector2D PanDirection = FVector2D::ZeroVector;
+
+	if (MouseX < EdgeThreshold) PanDirection.X -= 1.0f;           // Left
+	if (MouseX > SizeX - EdgeThreshold) PanDirection.X += 1.0f;   // Right
+	if (MouseY < EdgeThreshold) PanDirection.Y += 1.0f;            // Up/Forward
+	if (MouseY > SizeY - EdgeThreshold) PanDirection.Y -= 1.0f;    // Down/Backward
+
+	if (!PanDirection.IsNearlyZero())
+	{
+		PanDirection.Normalize();
+		CameraPawn->PanCamera(PanDirection);
 	}
 }
 
@@ -483,14 +493,12 @@ void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
 	}
 	else
 	{
-		// RTS mode: WASD moves the camera
+		// RTS mode: WASD moves the camera using PanCamera
 		ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
 		if (CameraPawn)
 		{
 			FVector2D MoveValue = Value.Get<FVector2D>();
-			float PanSpeed = FMath::Lerp(10000.0f, 2000.0f, CurrentZoomLevel);
-			FVector MoveDir = FVector(MoveValue.Y, MoveValue.X, 0.0f) * PanSpeed * GetWorld()->GetDeltaSeconds();
-			CameraPawn->AddActorWorldOffset(MoveDir);
+			CameraPawn->PanCamera(MoveValue);
 		}
 	}
 }

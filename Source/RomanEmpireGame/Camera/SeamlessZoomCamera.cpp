@@ -62,10 +62,10 @@ ASeamlessZoomCamera::ASeamlessZoomCamera()
 	CityPanSpeed = 2000.0f;          // Slower pan when zoomed in
 
 	// Initialize state
-	CurrentZoomLevel = 0.3f;         // Start at territory view
-	TargetZoomLevel = 0.3f;
+	CurrentZoomLevel = 0.55f;         // Start at city/tactical view
+	TargetZoomLevel = 0.55f;
 	FocusedActor = nullptr;
-	LastZoomLevel = EZoomLevel::Territory;
+	LastZoomLevel = EZoomLevel::City;
 }
 
 void ASeamlessZoomCamera::BeginPlay()
