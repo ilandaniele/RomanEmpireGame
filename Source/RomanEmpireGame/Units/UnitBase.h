@@ -101,6 +101,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
 	int32 GetCurrentMorale() const { return CurrentMorale; }
 
+	UFUNCTION(BlueprintCallable, Category = "Unit|Health")
+	void SetCurrentHealth(int32 NewHealth) { CurrentHealth = FMath::Clamp(NewHealth, 0, UnitData.BaseStats.MaxHealth); }
+
+	// Apply faction-based color to visual mesh
+	void ApplyFactionColor();
+
 	// Stamina (FPS mode)
 	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
 	float GetStaminaPercent() const { return CurrentStamina / UnitData.BaseStats.Stamina; }

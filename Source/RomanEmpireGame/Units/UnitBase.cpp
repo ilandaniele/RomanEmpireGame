@@ -25,7 +25,7 @@ AUnitBase::AUnitBase()
 	{
 		VisualMesh->SetupAttachment(GetRootComponent());
 		VisualMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
-		VisualMesh->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.8f));
+		VisualMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.0f));  // Bigger so visible from RTS camera
 		VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 		// Use engine built-in cylinder mesh
@@ -94,6 +94,7 @@ void AUnitBase::BeginPlay()
 	}
 	
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit spawned: %s"), *UnitData.DisplayName.ToString());
+	ApplyFactionColor();  // Apply faction color on spawn
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
@@ -119,6 +120,32 @@ void AUnitBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 void AUnitBase::SetOwnerFaction(EFactionID NewOwner)
 {
 	OwnerFaction = NewOwner;
+	ApplyFactionColor();
+}
+
+void AUnitBase::ApplyFactionColor()
+{
+	if (!VisualMesh) return;
+
+	FLinearColor FactionColor;
+	switch (OwnerFaction)
+	{
+		case EFactionID::Rome:     FactionColor = FLinearColor(0.8f, 0.15f, 0.1f); break;  // Red
+		case EFactionID::Carthage: FactionColor = FLinearColor(0.5f, 0.1f, 0.6f); break;   // Purple
+		case EFactionID::Gaul:     FactionColor = FLinearColor(0.2f, 0.5f, 0.15f); break;  // Green
+		default:                   FactionColor = FLinearColor(0.5f, 0.5f, 0.5f); break;   // Gray
+	}
+
+	UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+	if (BaseMat)
+	{
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(BaseMat, this);
+		if (MID)
+		{
+			MID->SetVectorParameterValue(TEXT("Color"), FactionColor);
+			VisualMesh->SetMaterial(0, MID);
+		}
+	}
 }
 
 void AUnitBase::SetSelected(bool bNewSelected)

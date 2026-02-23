@@ -91,6 +91,8 @@ protected:
 private:
 	void InitializeManagers();
 	void SpawnInitialUnits();
+	void SpawnInitialBuildings();
+	void SpawnWorldTerrain();
 	void UpdateHUDResources();
 	EGamePhase DeterminePhaseFromZoom(float ZoomLevel) const;
 };
