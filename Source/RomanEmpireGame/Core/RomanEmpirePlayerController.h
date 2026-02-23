@@ -13,7 +13,7 @@ class UInputAction;
 class AUnitBase;
 class ABuildingBase;
 class UBuildingPlacementComponent;
-class USeamlessZoomCamera;
+class ASeamlessZoomCamera;
 
 /**
  * Selection mode for the player
@@ -29,7 +29,7 @@ enum class ERomanSelectionMode : uint8
 
 /**
  * Main player controller handling input for all game modes
- * Adapts behavior based on current game phase and zoom level
+ * Creates Enhanced Input actions programmatically (no .uasset files needed)
  */
 UCLASS()
 class ROMANEMPIREGAME_API ARomanEmpirePlayerController : public APlayerController
@@ -81,36 +81,39 @@ public:
 	float GetCurrentZoom() const { return CurrentZoomLevel; }
 
 protected:
-	// Enhanced Input
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	// Enhanced Input — created programmatically, no Blueprint assets needed
+	UPROPERTY()
 	UInputMappingContext* DefaultMappingContext;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Select;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Command;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Zoom;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Move;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Look;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_EnterFPS;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_BuildMenu;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Attack;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UPROPERTY()
 	UInputAction* IA_Block;
+
+	UPROPERTY()
+	UInputAction* IA_EndTurn;
 
 	// Selection state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
@@ -149,6 +152,10 @@ protected:
 	void OnAttackPressed();
 	void OnBlockPressed();
 	void OnBlockReleased();
+	void OnEndTurnPressed();
+
+	// Edge scroll for RTS camera
+	void HandleEdgeScroll(float DeltaTime);
 
 private:
 	// Box selection
@@ -158,8 +165,8 @@ private:
 	// Cache game mode
 	ARomanEmpireGameMode* GameMode;
 
+	void CreateInputActionsAndMappings();
 	void UpdateZoom(float DeltaTime);
 	void PerformBoxSelect();
 	AActor* GetActorUnderCursor() const;
 };
-

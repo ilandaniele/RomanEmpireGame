@@ -2,14 +2,20 @@
 
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireGameMode.h"
+#include "RomanEmpireHUD.h"
 #include "../RomanEmpireGame.h"
 #include "../Units/UnitBase.h"
 #include "../Building/BuildingBase.h"
 #include "../Building/BuildingPlacementComponent.h"
+#include "../Camera/SeamlessZoomCamera.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "InputModifiers.h"
+#include "InputTriggers.h"
 #include "Kismet/GameplayStatics.h"
-
+#include "GameFramework/FloatingPawnMovement.h"
 
 ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 {
@@ -19,24 +25,131 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	DefaultMouseCursor = EMouseCursor::Default;
 	
 	CurrentSelectionMode = ERomanSelectionMode::None;
-	CurrentZoomLevel = 0.3f; // Start at territory view
+	CurrentZoomLevel = 0.3f;
 	ZoomSpeed = 2.0f;
 	bIsInFirstPersonMode = false;
 	bIsBoxSelecting = false;
 	PossessedUnit = nullptr;
 	GameMode = nullptr;
+
+	DefaultMappingContext = nullptr;
+	IA_Select = nullptr;
+	IA_Command = nullptr;
+	IA_Zoom = nullptr;
+	IA_Move = nullptr;
+	IA_Look = nullptr;
+	IA_EnterFPS = nullptr;
+	IA_BuildMenu = nullptr;
+	IA_Attack = nullptr;
+	IA_Block = nullptr;
+	IA_EndTurn = nullptr;
+}
+
+void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
+{
+	// Create Input Actions programmatically
+	IA_Select = NewObject<UInputAction>(this, TEXT("IA_Select"));
+	IA_Select->ValueType = EInputActionValueType::Boolean;
+
+	IA_Command = NewObject<UInputAction>(this, TEXT("IA_Command"));
+	IA_Command->ValueType = EInputActionValueType::Boolean;
+
+	IA_Zoom = NewObject<UInputAction>(this, TEXT("IA_Zoom"));
+	IA_Zoom->ValueType = EInputActionValueType::Axis1D;
+
+	IA_Move = NewObject<UInputAction>(this, TEXT("IA_Move"));
+	IA_Move->ValueType = EInputActionValueType::Axis2D;
+
+	IA_Look = NewObject<UInputAction>(this, TEXT("IA_Look"));
+	IA_Look->ValueType = EInputActionValueType::Axis2D;
+
+	IA_EnterFPS = NewObject<UInputAction>(this, TEXT("IA_EnterFPS"));
+	IA_EnterFPS->ValueType = EInputActionValueType::Boolean;
+
+	IA_BuildMenu = NewObject<UInputAction>(this, TEXT("IA_BuildMenu"));
+	IA_BuildMenu->ValueType = EInputActionValueType::Boolean;
+
+	IA_Attack = NewObject<UInputAction>(this, TEXT("IA_Attack"));
+	IA_Attack->ValueType = EInputActionValueType::Boolean;
+
+	IA_Block = NewObject<UInputAction>(this, TEXT("IA_Block"));
+	IA_Block->ValueType = EInputActionValueType::Boolean;
+
+	IA_EndTurn = NewObject<UInputAction>(this, TEXT("IA_EndTurn"));
+	IA_EndTurn->ValueType = EInputActionValueType::Boolean;
+
+	// Create Input Mapping Context
+	DefaultMappingContext = NewObject<UInputMappingContext>(this, TEXT("DefaultMappingContext"));
+
+	// --- Key bindings ---
+
+	// LMB = Select
+	FEnhancedActionKeyMapping& SelectMapping = DefaultMappingContext->MapKey(IA_Select, EKeys::LeftMouseButton);
+
+	// RMB = Command (move/attack)
+	FEnhancedActionKeyMapping& CommandMapping = DefaultMappingContext->MapKey(IA_Command, EKeys::RightMouseButton);
+
+	// Mouse Wheel = Zoom
+	FEnhancedActionKeyMapping& ZoomMapping = DefaultMappingContext->MapKey(IA_Zoom, EKeys::MouseWheelAxis);
+
+	// WASD = Move (2D axis: W=Y+, S=Y-, A=X-, D=X+)
+    FEnhancedActionKeyMapping& MoveW = DefaultMappingContext->MapKey(IA_Move, EKeys::W);
+    {
+        UInputModifierSwizzleAxis* SwizzleYX = NewObject<UInputModifierSwizzleAxis>(this);
+        SwizzleYX->Order = EInputAxisSwizzle::YXZ;
+        MoveW.Modifiers.Add(SwizzleYX);
+    }
+
+    FEnhancedActionKeyMapping& MoveS = DefaultMappingContext->MapKey(IA_Move, EKeys::S);
+    {
+        UInputModifierSwizzleAxis* SwizzleYX = NewObject<UInputModifierSwizzleAxis>(this);
+        SwizzleYX->Order = EInputAxisSwizzle::YXZ;
+        MoveS.Modifiers.Add(SwizzleYX);
+        UInputModifierNegate* Negate = NewObject<UInputModifierNegate>(this);
+        MoveS.Modifiers.Add(Negate);
+    }
+
+    FEnhancedActionKeyMapping& MoveD = DefaultMappingContext->MapKey(IA_Move, EKeys::D);
+    // D = positive X, no modifiers needed
+
+    FEnhancedActionKeyMapping& MoveA = DefaultMappingContext->MapKey(IA_Move, EKeys::A);
+    {
+        UInputModifierNegate* Negate = NewObject<UInputModifierNegate>(this);
+        MoveA.Modifiers.Add(Negate);
+    }
+
+	// Mouse XY = Look (for FPS mode)
+	FEnhancedActionKeyMapping& LookMapping = DefaultMappingContext->MapKey(IA_Look, EKeys::Mouse2D);
+
+	// F = Enter/Exit FPS mode
+	FEnhancedActionKeyMapping& FPSMapping = DefaultMappingContext->MapKey(IA_EnterFPS, EKeys::F);
+
+	// B = Build menu toggle
+	FEnhancedActionKeyMapping& BuildMapping = DefaultMappingContext->MapKey(IA_BuildMenu, EKeys::B);
+
+	// Left mouse = Attack (in FPS mode, same as select)
+	// Right mouse = Block (in FPS mode, same as command)
+
+	// T = End turn
+	FEnhancedActionKeyMapping& EndTurnMapping = DefaultMappingContext->MapKey(IA_EndTurn, EKeys::T);
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("Input actions and mappings created programmatically"));
 }
 
 void ARomanEmpirePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	// Create input actions and mappings programmatically
+	CreateInputActionsAndMappings();
+
 	// Setup Enhanced Input
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
 		if (DefaultMappingContext)
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			UE_LOG(LogRomanEmpire, Log, TEXT("Enhanced Input mapping context registered"));
 		}
 	}
 	
@@ -49,8 +162,14 @@ void ARomanEmpirePlayerController::BeginPlay()
 	{
 		BuildingPlacementComponent->RegisterComponent();
 	}
+
+	// Set input mode to allow both game and UI
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
 	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized"));
+	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized with programmatic input"));
 }
 
 void ARomanEmpirePlayerController::SetupInputComponent()
@@ -113,6 +232,11 @@ void ARomanEmpirePlayerController::SetupInputComponent()
 			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBlockPressed);
 			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnBlockReleased);
 		}
+
+		if (IA_EndTurn)
+		{
+			EnhancedInputComponent->BindAction(IA_EndTurn, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEndTurnPressed);
+		}
 	}
 }
 
@@ -122,12 +246,46 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	
 	UpdateZoom(DeltaSeconds);
 	
+	// Edge scrolling in RTS mode
+	if (!bIsInFirstPersonMode)
+	{
+		HandleEdgeScroll(DeltaSeconds);
+	}
+
 	// Update building placement preview if active
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement && BuildingPlacementComponent)
 	{
 		FHitResult HitResult;
 		GetHitResultUnderCursor(ECC_Visibility, true, HitResult);
 		BuildingPlacementComponent->UpdatePreview(HitResult.Location);
+	}
+}
+
+void ARomanEmpirePlayerController::HandleEdgeScroll(float DeltaTime)
+{
+	ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
+	if (!CameraPawn) return;
+
+	int32 SizeX, SizeY;
+	GetViewportSize(SizeX, SizeY);
+	if (SizeX <= 0 || SizeY <= 0) return;
+
+	float MouseX, MouseY;
+	GetMousePosition(MouseX, MouseY);
+
+	const float EdgeThreshold = 20.0f;
+	FVector MoveDirection = FVector::ZeroVector;
+	float PanSpeed = FMath::Lerp(10000.0f, 2000.0f, CurrentZoomLevel);
+
+	if (MouseX < EdgeThreshold) MoveDirection.Y -= 1.0f;           // Left
+	if (MouseX > SizeX - EdgeThreshold) MoveDirection.Y += 1.0f;   // Right
+	if (MouseY < EdgeThreshold) MoveDirection.X += 1.0f;            // Up/Forward
+	if (MouseY > SizeY - EdgeThreshold) MoveDirection.X -= 1.0f;    // Down/Backward
+
+	if (!MoveDirection.IsNearlyZero())
+	{
+		MoveDirection.Normalize();
+		CameraPawn->AddActorWorldOffset(MoveDirection * PanSpeed * DeltaTime);
 	}
 }
 
@@ -200,10 +358,8 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	bIsInFirstPersonMode = true;
 	bShowMouseCursor = false;
 	
-	// Lock input to first-person mode
 	SetInputMode(FInputModeGameOnly());
 	
-	// Notify game mode
 	if (GameMode)
 	{
 		GameMode->SetGamePhase(EGamePhase::FirstPerson);
@@ -223,10 +379,8 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 	PossessedUnit = nullptr;
 	bShowMouseCursor = true;
 	
-	// Restore RTS input mode
 	SetInputMode(FInputModeGameAndUI());
 	
-	// Notify game mode
 	if (GameMode)
 	{
 		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
@@ -239,6 +393,12 @@ void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
 	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 1.0f);
 	
+	// Update camera pawn
+	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
+	{
+		CameraPawn->SetZoomLevel(CurrentZoomLevel);
+	}
+	
 	if (GameMode)
 	{
 		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
@@ -249,12 +409,13 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 {
 	if (bIsInFirstPersonMode)
 	{
-		return; // In FPS mode, select = attack
+		// In FPS mode, left click = attack
+		OnAttackPressed();
+		return;
 	}
 	
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
-		// Confirm building placement
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
 		{
 			BuildingPlacementComponent->ConfirmPlacement();
@@ -263,7 +424,6 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 		return;
 	}
 	
-	// Start box selection
 	GetMousePosition(BoxSelectStart.X, BoxSelectStart.Y);
 	bIsBoxSelecting = true;
 }
@@ -281,7 +441,8 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 {
 	if (bIsInFirstPersonMode)
 	{
-		return; // In FPS mode, command = block
+		OnBlockPressed();
+		return;
 	}
 	
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
@@ -320,6 +481,18 @@ void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
 		FVector2D MoveValue = Value.Get<FVector2D>();
 		PossessedUnit->MoveInput(MoveValue);
 	}
+	else
+	{
+		// RTS mode: WASD moves the camera
+		ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
+		if (CameraPawn)
+		{
+			FVector2D MoveValue = Value.Get<FVector2D>();
+			float PanSpeed = FMath::Lerp(10000.0f, 2000.0f, CurrentZoomLevel);
+			FVector MoveDir = FVector(MoveValue.Y, MoveValue.X, 0.0f) * PanSpeed * GetWorld()->GetDeltaSeconds();
+			CameraPawn->AddActorWorldOffset(MoveDir);
+		}
+	}
 }
 
 void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
@@ -345,7 +518,10 @@ void ARomanEmpirePlayerController::OnEnterFPSPressed()
 
 void ARomanEmpirePlayerController::OnBuildMenuPressed()
 {
-	// Toggle build menu - TODO: Implement UI
+	if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
+	{
+		REHUD->ToggleBuildingMenu();
+	}
 	UE_LOG(LogRomanEmpire, Log, TEXT("Build menu toggled"));
 }
 
@@ -373,6 +549,15 @@ void ARomanEmpirePlayerController::OnBlockReleased()
 	}
 }
 
+void ARomanEmpirePlayerController::OnEndTurnPressed()
+{
+	if (GameMode)
+	{
+		GameMode->EndTurn();
+		UE_LOG(LogRomanEmpire, Log, TEXT("Turn ended by player"));
+	}
+}
+
 void ARomanEmpirePlayerController::UpdateZoom(float DeltaTime)
 {
 	// Smooth zoom interpolation handled by camera component
@@ -383,7 +568,6 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 	FVector2D CurrentMousePos;
 	GetMousePosition(CurrentMousePos.X, CurrentMousePos.Y);
 	
-	// Check if it's a click (small movement) or drag (box select)
 	float Distance = FVector2D::Distance(BoxSelectStart, CurrentMousePos);
 	
 	if (Distance < 10.0f)
@@ -401,9 +585,33 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 	}
 	else
 	{
-		// Box selection - find all units within the box
-		// TODO: Implement proper screen-space box selection
+		// Box selection — find all units within screen rect
 		ClearSelection();
+		
+		TArray<AActor*> AllUnits;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
+		
+		FVector2D MinBox(FMath::Min(BoxSelectStart.X, CurrentMousePos.X), FMath::Min(BoxSelectStart.Y, CurrentMousePos.Y));
+		FVector2D MaxBox(FMath::Max(BoxSelectStart.X, CurrentMousePos.X), FMath::Max(BoxSelectStart.Y, CurrentMousePos.Y));
+		
+		for (AActor* Actor : AllUnits)
+		{
+			AUnitBase* Unit = Cast<AUnitBase>(Actor);
+			if (!Unit) continue;
+			
+			FVector2D ScreenPos;
+			if (ProjectWorldLocationToScreen(Unit->GetActorLocation(), ScreenPos))
+			{
+				if (ScreenPos.X >= MinBox.X && ScreenPos.X <= MaxBox.X &&
+					ScreenPos.Y >= MinBox.Y && ScreenPos.Y <= MaxBox.Y)
+				{
+					SelectedUnits.Add(Unit);
+					Unit->SetSelected(true);
+				}
+			}
+		}
+		
+		UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), SelectedUnits.Num());
 	}
 }
 
@@ -416,4 +624,3 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 	}
 	return nullptr;
 }
-

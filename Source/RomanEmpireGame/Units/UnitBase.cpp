@@ -4,10 +4,13 @@
 #include "../RomanEmpireGame.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "AIController.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 AUnitBase::AUnitBase()
 {
@@ -15,6 +18,34 @@ AUnitBase::AUnitBase()
 
 	// Configure capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
+
+	// Create visible placeholder mesh (cylinder body)
+	VisualMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMesh"));
+	if (VisualMesh)
+	{
+		VisualMesh->SetupAttachment(GetRootComponent());
+		VisualMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+		VisualMesh->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.8f));
+		VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		// Use engine built-in cylinder mesh
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder"));
+		if (CylinderMesh.Succeeded())
+		{
+			VisualMesh->SetStaticMesh(CylinderMesh.Object);
+		}
+	}
+
+	// Create selection decal (ring under unit when selected)
+	SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
+	if (SelectionDecal)
+	{
+		SelectionDecal->SetupAttachment(GetRootComponent());
+		SelectionDecal->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
+		SelectionDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
+		SelectionDecal->DecalSize = FVector(64.0f, 64.0f, 64.0f);
+		SelectionDecal->SetVisibility(false); // Hidden until selected
+	}
 
 	// Configure movement
 	UCharacterMovementComponent* Movement = GetCharacterMovement();

@@ -62,6 +62,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Managers")
 	ACampaignManager* GetCampaignManager() const { return CampaignManager; }
 
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	int32 GetCurrentTurn() const { return CurrentTurn; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
 	EGamePhase CurrentPhase;
@@ -87,6 +90,8 @@ protected:
 
 private:
 	void InitializeManagers();
+	void SpawnInitialUnits();
+	void UpdateHUDResources();
 	EGamePhase DeterminePhaseFromZoom(float ZoomLevel) const;
 };
 

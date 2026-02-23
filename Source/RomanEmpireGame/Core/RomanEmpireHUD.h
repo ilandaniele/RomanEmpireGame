@@ -6,15 +6,12 @@
 #include "GameFramework/HUD.h"
 #include "RomanEmpireHUD.generated.h"
 
-class URomanEmpireMainWidget;
-class UBuildingMenuWidget;
-class UUnitPanelWidget;
-class UMinimapWidget;
-class UResourceDisplayWidget;
+class AUnitBase;
+class ARomanEmpireGameMode;
 
 /**
- * Main HUD class managing all UI elements
- * Adapts display based on current game phase and zoom level
+ * Main HUD class using Canvas-based drawing (no Widget Blueprints needed)
+ * Draws resource bar, phase indicator, unit info, and minimap directly
  */
 UCLASS()
 class ROMANEMPIREGAME_API ARomanEmpireHUD : public AHUD
@@ -27,10 +24,6 @@ public:
 	virtual void BeginPlay() override;
 	virtual void DrawHUD() override;
 
-	// Widget access
-	UFUNCTION(BlueprintPure, Category = "HUD")
-	URomanEmpireMainWidget* GetMainWidget() const { return MainWidget; }
-
 	// UI control
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void ShowBuildingMenu();
@@ -42,39 +35,40 @@ public:
 	void ToggleBuildingMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
-	void UpdateUnitSelection(const TArray<class AUnitBase*>& SelectedUnits);
-
-	UFUNCTION(BlueprintCallable, Category = "HUD")
-	void ShowFPSOverlay(bool bShow);
+	void UpdateUnitSelection(const TArray<AUnitBase*>& SelectedUnits);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population);
 
-	// Zoom level based UI
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void OnZoomLevelChanged(float ZoomLevel);
 
 protected:
-	// Widget classes
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|Widgets")
-	TSubclassOf<URomanEmpireMainWidget> MainWidgetClass;
-
-	// Widget instances
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Widgets")
-	URomanEmpireMainWidget* MainWidget;
-
 	// State
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
 	bool bBuildingMenuVisible;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
 	bool bFPSMode;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
 	float CurrentZoomLevel;
 
-private:
-	void CreateWidgets();
-	void UpdateUIVisibility();
-};
+	// Cached resource values
+	int32 DisplayGold;
+	int32 DisplayFood;
+	int32 DisplayIron;
+	int32 DisplayWood;
+	int32 DisplayStone;
+	int32 DisplayPopulation;
 
+	// Cached selections
+	TArray<AUnitBase*> CurrentSelectedUnits;
+
+	// Cache
+	ARomanEmpireGameMode* CachedGameMode;
+
+private:
+	void DrawResourceBar();
+	void DrawPhaseIndicator();
+	void DrawUnitPanel();
+	void DrawBuildingMenu();
+	void DrawMinimap();
+	void DrawSelectionBoxes();
+	void DrawControlsHelp();
+};

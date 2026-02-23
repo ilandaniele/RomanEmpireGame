@@ -10,6 +10,7 @@
 
 class UCapsuleComponent;
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
 
 /**
  * Base class for all military units in the game
@@ -85,10 +86,20 @@ public:
 	void TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRanged);
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	float GetHealthPercent() const { return (float)CurrentHealth / (float)UnitData.BaseStats.MaxHealth; }
+	float GetHealthPercent() const { return UnitData.BaseStats.MaxHealth > 0 ? (float)CurrentHealth / (float)UnitData.BaseStats.MaxHealth : 0.0f; }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
 	bool IsAlive() const { return CurrentHealth > 0; }
+
+	// Accessors used by HUD
+	UFUNCTION(BlueprintPure, Category = "Unit")
+	FString GetUnitDisplayName() const { return UnitData.DisplayName.ToString(); }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|Health")
+	int32 GetCurrentHealth() const { return CurrentHealth; }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	int32 GetCurrentMorale() const { return CurrentMorale; }
 
 	// Stamina (FPS mode)
 	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
@@ -143,6 +154,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|AI")
 	AActor* AttackTarget;
+
+	// Visual mesh (placeholder geometry)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* VisualMesh;
 
 	// Selection indicator
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
