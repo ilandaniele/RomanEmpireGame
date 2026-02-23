@@ -387,9 +387,55 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 		if (Distance <= UnitData.AttackRange)
 		{
 			// In attack range - stop and attack
-			CommandStop();
+			bHasMoveCommand = false;
 			PerformAttack();
+			return;
 		}
+		else
+		{
+			// Move toward target
+			CommandMoveTo(AttackTarget->GetActorLocation());
+			return;
+		}
+	}
+
+	// Auto-detect enemies (only for non-player-controlled units)
+	if (OwnerFaction != EFactionID::None && OwnerFaction != EFactionID::Rome)
+	{
+		// Enemy AI: scan for nearby Roman units
+		const float DetectRange = 2000.0f;
+		AUnitBase* ClosestEnemy = nullptr;
+		float ClosestDist = DetectRange;
+
+		TArray<AActor*> AllActors;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
+
+		for (AActor* Actor : AllActors)
+		{
+			AUnitBase* OtherUnit = Cast<AUnitBase>(Actor);
+			if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
+			if (OtherUnit->GetOwnerFaction() == OwnerFaction) continue; // Same team
+
+			float Dist = FVector::Distance(GetActorLocation(), OtherUnit->GetActorLocation());
+			if (Dist < ClosestDist)
+			{
+				ClosestDist = Dist;
+				ClosestEnemy = OtherUnit;
+			}
+		}
+
+		if (ClosestEnemy)
+		{
+			CommandAttack(ClosestEnemy);
+			return;
+		}
+	}
+
+	// If no attack target and no move command, patrol randomly
+	if (!bHasMoveCommand && FMath::FRand() < 0.005f) // ~0.5% chance per frame = patrol occasionally
+	{
+		FVector PatrolOffset = FVector(FMath::RandRange(-500.0f, 500.0f), FMath::RandRange(-500.0f, 500.0f), 0.0f);
+		CommandMoveTo(GetActorLocation() + PatrolOffset);
 	}
 }
 
