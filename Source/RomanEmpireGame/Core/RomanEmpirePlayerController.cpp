@@ -143,14 +143,68 @@ void ARomanEmpirePlayerController::BeginPlay()
 	// Create input actions and mappings programmatically
 	CreateInputActionsAndMappings();
 
-	// Setup Enhanced Input
+	// Setup Enhanced Input subsystem
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
 		if (DefaultMappingContext)
 		{
+			Subsystem->ClearAllMappings();
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 			UE_LOG(LogRomanEmpire, Log, TEXT("Enhanced Input mapping context registered"));
 		}
+	}
+	
+	// BIND INPUT ACTIONS — must happen here, AFTER actions are created
+	// (SetupInputComponent runs before BeginPlay, so actions would be null there)
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		if (IA_Select)
+		{
+			EIC->BindAction(IA_Select, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnSelectPressed);
+			EIC->BindAction(IA_Select, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnSelectReleased);
+		}
+		if (IA_Command)
+		{
+			EIC->BindAction(IA_Command, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnCommandPressed);
+		}
+		if (IA_Zoom)
+		{
+			EIC->BindAction(IA_Zoom, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnZoomInput);
+		}
+		if (IA_Move)
+		{
+			EIC->BindAction(IA_Move, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnMoveInput);
+		}
+		if (IA_Look)
+		{
+			EIC->BindAction(IA_Look, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnLookInput);
+		}
+		if (IA_EnterFPS)
+		{
+			EIC->BindAction(IA_EnterFPS, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEnterFPSPressed);
+		}
+		if (IA_BuildMenu)
+		{
+			EIC->BindAction(IA_BuildMenu, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildMenuPressed);
+		}
+		if (IA_Attack)
+		{
+			EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnAttackPressed);
+		}
+		if (IA_Block)
+		{
+			EIC->BindAction(IA_Block, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBlockPressed);
+			EIC->BindAction(IA_Block, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnBlockReleased);
+		}
+		if (IA_EndTurn)
+		{
+			EIC->BindAction(IA_EndTurn, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEndTurnPressed);
+		}
+		UE_LOG(LogRomanEmpire, Log, TEXT("All input actions bound in BeginPlay"));
+	}
+	else
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("FAILED to get EnhancedInputComponent — input will not work!"));
 	}
 	
 	// Cache game mode
@@ -163,81 +217,24 @@ void ARomanEmpirePlayerController::BeginPlay()
 		BuildingPlacementComponent->RegisterComponent();
 	}
 
-	// Set input mode to allow both game and UI
+	// Set input mode: game + UI, mouse visible, not locked
+	bShowMouseCursor = true;
 	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized with programmatic input"));
+	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized — all input active"));
 }
 
 void ARomanEmpirePlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
-	{
-		// Selection
-		if (IA_Select)
-		{
-			EnhancedInputComponent->BindAction(IA_Select, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnSelectPressed);
-			EnhancedInputComponent->BindAction(IA_Select, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnSelectReleased);
-		}
-		
-		// Command (right click)
-		if (IA_Command)
-		{
-			EnhancedInputComponent->BindAction(IA_Command, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnCommandPressed);
-		}
-		
-		// Zoom
-		if (IA_Zoom)
-		{
-			EnhancedInputComponent->BindAction(IA_Zoom, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnZoomInput);
-		}
-		
-		// Movement
-		if (IA_Move)
-		{
-			EnhancedInputComponent->BindAction(IA_Move, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnMoveInput);
-		}
-		
-		// Look
-		if (IA_Look)
-		{
-			EnhancedInputComponent->BindAction(IA_Look, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnLookInput);
-		}
-		
-		// Enter FPS
-		if (IA_EnterFPS)
-		{
-			EnhancedInputComponent->BindAction(IA_EnterFPS, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEnterFPSPressed);
-		}
-		
-		// Build Menu
-		if (IA_BuildMenu)
-		{
-			EnhancedInputComponent->BindAction(IA_BuildMenu, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildMenuPressed);
-		}
-		
-		// Combat
-		if (IA_Attack)
-		{
-			EnhancedInputComponent->BindAction(IA_Attack, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnAttackPressed);
-		}
-		
-		if (IA_Block)
-		{
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBlockPressed);
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnBlockReleased);
-		}
-
-		if (IA_EndTurn)
-		{
-			EnhancedInputComponent->BindAction(IA_EndTurn, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEndTurnPressed);
-		}
-	}
+	// NOTE: Input bindings are done in BeginPlay() because
+	// SetupInputComponent runs before BeginPlay, and our
+	// input actions are created programmatically in BeginPlay.
+	// Binding here would fail silently since IA pointers are null.
 }
 
 void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
