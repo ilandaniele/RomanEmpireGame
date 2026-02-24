@@ -259,7 +259,76 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 		}
 	}
 
-	UE_LOG(LogRomanEmpire, Log, TEXT("World terrain spawned with ground, road, river, trees, hills"));
+	// Gold mines (golden cubes with tall marker poles)
+	UStaticMesh* CubeMesh = GetEngineMesh(TEXT("/Engine/BasicShapes/Cube"));
+	if (CubeMesh && CylinderMesh)
+	{
+		struct FMineData { FVector Pos; };
+		TArray<FMineData> Mines = {
+			{{ 2500, -2000, 0 }},   // Between camps — contested
+			{{ -4000, 3000, 0 }},   // Near river
+			{{ 5000, -4500, 0 }}    // Near big hill
+		};
+
+		for (const auto& Mine : Mines)
+		{
+			// Gold cube (ore deposit)
+			AStaticMeshActor* GoldCube = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Mine.Pos + FVector(0, 0, 50), FRotator::ZeroRotator, SP);
+			if (GoldCube)
+			{
+				GoldCube->GetStaticMeshComponent()->SetStaticMesh(CubeMesh);
+				GoldCube->SetActorScale3D(FVector(2.0f, 2.0f, 1.5f));
+				GoldCube->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				UMaterialInstanceDynamic* GoldMat = MakeColorMaterial(GoldCube, FLinearColor(0.85f, 0.65f, 0.05f)); // Gold
+				if (GoldMat) GoldCube->GetStaticMeshComponent()->SetMaterial(0, GoldMat);
+			}
+			// Mine marker pole
+			AStaticMeshActor* Pole = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Mine.Pos + FVector(0, 0, 200), FRotator::ZeroRotator, SP);
+			if (Pole)
+			{
+				Pole->GetStaticMeshComponent()->SetStaticMesh(CylinderMesh);
+				Pole->SetActorScale3D(FVector(0.15f, 0.15f, 3.0f));
+				Pole->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				UMaterialInstanceDynamic* PoleMat = MakeColorMaterial(Pole, FLinearColor(0.95f, 0.75f, 0.1f)); // Bright gold
+				if (PoleMat) Pole->GetStaticMeshComponent()->SetMaterial(0, PoleMat);
+			}
+		}
+		UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 3 gold mines"));
+	}
+
+	// Lumber yards (stacked brown cylinders = log piles)
+	if (CylinderMesh)
+	{
+		struct FLumberData { FVector Pos; };
+		TArray<FLumberData> LumberYards = {
+			{{ -3000, -3000, 0 }},  // Forest edge
+			{{ 4000, 4000, 0 }},    // Opposite forest edge
+			{{ -6000, 1000, 0 }}    // Near other trees
+		};
+
+		for (const auto& Lumber : LumberYards)
+		{
+			// Create a pile of 3 logs
+			for (int32 LogIdx = 0; LogIdx < 3; LogIdx++)
+			{
+				FVector WoodPos = Lumber.Pos + FVector(LogIdx * 80.0f - 80.0f, 0, 30.0f + LogIdx * 15.0f);
+				FRotator WoodRot = FRotator(0, FMath::RandRange(0.0f, 30.0f), 90.0f);
+
+				AStaticMeshActor* WoodActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), WoodPos, WoodRot, SP);
+				if (WoodActor)
+				{
+					WoodActor->GetStaticMeshComponent()->SetStaticMesh(CylinderMesh);
+					WoodActor->SetActorScale3D(FVector(0.4f, 0.4f, 1.5f));
+					WoodActor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					UMaterialInstanceDynamic* WoodMat = MakeColorMaterial(WoodActor, FLinearColor(0.4f, 0.25f, 0.1f)); // Wood brown
+					if (WoodMat) WoodActor->GetStaticMeshComponent()->SetMaterial(0, WoodMat);
+				}
+			}
+		}
+		UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 3 lumber yards"));
+	}
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("World terrain spawned with ground, road, river, trees, hills, gold mines, lumber"));
 }
 
 void ARomanEmpireGameMode::SpawnInitialUnits()
