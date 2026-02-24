@@ -169,6 +169,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UDecalComponent* SelectionDecal;
 
+	// Selection ring (visible green disc under selected units)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* SelectionRingMesh;
+
+	// Head mesh (sphere on top of body)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* HeadMesh;
+
 	// Combat
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Combat")
 	float AttackCooldown;

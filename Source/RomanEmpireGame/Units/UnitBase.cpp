@@ -36,7 +36,7 @@ AUnitBase::AUnitBase()
 		}
 	}
 
-	// Create selection decal (ring under unit when selected)
+	// Create selection decal (ring under unit when selected) - use a flat cylinder as selection ring
 	SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
 	if (SelectionDecal)
 	{
@@ -45,6 +45,39 @@ AUnitBase::AUnitBase()
 		SelectionDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
 		SelectionDecal->DecalSize = FVector(64.0f, 64.0f, 64.0f);
 		SelectionDecal->SetVisibility(false); // Hidden until selected
+	}
+
+	// Create visible selection ring (flat green cylinder)
+	SelectionRingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SelectionRing"));
+	if (SelectionRingMesh)
+	{
+		SelectionRingMesh->SetupAttachment(GetRootComponent());
+		SelectionRingMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -94.0f));
+		SelectionRingMesh->SetRelativeScale3D(FVector(2.5f, 2.5f, 0.05f)); // Flat disc
+		SelectionRingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SelectionRingMesh->SetVisibility(false); // Hidden until selected
+
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> RingMesh(TEXT("/Engine/BasicShapes/Cylinder"));
+		if (RingMesh.Succeeded())
+		{
+			SelectionRingMesh->SetStaticMesh(RingMesh.Object);
+		}
+	}
+
+	// Create head sphere on top of body
+	HeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadMesh"));
+	if (HeadMesh)
+	{
+		HeadMesh->SetupAttachment(GetRootComponent());
+		HeadMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 60.0f));
+		HeadMesh->SetRelativeScale3D(FVector(0.7f, 0.7f, 0.7f));
+		HeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere"));
+		if (SphereMesh.Succeeded())
+		{
+			HeadMesh->SetStaticMesh(SphereMesh.Object);
+		}
 	}
 
 	// Configure movement
@@ -75,6 +108,8 @@ AUnitBase::AUnitBase()
 	AttackTarget = nullptr;
 	AttackCooldown = 1.0f;
 	AttackCooldownRemaining = 0.0f;
+	SelectionRingMesh = nullptr;
+	HeadMesh = nullptr;
 }
 
 void AUnitBase::BeginPlay()
@@ -145,6 +180,18 @@ void AUnitBase::ApplyFactionColor()
 			MID->SetVectorParameterValue(TEXT("Color"), FactionColor);
 			VisualMesh->SetMaterial(0, MID);
 		}
+
+		// Color head with a lighter skin tone variant
+		if (HeadMesh)
+		{
+			UMaterialInstanceDynamic* HeadMID = UMaterialInstanceDynamic::Create(BaseMat, this);
+			if (HeadMID)
+			{
+				FLinearColor HeadColor = FLinearColor(0.85f, 0.72f, 0.55f); // Skin tone
+				HeadMID->SetVectorParameterValue(TEXT("Color"), HeadColor);
+				HeadMesh->SetMaterial(0, HeadMID);
+			}
+		}
 	}
 }
 
@@ -156,6 +203,26 @@ void AUnitBase::SetSelected(bool bNewSelected)
 	if (SelectionDecal)
 	{
 		SelectionDecal->SetVisibility(bNewSelected);
+	}
+
+	// Show/hide selection ring
+	if (SelectionRingMesh)
+	{
+		SelectionRingMesh->SetVisibility(bNewSelected);
+		if (bNewSelected)
+		{
+			// Apply green glowing material to selection ring
+			UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+			if (BaseMat)
+			{
+				UMaterialInstanceDynamic* RingMat = UMaterialInstanceDynamic::Create(BaseMat, this);
+				if (RingMat)
+				{
+					RingMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.0f, 1.0f, 0.0f, 0.7f)); // Green
+					SelectionRingMesh->SetMaterial(0, RingMat);
+				}
+			}
+		}
 	}
 }
 
