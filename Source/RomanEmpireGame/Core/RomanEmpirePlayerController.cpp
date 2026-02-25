@@ -433,10 +433,10 @@ void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
 	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 1.0f);
 
-	// Use SetTargetZoomLevel for smooth interpolation
+	// Instant zoom — no interpolation delay
 	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
 	{
-		CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
+		CameraPawn->SetZoomLevel(CurrentZoomLevel);
 	}
 
 	if (GameMode)
@@ -510,8 +510,12 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 {
-	float ZoomDelta = Value.Get<float>() * ZoomSpeed * 0.1f; // Smooth small increments
-	SetTargetZoom(CurrentZoomLevel + ZoomDelta);
+	// Fixed step per scroll notch — no delay, no drift
+	float ScrollVal = Value.Get<float>();
+	if (ScrollVal > 0.0f)
+		SetTargetZoom(CurrentZoomLevel + 0.05f);
+	else if (ScrollVal < 0.0f)
+		SetTargetZoom(CurrentZoomLevel - 0.05f);
 }
 
 void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
