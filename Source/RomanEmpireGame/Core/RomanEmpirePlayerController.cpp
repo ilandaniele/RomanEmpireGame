@@ -31,6 +31,7 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	bIsBoxSelecting = false;
 	PossessedUnit = nullptr;
 	GameMode = nullptr;
+	CachedCameraPawn = nullptr;
 
 	DefaultMappingContext = nullptr;
 	IA_Select = nullptr;
@@ -360,18 +361,31 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot enter FPS mode: no unit specified"));
 		return;
 	}
-	
+
+	// Store the camera pawn so we can restore it later
+	APawn* CurrentPawn = GetPawn();
+	if (ASeamlessZoomCamera* CamPawn = Cast<ASeamlessZoomCamera>(CurrentPawn))
+	{
+		CachedCameraPawn = CamPawn;
+	}
+
 	PossessedUnit = UnitToPossess;
 	bIsInFirstPersonMode = true;
 	bShowMouseCursor = false;
-	
+
+	// Mark unit as player-possessed
+	UnitToPossess->SetPossessedByPlayer(true);
+
+	// Actually possess the unit pawn so the camera follows it
+	Possess(UnitToPossess);
+
 	SetInputMode(FInputModeGameOnly());
-	
+
 	if (GameMode)
 	{
 		GameMode->SetGamePhase(EGamePhase::FirstPerson);
 	}
-	
+
 	UE_LOG(LogRomanEmpire, Log, TEXT("Entered FPS mode with unit: %s"), *UnitToPossess->GetName());
 }
 
@@ -381,31 +395,50 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 	{
 		return;
 	}
-	
+
 	bIsInFirstPersonMode = false;
+
+	// Unpossess the unit
+	if (PossessedUnit)
+	{
+		PossessedUnit->SetPossessedByPlayer(false);
+
+		// Spawn AI controller for the unit again
+		PossessedUnit->SpawnDefaultController();
+	}
+
+	// Re-possess the camera pawn
+	if (CachedCameraPawn)
+	{
+		Possess(CachedCameraPawn);
+	}
+
 	PossessedUnit = nullptr;
 	bShowMouseCursor = true;
-	
-	SetInputMode(FInputModeGameAndUI());
-	
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+
 	if (GameMode)
 	{
 		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
 	}
-	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Exited FPS mode"));
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("Exited FPS mode — camera restored"));
 }
 
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
 	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 1.0f);
-	
-	// Update camera pawn
+
+	// Use SetTargetZoomLevel for smooth interpolation
 	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
 	{
-		CameraPawn->SetZoomLevel(CurrentZoomLevel);
+		CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
 	}
-	
+
 	if (GameMode)
 	{
 		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
@@ -477,7 +510,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 {
-	float ZoomDelta = Value.Get<float>() * ZoomSpeed * GetWorld()->GetDeltaSeconds();
+	float ZoomDelta = Value.Get<float>() * ZoomSpeed * 0.1f; // Smooth small increments
 	SetTargetZoom(CurrentZoomLevel + ZoomDelta);
 }
 

@@ -136,6 +136,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FPS")
 	AUnitBase* PossessedUnit;
 
+	// Cached camera pawn for restoring after FPS mode
+	UPROPERTY()
+	ASeamlessZoomCamera* CachedCameraPawn;
+
 	// Building placement
 	UPROPERTY()
 	UBuildingPlacementComponent* BuildingPlacementComponent;

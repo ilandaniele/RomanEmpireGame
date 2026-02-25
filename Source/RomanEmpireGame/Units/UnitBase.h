@@ -177,6 +177,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* HeadMesh;
 
+	// Weapon mesh (sword = thin cube)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* WeaponMesh;
+
+	// Shield mesh (flat cylinder)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* ShieldMesh;
+
 	// Combat
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Combat")
 	float AttackCooldown;

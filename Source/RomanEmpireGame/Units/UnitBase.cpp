@@ -80,6 +80,39 @@ AUnitBase::AUnitBase()
 		}
 	}
 
+	// Create sword (thin stretched cube = blade shape)
+	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetupAttachment(GetRootComponent());
+		WeaponMesh->SetRelativeLocation(FVector(20.0f, 50.0f, 10.0f)); // Right side
+		WeaponMesh->SetRelativeRotation(FRotator(0.0f, 0.0f, -30.0f)); // Angled
+		WeaponMesh->SetRelativeScale3D(FVector(0.08f, 0.08f, 1.2f)); // Long thin blade
+		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube"));
+		if (CubeMesh.Succeeded())
+		{
+			WeaponMesh->SetStaticMesh(CubeMesh.Object);
+		}
+	}
+
+	// Create shield (flat cylinder on left side)
+	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
+	if (ShieldMesh)
+	{
+		ShieldMesh->SetupAttachment(GetRootComponent());
+		ShieldMesh->SetRelativeLocation(FVector(10.0f, -55.0f, -10.0f)); // Left side
+		ShieldMesh->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
+		ShieldMesh->SetRelativeScale3D(FVector(0.7f, 0.05f, 0.7f)); // Flat disc
+		ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> ShieldCylinder(TEXT("/Engine/BasicShapes/Cylinder"));
+		if (ShieldCylinder.Succeeded())
+		{
+			ShieldMesh->SetStaticMesh(ShieldCylinder.Object);
+		}
+	}
 	// Configure movement
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
@@ -110,6 +143,8 @@ AUnitBase::AUnitBase()
 	AttackCooldownRemaining = 0.0f;
 	SelectionRingMesh = nullptr;
 	HeadMesh = nullptr;
+	WeaponMesh = nullptr;
+	ShieldMesh = nullptr;
 }
 
 void AUnitBase::BeginPlay()
@@ -190,6 +225,30 @@ void AUnitBase::ApplyFactionColor()
 				FLinearColor HeadColor = FLinearColor(0.85f, 0.72f, 0.55f); // Skin tone
 				HeadMID->SetVectorParameterValue(TEXT("Color"), HeadColor);
 				HeadMesh->SetMaterial(0, HeadMID);
+			}
+		}
+
+		// Color sword blade (silver metallic)
+		if (WeaponMesh)
+		{
+			UMaterialInstanceDynamic* SwordMID = UMaterialInstanceDynamic::Create(BaseMat, this);
+			if (SwordMID)
+			{
+				SwordMID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.75f, 0.75f, 0.8f));
+				WeaponMesh->SetMaterial(0, SwordMID);
+			}
+		}
+
+		// Color shield (darker faction color)
+		if (ShieldMesh)
+		{
+			UMaterialInstanceDynamic* ShieldMID = UMaterialInstanceDynamic::Create(BaseMat, this);
+			if (ShieldMID)
+			{
+				FLinearColor ShieldColor = FactionColor * 0.6f; // Darker faction
+				ShieldColor.A = 1.0f;
+				ShieldMID->SetVectorParameterValue(TEXT("Color"), ShieldColor);
+				ShieldMesh->SetMaterial(0, ShieldMID);
 			}
 		}
 	}
