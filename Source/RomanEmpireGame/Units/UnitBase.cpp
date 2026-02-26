@@ -16,14 +16,18 @@ AUnitBase::AUnitBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Configure capsule (collision only, not visible)
+	// Configure capsule (collision only, not visible in-game)
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
 	GetCapsuleComponent()->SetVisibility(false);
+	GetCapsuleComponent()->SetHiddenInGame(true);
+	GetCapsuleComponent()->SetCastShadow(false);
 
-	// Hide default skeletal mesh (we use custom static meshes)
+	// Hide default skeletal mesh (we use custom static meshes instead)
 	if (GetMesh())
 	{
 		GetMesh()->SetVisibility(false);
+		GetMesh()->SetHiddenInGame(true);
+		GetMesh()->SetCastShadow(false);
 	}
 
 	// Create visible placeholder mesh (cylinder body)

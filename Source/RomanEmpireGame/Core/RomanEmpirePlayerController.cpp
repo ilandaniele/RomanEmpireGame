@@ -265,7 +265,7 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement && BuildingPlacementComponent)
 	{
 		FHitResult HitResult;
-		GetHitResultUnderCursor(ECC_Visibility, true, HitResult);
+		GetHitResultUnderCursor(ECC_WorldStatic, true, HitResult);
 		BuildingPlacementComponent->UpdatePreview(HitResult.Location);
 	}
 }
@@ -442,7 +442,8 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
-	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 1.0f);
+	// Cap at 0.75 — prevents auto-entering FPS phase (>0.8 = underground)
+	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.75f);
 
 	// Smooth zoom — camera interpolates at speed 15
 	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
@@ -539,6 +540,9 @@ void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 		SetTargetZoom(CurrentZoomLevel + 0.05f);
 	else if (ScrollVal < 0.0f)
 		SetTargetZoom(CurrentZoomLevel - 0.05f);
+
+	// Cap zoom at 0.75 to prevent auto-entering FPS underground
+	CurrentZoomLevel = FMath::Clamp(CurrentZoomLevel, 0.0f, 0.75f);
 }
 
 void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
