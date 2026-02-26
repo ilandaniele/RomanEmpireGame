@@ -6,6 +6,7 @@
 #include "../RomanEmpireGame.h"
 #include "../Units/UnitBase.h"
 #include "../Building/BuildingBase.h"
+#include "../Building/Barracks.h"
 #include "../Building/BuildingPlacementComponent.h"
 #include "../Camera/SeamlessZoomCamera.h"
 #include "EnhancedInputComponent.h"
@@ -44,6 +45,7 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_Attack = nullptr;
 	IA_Block = nullptr;
 	IA_EndTurn = nullptr;
+	IA_BuildKey1 = nullptr;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -134,6 +136,11 @@ void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
 	// T = End turn
 	FEnhancedActionKeyMapping& EndTurnMapping = DefaultMappingContext->MapKey(IA_EndTurn, EKeys::T);
 
+	// 1 = Build Barracks (when building menu is open)
+	IA_BuildKey1 = NewObject<UInputAction>(this, TEXT("IA_BuildKey1"));
+	IA_BuildKey1->ValueType = EInputActionValueType::Boolean;
+	FEnhancedActionKeyMapping& BuildKey1Mapping = DefaultMappingContext->MapKey(IA_BuildKey1, EKeys::One);
+
 	UE_LOG(LogRomanEmpire, Log, TEXT("Input actions and mappings created programmatically"));
 }
 
@@ -200,6 +207,10 @@ void ARomanEmpirePlayerController::BeginPlay()
 		if (IA_EndTurn)
 		{
 			EIC->BindAction(IA_EndTurn, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEndTurnPressed);
+		}
+		if (IA_BuildKey1)
+		{
+			EIC->BindAction(IA_BuildKey1, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey1Pressed);
 		}
 		UE_LOG(LogRomanEmpire, Log, TEXT("All input actions bound in BeginPlay"));
 	}
@@ -495,8 +506,12 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 	if (SelectedUnits.Num() > 0)
 	{
 		FHitResult HitResult;
-		if (GetHitResultUnderCursor(ECC_Visibility, true, HitResult))
+		if (GetHitResultUnderCursor(ECC_WorldStatic, true, HitResult))
 		{
+			UE_LOG(LogRomanEmpire, Log, TEXT("Right-click move command to: %s (hit: %s)"),
+				*HitResult.Location.ToString(),
+				HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("null"));
+
 			for (AUnitBase* Unit : SelectedUnits)
 			{
 				if (Unit)
@@ -505,6 +520,14 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 				}
 			}
 		}
+		else
+		{
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Right-click: GetHitResultUnderCursor failed (no ground hit)"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogRomanEmpire, Verbose, TEXT("Right-click: no units selected"));
 	}
 }
 
@@ -564,7 +587,17 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 	{
 		REHUD->ToggleBuildingMenu();
 	}
+
+	// If building menu is now visible, enter building placement with Barracks
+	// (The user presses B to open, then 1-6 keys or clicks to select a building)
 	UE_LOG(LogRomanEmpire, Log, TEXT("Build menu toggled"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
+{
+	// Build Barracks
+	StartBuildingPlacement(ABarracks::StaticClass());
+	UE_LOG(LogRomanEmpire, Log, TEXT("Building selection: Barracks"));
 }
 
 void ARomanEmpirePlayerController::OnAttackPressed()

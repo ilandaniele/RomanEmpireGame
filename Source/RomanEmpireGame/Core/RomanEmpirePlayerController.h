@@ -63,6 +63,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Building")
 	void CancelBuildingPlacement();
 
+	void OnBuildingKey1Pressed();
+
 	// FPS Mode
 	UFUNCTION(BlueprintCallable, Category = "FPS")
 	void EnterFirstPersonMode(AUnitBase* UnitToPossess);
@@ -114,6 +116,9 @@ protected:
 
 	UPROPERTY()
 	UInputAction* IA_EndTurn;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey1;
 
 	// Selection state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
