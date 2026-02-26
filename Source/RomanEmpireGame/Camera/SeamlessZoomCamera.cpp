@@ -190,17 +190,35 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 	float TargetPitch = GetTargetPitch();
 	float TargetFOV = GetTargetFOV();
 
-	// Snap camera properties directly — no interpolation delay
+	// Fast but smooth interpolation (speed 15 = responsive, not jerky)
+	float Speed = 15.0f;
+
 	if (CameraArm)
 	{
-		CameraArm->TargetArmLength = TargetHeight;
-		FRotator CurrentRotation = CameraArm->GetRelativeRotation();
-		CameraArm->SetRelativeRotation(FRotator(TargetPitch, CurrentRotation.Yaw, 0.0f));
+		if (DeltaSeconds > 0.0f)
+		{
+			CameraArm->TargetArmLength = FMath::FInterpTo(CameraArm->TargetArmLength, TargetHeight, DeltaSeconds, Speed);
+			FRotator CurrentRotation = CameraArm->GetRelativeRotation();
+			FRotator TargetRotation = FRotator(TargetPitch, CurrentRotation.Yaw, 0.0f);
+			CameraArm->SetRelativeRotation(FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaSeconds, Speed));
+		}
+		else
+		{
+			CameraArm->TargetArmLength = TargetHeight;
+			CameraArm->SetRelativeRotation(FRotator(TargetPitch, 0.0f, 0.0f));
+		}
 	}
 
 	if (Camera)
 	{
-		Camera->FieldOfView = TargetFOV;
+		if (DeltaSeconds > 0.0f)
+		{
+			Camera->FieldOfView = FMath::FInterpTo(Camera->FieldOfView, TargetFOV, DeltaSeconds, Speed);
+		}
+		else
+		{
+			Camera->FieldOfView = TargetFOV;
+		}
 	}
 }
 

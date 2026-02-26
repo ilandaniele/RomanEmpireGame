@@ -5,10 +5,10 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "NavigationSystem.h"
-#include "AIController.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
@@ -113,6 +113,131 @@ AUnitBase::AUnitBase()
 			ShieldMesh->SetStaticMesh(ShieldCylinder.Object);
 		}
 	}
+
+	// --- FPS Camera (for first-person mode) ---
+	FPSCameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("FPSCameraArm"));
+	if (FPSCameraArm)
+	{
+		FPSCameraArm->SetupAttachment(GetRootComponent());
+		FPSCameraArm->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f)); // Eye height
+		FPSCameraArm->TargetArmLength = 0.0f; // First person = no arm
+		FPSCameraArm->bUsePawnControlRotation = true;
+		FPSCameraArm->bDoCollisionTest = false;
+	}
+
+	FPSCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FPSCamera"));
+	if (FPSCamera && FPSCameraArm)
+	{
+		FPSCamera->SetupAttachment(FPSCameraArm);
+		FPSCamera->bAutoActivate = false; // Only active in FPS mode
+	}
+
+	// --- Limbs ---
+	// Right arm
+	RightArmMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArm"));
+	if (RightArmMesh)
+	{
+		RightArmMesh->SetupAttachment(GetRootComponent());
+		RightArmMesh->SetRelativeLocation(FVector(0.0f, 35.0f, 20.0f));
+		RightArmMesh->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.7f));
+		RightArmMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Left arm
+	LeftArmMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArm"));
+	if (LeftArmMesh)
+	{
+		LeftArmMesh->SetupAttachment(GetRootComponent());
+		LeftArmMesh->SetRelativeLocation(FVector(0.0f, -35.0f, 20.0f));
+		LeftArmMesh->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.7f));
+		LeftArmMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Right leg
+	RightLegMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightLeg"));
+	if (RightLegMesh)
+	{
+		RightLegMesh->SetupAttachment(GetRootComponent());
+		RightLegMesh->SetRelativeLocation(FVector(0.0f, 15.0f, -55.0f));
+		RightLegMesh->SetRelativeScale3D(FVector(0.2f, 0.2f, 0.8f));
+		RightLegMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Left leg
+	LeftLegMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftLeg"));
+	if (LeftLegMesh)
+	{
+		LeftLegMesh->SetupAttachment(GetRootComponent());
+		LeftLegMesh->SetRelativeLocation(FVector(0.0f, -15.0f, -55.0f));
+		LeftLegMesh->SetRelativeScale3D(FVector(0.2f, 0.2f, 0.8f));
+		LeftLegMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Right hand (small sphere at arm tip)
+	RightHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightHand"));
+	if (RightHandMesh)
+	{
+		RightHandMesh->SetupAttachment(GetRootComponent());
+		RightHandMesh->SetRelativeLocation(FVector(0.0f, 40.0f, -18.0f));
+		RightHandMesh->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.22f));
+		RightHandMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Left hand
+	LeftHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftHand"));
+	if (LeftHandMesh)
+	{
+		LeftHandMesh->SetupAttachment(GetRootComponent());
+		LeftHandMesh->SetRelativeLocation(FVector(0.0f, -40.0f, -18.0f));
+		LeftHandMesh->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.22f));
+		LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Right foot (small cube)
+	RightFootMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightFoot"));
+	if (RightFootMesh)
+	{
+		RightFootMesh->SetupAttachment(GetRootComponent());
+		RightFootMesh->SetRelativeLocation(FVector(5.0f, 15.0f, -100.0f));
+		RightFootMesh->SetRelativeScale3D(FVector(0.3f, 0.18f, 0.1f));
+		RightFootMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Left foot
+	LeftFootMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftFoot"));
+	if (LeftFootMesh)
+	{
+		LeftFootMesh->SetupAttachment(GetRootComponent());
+		LeftFootMesh->SetRelativeLocation(FVector(5.0f, -15.0f, -100.0f));
+		LeftFootMesh->SetRelativeScale3D(FVector(0.3f, 0.18f, 0.1f));
+		LeftFootMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// Assign meshes to limbs (using same static meshes)
+	{
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> LimbCylinder(TEXT("/Engine/BasicShapes/Cylinder"));
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> LimbSphere(TEXT("/Engine/BasicShapes/Sphere"));
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> LimbCube(TEXT("/Engine/BasicShapes/Cube"));
+
+		if (LimbCylinder.Succeeded())
+		{
+			if (RightArmMesh) RightArmMesh->SetStaticMesh(LimbCylinder.Object);
+			if (LeftArmMesh) LeftArmMesh->SetStaticMesh(LimbCylinder.Object);
+			if (RightLegMesh) RightLegMesh->SetStaticMesh(LimbCylinder.Object);
+			if (LeftLegMesh) LeftLegMesh->SetStaticMesh(LimbCylinder.Object);
+		}
+		if (LimbSphere.Succeeded())
+		{
+			if (RightHandMesh) RightHandMesh->SetStaticMesh(LimbSphere.Object);
+			if (LeftHandMesh) LeftHandMesh->SetStaticMesh(LimbSphere.Object);
+		}
+		if (LimbCube.Succeeded())
+		{
+			if (RightFootMesh) RightFootMesh->SetStaticMesh(LimbCube.Object);
+			if (LeftFootMesh) LeftFootMesh->SetStaticMesh(LimbCube.Object);
+		}
+	}
+
 	// Configure movement
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
@@ -145,6 +270,16 @@ AUnitBase::AUnitBase()
 	HeadMesh = nullptr;
 	WeaponMesh = nullptr;
 	ShieldMesh = nullptr;
+	FPSCameraArm = nullptr; // Will be set by CreateDefaultSubobject above
+	FPSCamera = nullptr;
+	RightArmMesh = nullptr;
+	LeftArmMesh = nullptr;
+	RightLegMesh = nullptr;
+	LeftLegMesh = nullptr;
+	RightHandMesh = nullptr;
+	LeftHandMesh = nullptr;
+	RightFootMesh = nullptr;
+	LeftFootMesh = nullptr;
 }
 
 void AUnitBase::BeginPlay()
@@ -175,8 +310,31 @@ void AUnitBase::Tick(float DeltaSeconds)
 	{
 		// RTS mode - AI movement
 		UpdateAIMovement(DeltaSeconds);
+
+		// Direct movement toward destination (no NavMesh needed)
+		if (bHasMoveCommand)
+		{
+			FVector CurrentLoc = GetActorLocation();
+			FVector Dir = MoveDestination - CurrentLoc;
+			Dir.Z = 0.0f;
+			float Dist = Dir.Size();
+
+			if (Dist > 80.0f)
+			{
+				Dir.Normalize();
+				AddMovementInput(Dir, 1.0f);
+
+				// Face movement direction
+				FRotator TargetRot = Dir.Rotation();
+				SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaSeconds, 10.0f));
+			}
+			else
+			{
+				bHasMoveCommand = false;
+			}
+		}
 	}
-	
+
 	UpdateCombatCooldowns(DeltaSeconds);
 	UpdateStamina(DeltaSeconds);
 }
@@ -251,6 +409,27 @@ void AUnitBase::ApplyFactionColor()
 				ShieldMesh->SetMaterial(0, ShieldMID);
 			}
 		}
+
+		// Color limbs with skin tone
+		FLinearColor SkinColor = FLinearColor(0.85f, 0.72f, 0.55f);
+		TArray<UStaticMeshComponent*> SkinMeshes = {
+			RightArmMesh, LeftArmMesh,
+			RightLegMesh, LeftLegMesh,
+			RightHandMesh, LeftHandMesh,
+			RightFootMesh, LeftFootMesh
+		};
+		for (UStaticMeshComponent* LimbMesh : SkinMeshes)
+		{
+			if (LimbMesh)
+			{
+				UMaterialInstanceDynamic* LimbMID = UMaterialInstanceDynamic::Create(BaseMat, this);
+				if (LimbMID)
+				{
+					LimbMID->SetVectorParameterValue(TEXT("Color"), SkinColor);
+					LimbMesh->SetMaterial(0, LimbMID);
+				}
+			}
+		}
 	}
 }
 
@@ -290,13 +469,6 @@ void AUnitBase::CommandMoveTo(const FVector& Destination)
 	MoveDestination = Destination;
 	bHasMoveCommand = true;
 	AttackTarget = nullptr;
-	
-	// Use AI move request
-	AAIController* AIController = Cast<AAIController>(GetController());
-	if (AIController)
-	{
-		AIController->MoveToLocation(Destination, 50.0f); // 50cm acceptance radius
-	}
 }
 
 void AUnitBase::CommandAttack(AActor* Target)
@@ -312,12 +484,6 @@ void AUnitBase::CommandStop()
 {
 	bHasMoveCommand = false;
 	AttackTarget = nullptr;
-	
-	AAIController* AIController = Cast<AAIController>(GetController());
-	if (AIController)
-	{
-		AIController->StopMovement();
-	}
 }
 
 void AUnitBase::CommandHold()
@@ -495,11 +661,31 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 	// Enable/disable FPS mode settings
 	bUseControllerRotationYaw = bPossessed;
 	bUseControllerRotationPitch = bPossessed;
-	
+
+	// Activate/deactivate FPS camera
+	if (FPSCamera)
+	{
+		FPSCamera->SetActive(bPossessed);
+	}
+
 	if (bPossessed)
 	{
 		// Stop AI movement when possessed
 		CommandStop();
+
+		// Increase walk speed in FPS
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->MaxWalkSpeed = 500.0f;
+		}
+	}
+	else
+	{
+		// Restore default walk speed
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->MaxWalkSpeed = UnitData.BaseStats.Speed;
+		}
 	}
 }
 

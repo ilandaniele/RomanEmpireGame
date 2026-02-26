@@ -433,10 +433,10 @@ void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
 	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 1.0f);
 
-	// Instant zoom — no interpolation delay
+	// Smooth zoom — camera interpolates at speed 15
 	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
 	{
-		CameraPawn->SetZoomLevel(CurrentZoomLevel);
+		CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
 	}
 
 	if (GameMode)
