@@ -37,7 +37,7 @@ ASeamlessZoomCamera::ASeamlessZoomCamera()
 	// Initialize zoom settings
 	MinZoom = 0.0f;
 	MaxZoom = 1.0f;
-	ZoomInterpSpeed = 3.0f;
+	ZoomInterpSpeed = 50.0f;  // Near-instant camera catch-up
 
 	// Height settings (in Unreal units, 1 unit = 1 cm)
 	WorldViewHeight = 50000.0f;      // 500 meters - see continents
@@ -190,35 +190,17 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 	float TargetPitch = GetTargetPitch();
 	float TargetFOV = GetTargetFOV();
 
-	// Update spring arm length (affects camera distance/height)
+	// Snap camera properties directly — no interpolation delay
 	if (CameraArm)
 	{
-		if (DeltaSeconds > 0.0f)
-		{
-			CameraArm->TargetArmLength = FMath::FInterpTo(CameraArm->TargetArmLength, TargetHeight, DeltaSeconds, ZoomInterpSpeed);
-			
-			FRotator CurrentRotation = CameraArm->GetRelativeRotation();
-			FRotator TargetRotation = FRotator(TargetPitch, CurrentRotation.Yaw, 0.0f);
-			CameraArm->SetRelativeRotation(FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaSeconds, ZoomInterpSpeed));
-		}
-		else
-		{
-			CameraArm->TargetArmLength = TargetHeight;
-			CameraArm->SetRelativeRotation(FRotator(TargetPitch, 0.0f, 0.0f));
-		}
+		CameraArm->TargetArmLength = TargetHeight;
+		FRotator CurrentRotation = CameraArm->GetRelativeRotation();
+		CameraArm->SetRelativeRotation(FRotator(TargetPitch, CurrentRotation.Yaw, 0.0f));
 	}
 
-	// Update FOV
 	if (Camera)
 	{
-		if (DeltaSeconds > 0.0f)
-		{
-			Camera->FieldOfView = FMath::FInterpTo(Camera->FieldOfView, TargetFOV, DeltaSeconds, ZoomInterpSpeed);
-		}
-		else
-		{
-			Camera->FieldOfView = TargetFOV;
-		}
+		Camera->FieldOfView = TargetFOV;
 	}
 }
 
