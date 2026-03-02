@@ -663,15 +663,12 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 {
-	// Fixed step per scroll notch — no delay, no drift
+	// Fixed step per scroll notch
 	float ScrollVal = Value.Get<float>();
 	if (ScrollVal > 0.0f)
-		SetTargetZoom(CurrentZoomLevel + 0.05f);
+		SetTargetZoom(CurrentZoomLevel + 0.08f);
 	else if (ScrollVal < 0.0f)
-		SetTargetZoom(CurrentZoomLevel - 0.05f);
-
-	// Cap zoom at 0.75 to prevent auto-entering FPS underground
-	CurrentZoomLevel = FMath::Clamp(CurrentZoomLevel, 0.0f, 0.75f);
+		SetTargetZoom(CurrentZoomLevel - 0.08f);
 }
 
 void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)

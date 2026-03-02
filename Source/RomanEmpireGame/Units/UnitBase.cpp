@@ -313,6 +313,7 @@ void AUnitBase::BeginPlay()
 	
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit spawned: %s"), *UnitData.DisplayName.ToString());
 	ApplyFactionColor();  // Apply faction color on spawn
+	AttackCooldown = 0.0f;
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
@@ -337,6 +338,44 @@ void AUnitBase::Tick(float DeltaSeconds)
 		// RTS mode - AI movement
 		UpdateAIMovement(DeltaSeconds);
 
+		// Rome units: handle player-commanded attack
+		if (OwnerFaction == EFactionID::Rome && AttackTarget && IsValid(AttackTarget))
+		{
+			AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+			if (Target && Target->IsAlive())
+			{
+				float Distance = FVector::Distance(GetActorLocation(), Target->GetActorLocation());
+				if (Distance <= 250.0f) // Attack range
+				{
+					// In range — attack every 1.5 seconds
+					bHasMoveCommand = false;
+					AttackCooldown -= DeltaSeconds;
+					if (AttackCooldown <= 0.0f)
+					{
+						Target->TakeCombatDamage(UnitData.BaseStats.MeleeAttack, this, false);
+						AttackCooldown = 1.5f;
+					}
+					// Face target
+					FVector Dir = Target->GetActorLocation() - GetActorLocation();
+					Dir.Z = 0.0f;
+					if (!Dir.IsNearlyZero())
+					{
+						SetActorRotation(FMath::RInterpTo(GetActorRotation(), Dir.Rotation(), DeltaSeconds, 10.0f));
+					}
+				}
+				else
+				{
+					// Move toward target
+					MoveDestination = Target->GetActorLocation();
+					bHasMoveCommand = true;
+				}
+			}
+			else
+			{
+				AttackTarget = nullptr; // Target dead or invalid
+			}
+		}
+
 		// Direct movement toward destination (no NavMesh needed)
 		if (bHasMoveCommand)
 		{
@@ -349,8 +388,8 @@ void AUnitBase::Tick(float DeltaSeconds)
 			{
 				Dir.Normalize();
 
-				// Direct position update — bypasses CharacterMovementComponent
-				float MoveSpeed = 300.0f; // units per second
+				// Direct position update
+				float MoveSpeed = 300.0f;
 				if (GetCharacterMovement())
 				{
 					MoveSpeed = GetCharacterMovement()->MaxWalkSpeed;
@@ -359,7 +398,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 				if (StepSize > Dist) StepSize = Dist;
 
 				FVector NewLoc = CurrentLoc + Dir * StepSize;
-				SetActorLocation(NewLoc, false); // NO sweep — ground collision blocks movement
+				SetActorLocation(NewLoc, false);
 
 				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();
