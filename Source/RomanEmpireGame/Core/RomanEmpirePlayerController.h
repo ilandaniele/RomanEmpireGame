@@ -144,6 +144,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
 	TArray<AUnitBase*> SelectedUnits;
 
+	// Building cost for current placement
+	int32 CurrentBuildingCost;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
 	ERomanSelectionMode CurrentSelectionMode;
 

@@ -133,27 +133,22 @@ void ASeamlessZoomCamera::SetTargetZoomLevel(float NewTargetZoom)
 
 EZoomLevel ASeamlessZoomCamera::GetZoomLevelEnum() const
 {
-	using namespace RomanEmpireConstants;
-	
-	if (CurrentZoomLevel <= ZOOM_WORLD_MAX)
+	// Three user-facing views with clear separation
+	if (CurrentZoomLevel <= 0.25f)
 	{
-		return EZoomLevel::World;
+		return EZoomLevel::World; // Strategic View (0.0–0.25)
 	}
-	else if (CurrentZoomLevel <= ZOOM_TERRITORY_MAX)
+	else if (CurrentZoomLevel <= 0.70f)
 	{
-		return EZoomLevel::Territory;
+		return EZoomLevel::City; // Tactical View (0.25–0.70)
 	}
-	else if (CurrentZoomLevel <= ZOOM_CITY_MAX)
+	else if (CurrentZoomLevel <= 0.80f)
 	{
-		return EZoomLevel::City;
-	}
-	else if (CurrentZoomLevel <= ZOOM_GROUND_MAX)
-	{
-		return EZoomLevel::Ground;
+		return EZoomLevel::Ground; // Close Ground View (0.70–0.80)
 	}
 	else
 	{
-		return EZoomLevel::FirstPerson;
+		return EZoomLevel::FirstPerson; // Combat / FPS
 	}
 }
 
@@ -224,68 +219,53 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 
 float ASeamlessZoomCamera::GetTargetHeight() const
 {
-	using namespace RomanEmpireConstants;
-	
-	// Interpolate height based on zoom level
-	if (CurrentZoomLevel <= ZOOM_WORLD_MAX)
+	// Strategic View: 0.0–0.25 → height 50000→12000
+	if (CurrentZoomLevel <= 0.25f)
 	{
-		// World view
-		float Alpha = CurrentZoomLevel / ZOOM_WORLD_MAX;
-		return FMath::Lerp(WorldViewHeight, TerritoryViewHeight, Alpha);
+		float Alpha = CurrentZoomLevel / 0.25f;
+		return FMath::Lerp(50000.0f, 12000.0f, Alpha);
 	}
-	else if (CurrentZoomLevel <= ZOOM_TERRITORY_MAX)
+	// Tactical View: 0.25–0.70 → height 12000→500
+	else if (CurrentZoomLevel <= 0.70f)
 	{
-		// Territory view
-		float Alpha = (CurrentZoomLevel - ZOOM_WORLD_MAX) / (ZOOM_TERRITORY_MAX - ZOOM_WORLD_MAX);
-		return FMath::Lerp(TerritoryViewHeight, CityViewHeight, Alpha);
+		float Alpha = (CurrentZoomLevel - 0.25f) / 0.45f;
+		return FMath::Lerp(12000.0f, 500.0f, Alpha);
 	}
-	else if (CurrentZoomLevel <= ZOOM_CITY_MAX)
+	// Ground View: 0.70–0.80 → height 500→180
+	else if (CurrentZoomLevel <= 0.80f)
 	{
-		// City view
-		float Alpha = (CurrentZoomLevel - ZOOM_TERRITORY_MAX) / (ZOOM_CITY_MAX - ZOOM_TERRITORY_MAX);
-		return FMath::Lerp(CityViewHeight, GroundViewHeight, Alpha);
-	}
-	else if (CurrentZoomLevel <= ZOOM_GROUND_MAX)
-	{
-		// Ground view
-		float Alpha = (CurrentZoomLevel - ZOOM_CITY_MAX) / (ZOOM_GROUND_MAX - ZOOM_CITY_MAX);
-		return FMath::Lerp(GroundViewHeight, FirstPersonHeight, Alpha);
+		float Alpha = (CurrentZoomLevel - 0.70f) / 0.10f;
+		return FMath::Lerp(500.0f, 180.0f, Alpha);
 	}
 	else
 	{
-		// First person view
-		return FirstPersonHeight;
+		return 180.0f;
 	}
 }
 
 float ASeamlessZoomCamera::GetTargetPitch() const
 {
-	using namespace RomanEmpireConstants;
-	
-	// Similar interpolation for pitch
-	if (CurrentZoomLevel <= ZOOM_WORLD_MAX)
+	// Strategic: -85 → -70
+	if (CurrentZoomLevel <= 0.25f)
 	{
-		float Alpha = CurrentZoomLevel / ZOOM_WORLD_MAX;
-		return FMath::Lerp(WorldViewPitch, TerritoryViewPitch, Alpha);
+		float Alpha = CurrentZoomLevel / 0.25f;
+		return FMath::Lerp(-85.0f, -70.0f, Alpha);
 	}
-	else if (CurrentZoomLevel <= ZOOM_TERRITORY_MAX)
+	// Tactical: -70 → -45
+	else if (CurrentZoomLevel <= 0.70f)
 	{
-		float Alpha = (CurrentZoomLevel - ZOOM_WORLD_MAX) / (ZOOM_TERRITORY_MAX - ZOOM_WORLD_MAX);
-		return FMath::Lerp(TerritoryViewPitch, CityViewPitch, Alpha);
+		float Alpha = (CurrentZoomLevel - 0.25f) / 0.45f;
+		return FMath::Lerp(-70.0f, -45.0f, Alpha);
 	}
-	else if (CurrentZoomLevel <= ZOOM_CITY_MAX)
+	// Ground: -45 → 0
+	else if (CurrentZoomLevel <= 0.80f)
 	{
-		float Alpha = (CurrentZoomLevel - ZOOM_TERRITORY_MAX) / (ZOOM_CITY_MAX - ZOOM_TERRITORY_MAX);
-		return FMath::Lerp(CityViewPitch, GroundViewPitch, Alpha);
-	}
-	else if (CurrentZoomLevel <= ZOOM_GROUND_MAX)
-	{
-		float Alpha = (CurrentZoomLevel - ZOOM_CITY_MAX) / (ZOOM_GROUND_MAX - ZOOM_CITY_MAX);
-		return FMath::Lerp(GroundViewPitch, FirstPersonPitch, Alpha);
+		float Alpha = (CurrentZoomLevel - 0.70f) / 0.10f;
+		return FMath::Lerp(-45.0f, 0.0f, Alpha);
 	}
 	else
 	{
-		return FirstPersonPitch;
+		return 0.0f;
 	}
 }
 

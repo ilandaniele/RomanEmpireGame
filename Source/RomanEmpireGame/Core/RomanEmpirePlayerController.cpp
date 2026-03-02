@@ -51,6 +51,7 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_BuildKey4 = nullptr;
 	IA_BuildKey5 = nullptr;
 	IA_BuildKey6 = nullptr;
+	CurrentBuildingCost = 0;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -497,10 +498,9 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
-	// Cap at 0.75 — prevents auto-entering FPS phase (>0.8 = underground)
-	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.75f);
+	// Cap at 0.70 — Tactical max. FPS is explicit mode only.
+	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.70f);
 
-	// Smooth zoom — camera interpolates at speed 15
 	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
 	{
 		CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
@@ -519,15 +519,21 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 		OnAttackPressed();
 		return;
 	}
+
+	// Block interactions in Strategic view (zoom < 0.25)
+	if (CurrentZoomLevel < 0.25f)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, TEXT("Zoom in for Tactical View to interact"));
+		return;
+	}
 	
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
 		{
-			// Deduct resources on placement
 			if (GameMode)
 			{
-				GameMode->SubtractGold(200); // Building cost
+				GameMode->SubtractGold(CurrentBuildingCost);
 			}
 			BuildingPlacementComponent->ConfirmPlacement();
 			CurrentSelectionMode = ERomanSelectionMode::None;
@@ -722,44 +728,77 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 {
+	CurrentBuildingCost = 200;
 	StartBuildingPlacement(ABarracks::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Barracks"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Barracks (200 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey2Pressed()
 {
+	CurrentBuildingCost = 100;
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Farm"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Farm (100 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 {
+	CurrentBuildingCost = 150;
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Mine"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Mine (150 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 {
+	CurrentBuildingCost = 120;
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Mill"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Mill (120 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 {
+	CurrentBuildingCost = 80;
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Wall"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Wall (80 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 {
+	CurrentBuildingCost = 300;
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Temple"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Temple (300 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnAttackPressed()
 {
 	if (bIsInFirstPersonMode && PossessedUnit)
 	{
+		// FPS melee attack: line trace 200cm forward from camera
+		FVector CamLoc;
+		FRotator CamRot;
+		GetPlayerViewPoint(CamLoc, CamRot);
+
+		FVector TraceStart = CamLoc;
+		FVector TraceEnd = CamLoc + CamRot.Vector() * 200.0f;
+
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(PossessedUnit);
+
+		if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Pawn, Params))
+		{
+			AUnitBase* HitUnit = Cast<AUnitBase>(HitResult.GetActor());
+			if (HitUnit && HitUnit->GetOwnerFaction() != EFactionID::Rome && HitUnit->IsAlive())
+			{
+				HitUnit->TakeCombatDamage(25.0f, PossessedUnit, false);
+				if (GEngine)
+				{
+					GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red,
+						FString::Printf(TEXT("HIT! %s (-25 HP)"), *HitUnit->GetName()));
+				}
+			}
+		}
+
+		// Always play punch animation
 		PossessedUnit->PerformAttack();
 	}
 }

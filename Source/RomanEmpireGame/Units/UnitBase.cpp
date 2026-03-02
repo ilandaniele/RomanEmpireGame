@@ -319,6 +319,19 @@ void AUnitBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	// Death sink: if dead, sink into ground and destroy
+	if (!IsAlive())
+	{
+		FVector Loc = GetActorLocation();
+		Loc.Z -= 30.0f * DeltaSeconds;
+		SetActorLocation(Loc, false);
+		if (Loc.Z < -200.0f)
+		{
+			Destroy();
+		}
+		return; // Dead units skip all other logic
+	}
+
 	if (!bIsPossessedByPlayer)
 	{
 		// RTS mode - AI movement
@@ -839,11 +852,19 @@ void AUnitBase::OnDeath()
 	
 	OnUnitDied.Broadcast(this);
 	
-	// TODO: Play death animation, spawn ragdoll
+	// Disable collision — unit is no longer interactable
 	SetActorEnableCollision(false);
-	SetActorHiddenInGame(true);
 	
-	// Destroy after delay
-	SetLifeSpan(5.0f);
+	// Stop all commands
+	bHasMoveCommand = false;
+	AttackTarget = nullptr;
+	
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+			FString::Printf(TEXT("%s died!"), *GetName()));
+	}
+	
+	// Sink animation handled in Tick — no instant hide/destroy
 }
 

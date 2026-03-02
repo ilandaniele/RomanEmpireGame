@@ -56,12 +56,17 @@ void ARomanEmpireHUD::DrawHUD()
 	UFont* Font = GEngine->GetSmallFont();
 	if (Font)
 	{
-		DrawText(TEXT("v0.1.2"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
-			Canvas->SizeX - 70.0f, Canvas->SizeY - 25.0f, Font);
+		DrawText(TEXT("v0.2"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
+			Canvas->SizeX - 55.0f, Canvas->SizeY - 25.0f, Font);
 
-		// Faction name (below resource bar, row 2)
+		// Faction name (below resource bar)
 		DrawText(TEXT("ROMAN EMPIRE"), FLinearColor(0.9f, 0.2f, 0.1f),
 			10.0f, 30.0f, Font);
+
+		// View mode label (right side, below resource bar)
+		FString ViewLabel = CurrentZoomLevel <= 0.25f ? TEXT("STRATEGIC VIEW") : TEXT("TACTICAL VIEW");
+		FLinearColor ViewColor = CurrentZoomLevel <= 0.25f ? FLinearColor(0.3f, 0.6f, 1.0f) : FLinearColor(0.2f, 0.8f, 0.3f);
+		DrawText(ViewLabel, ViewColor, Canvas->SizeX - 160.0f, 30.0f, Font);
 	}
 }
 
