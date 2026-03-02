@@ -9,6 +9,7 @@
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireHUD.h"
 #include "../Units/Legionary.h"
+#include "../Units/UnitBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
@@ -100,6 +101,36 @@ void ARomanEmpireGameMode::EndTurn()
 	UE_LOG(LogRomanEmpire, Log, TEXT("Turn %d started"), CurrentTurn);
 	if (CampaignManager) CampaignManager->ProcessTurn();
 	UpdateHUDResources();
+
+	// Enemy AI: all non-Rome units advance toward Rome's territory (origin area)
+	TArray<AActor*> AllUnits;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
+
+	for (AActor* Actor : AllUnits)
+	{
+		AUnitBase* Unit = Cast<AUnitBase>(Actor);
+		if (Unit && Unit->IsAlive() && Unit->GetOwnerFaction() != EFactionID::Rome && Unit->GetOwnerFaction() != EFactionID::None)
+		{
+			// Move toward origin (Roman base area) with some randomness
+			FVector CurrentPos = Unit->GetActorLocation();
+			FVector ToRome = FVector(0.0f, 0.0f, 0.0f) - CurrentPos;
+			ToRome.Z = 0.0f;
+			if (ToRome.SizeSquared() > 10000.0f)
+			{
+				ToRome.Normalize();
+				float AdvanceDistance = FMath::RandRange(500.0f, 2000.0f);
+				FVector NewDest = CurrentPos + ToRome * AdvanceDistance;
+				NewDest.Z = CurrentPos.Z;
+				Unit->CommandMoveTo(NewDest);
+			}
+		}
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Cyan,
+			FString::Printf(TEXT("Turn %d — Enemy forces advancing!"), CurrentTurn));
+	}
 }
 
 void ARomanEmpireGameMode::InitializeManagers()

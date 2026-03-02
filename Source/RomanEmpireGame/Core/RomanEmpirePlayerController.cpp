@@ -264,9 +264,18 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	// Update building placement preview if active
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement && BuildingPlacementComponent)
 	{
-		FHitResult HitResult;
-		GetHitResultUnderCursor(ECC_WorldStatic, true, HitResult);
-		BuildingPlacementComponent->UpdatePreview(HitResult.Location);
+		FVector WorldPos, WorldDir;
+		if (DeprojectMousePositionToWorld(WorldPos, WorldDir))
+		{
+			FVector TraceEnd = WorldPos + WorldDir * 50000.0f;
+			FHitResult HitResult;
+			FCollisionQueryParams Params;
+			Params.bTraceComplex = false;
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, WorldPos, TraceEnd, ECC_WorldStatic, Params))
+			{
+				BuildingPlacementComponent->UpdatePreview(HitResult.Location);
+			}
+		}
 	}
 }
 
@@ -506,29 +515,64 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 	// Issue movement command to selected units
 	if (SelectedUnits.Num() > 0)
 	{
-		FHitResult HitResult;
-		if (GetHitResultUnderCursor(ECC_WorldStatic, true, HitResult))
+		// Manual line trace from camera through mouse position — most reliable
+		FVector WorldPos, WorldDir;
+		if (DeprojectMousePositionToWorld(WorldPos, WorldDir))
 		{
-			UE_LOG(LogRomanEmpire, Log, TEXT("Right-click move command to: %s (hit: %s)"),
-				*HitResult.Location.ToString(),
-				HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("null"));
+			FVector TraceEnd = WorldPos + WorldDir * 50000.0f;
+			FHitResult HitResult;
+			FCollisionQueryParams Params;
+			Params.bTraceComplex = false;
 
-			for (AUnitBase* Unit : SelectedUnits)
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, WorldPos, TraceEnd, ECC_WorldStatic, Params))
 			{
-				if (Unit)
+				FVector Dest = HitResult.Location;
+
+				// On-screen debug
+				if (GEngine)
 				{
-					Unit->CommandMoveTo(HitResult.Location);
+					GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+						FString::Printf(TEXT("Move %d units to: %.0f, %.0f, %.0f"),
+							SelectedUnits.Num(), Dest.X, Dest.Y, Dest.Z));
+				}
+
+				for (AUnitBase* Unit : SelectedUnits)
+				{
+					if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+					{
+						Unit->CommandMoveTo(Dest);
+					}
+				}
+			}
+			else
+			{
+				// Fallback: project onto Z=0 plane
+				if (FMath::Abs(WorldDir.Z) > 0.001f)
+				{
+					float T = -WorldPos.Z / WorldDir.Z;
+					if (T > 0.0f)
+					{
+						FVector Dest = WorldPos + WorldDir * T;
+						Dest.Z = 0.0f;
+
+						if (GEngine)
+						{
+							GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+								FString::Printf(TEXT("Move (fallback) to: %.0f, %.0f"),
+									Dest.X, Dest.Y));
+						}
+
+						for (AUnitBase* Unit : SelectedUnits)
+						{
+							if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+							{
+								Unit->CommandMoveTo(Dest);
+							}
+						}
+					}
 				}
 			}
 		}
-		else
-		{
-			UE_LOG(LogRomanEmpire, Warning, TEXT("Right-click: GetHitResultUnderCursor failed (no ground hit)"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogRomanEmpire, Verbose, TEXT("Right-click: no units selected"));
 	}
 }
 

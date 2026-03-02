@@ -277,6 +277,7 @@ AUnitBase::AUnitBase()
 	AttackTarget = nullptr;
 	AttackCooldown = 1.0f;
 	AttackCooldownRemaining = 0.0f;
+	WalkAnimTime = 0.0f;
 	SelectionRingMesh = nullptr;
 	HeadMesh = nullptr;
 	WeaponMesh = nullptr;
@@ -344,6 +345,35 @@ void AUnitBase::Tick(float DeltaSeconds)
 				bHasMoveCommand = false;
 			}
 		}
+	}
+
+	// Procedural walking animation (limb swinging)
+	bool bIsMoving = (GetVelocity().SizeSquared2D() > 100.0f);
+	if (bIsMoving)
+	{
+		WalkAnimTime += DeltaSeconds * 8.0f; // Walk cycle speed
+		float Swing = FMath::Sin(WalkAnimTime) * 15.0f; // degrees
+
+		// Arms swing opposite to legs
+		if (RightArmMesh)
+			RightArmMesh->SetRelativeRotation(FRotator(Swing, 0.0f, 0.0f));
+		if (LeftArmMesh)
+			LeftArmMesh->SetRelativeRotation(FRotator(-Swing, 0.0f, 0.0f));
+
+		// Legs alternate
+		if (RightLegMesh)
+			RightLegMesh->SetRelativeRotation(FRotator(-Swing, 0.0f, 0.0f));
+		if (LeftLegMesh)
+			LeftLegMesh->SetRelativeRotation(FRotator(Swing, 0.0f, 0.0f));
+	}
+	else
+	{
+		// Reset limbs to default when idle
+		WalkAnimTime = 0.0f;
+		if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator::ZeroRotator);
+		if (LeftArmMesh) LeftArmMesh->SetRelativeRotation(FRotator::ZeroRotator);
+		if (RightLegMesh) RightLegMesh->SetRelativeRotation(FRotator::ZeroRotator);
+		if (LeftLegMesh) LeftLegMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 
 	UpdateCombatCooldowns(DeltaSeconds);

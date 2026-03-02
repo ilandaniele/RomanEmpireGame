@@ -223,6 +223,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Combat")
 	float AttackCooldown;
 
+	// Walk animation
+	float WalkAnimTime;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|Combat")
 	float AttackCooldownRemaining;
 
