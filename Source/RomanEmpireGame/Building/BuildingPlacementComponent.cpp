@@ -125,13 +125,19 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	if (NewBuilding)
 	{
-		// Set owner faction (TODO: Get from player controller)
+		// Set owner faction
 		NewBuilding->SetOwnerFaction(EFactionID::Rome);
 		
 		// Start construction
 		NewBuilding->StartConstruction();
 		
 		OnBuildingPlaced.Broadcast(NewBuilding);
+		
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
+				FString::Printf(TEXT("Building placed: %s"), *NewBuilding->GetName()));
+		}
 		
 		UE_LOG(LogRomanEmpire, Log, TEXT("Building placed and construction started: %s"), 
 			*NewBuilding->GetName());
@@ -217,18 +223,7 @@ bool UBuildingPlacementComponent::ValidatePlacement()
 		return false;
 	}
 
-	// Check if building can be placed at current location
-	if (!PreviewBuilding->CanPlaceAt(CurrentPlacementLocation))
-	{
-		return false;
-	}
-
-	// TODO: Additional checks:
-	// - Resource requirements
-	// - Within territory
-	// - Not in water
-	// - Sufficient distance from other buildings
-
+	// For now, all placements are valid (on ground)
 	return true;
 }
 

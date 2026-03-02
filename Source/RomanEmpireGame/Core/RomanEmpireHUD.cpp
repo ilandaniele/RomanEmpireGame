@@ -54,12 +54,12 @@ void ARomanEmpireHUD::DrawHUD()
 	UFont* Font = GEngine->GetSmallFont();
 	if (Font)
 	{
-		DrawText(TEXT("v0.1"), FLinearColor(0.5f, 0.5f, 0.5f, 0.6f),
-			Canvas->SizeX - 60.0f, Canvas->SizeY - 20.0f, Font);
+		DrawText(TEXT("v0.1.1"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
+			Canvas->SizeX - 70.0f, Canvas->SizeY - 25.0f, Font);
 
-		// Faction name (top-center)
+		// Faction name (below resource bar, row 2)
 		DrawText(TEXT("ROMAN EMPIRE"), FLinearColor(0.9f, 0.2f, 0.1f),
-			Canvas->SizeX / 2.0f - 50.0f, 8.0f, Font);
+			10.0f, 30.0f, Font);
 	}
 }
 

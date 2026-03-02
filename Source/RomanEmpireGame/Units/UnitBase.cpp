@@ -345,7 +345,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 				if (StepSize > Dist) StepSize = Dist;
 
 				FVector NewLoc = CurrentLoc + Dir * StepSize;
-				SetActorLocation(NewLoc, true); // sweep for collision
+				SetActorLocation(NewLoc, false); // NO sweep — ground collision blocks movement
 
 				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();
