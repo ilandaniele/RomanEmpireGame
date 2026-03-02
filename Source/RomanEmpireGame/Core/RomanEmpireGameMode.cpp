@@ -22,6 +22,7 @@ ARomanEmpireGameMode::ARomanEmpireGameMode()
 	
 	CurrentPhase = EGamePhase::Tactical;  // Start in tactical, not strategic
 	CurrentTurn = 1;
+	PlayerGold = 1000;
 	
 	FactionManager = nullptr;
 	WorldMapManager = nullptr;
@@ -585,5 +586,27 @@ void ARomanEmpireGameMode::UpdateHUDResources()
 				HUD->UpdateResources(Resources.Gold, Resources.Food, Resources.Iron, Resources.Wood, Resources.Stone, Resources.Population);
 			}
 		}
+	}
+}
+
+void ARomanEmpireGameMode::SubtractGold(int32 Amount)
+{
+	PlayerGold = FMath::Max(0, PlayerGold - Amount);
+
+	// Update HUD immediately
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		ARomanEmpireHUD* HUD = Cast<ARomanEmpireHUD>(PC->GetHUD());
+		if (HUD)
+		{
+			HUD->DisplayGold = FMath::Max(0, HUD->DisplayGold - Amount);
+		}
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+			FString::Printf(TEXT("-%d Gold (Remaining: %d)"), Amount, PlayerGold));
 	}
 }

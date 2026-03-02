@@ -65,12 +65,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentTurn() const { return CurrentTurn; }
 
+	// Resource management
+	void SubtractGold(int32 Amount);
+	int32 GetPlayerGold() const { return PlayerGold; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
 	EGamePhase CurrentPhase;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
 	int32 CurrentTurn;
+
+	int32 PlayerGold;
 
 	// Manager references
 	UPROPERTY()

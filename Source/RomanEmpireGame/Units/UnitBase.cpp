@@ -30,24 +30,24 @@ AUnitBase::AUnitBase()
 		GetMesh()->SetCastShadow(false);
 	}
 
-	// Create visible placeholder mesh (cylinder body)
+	// Create visible placeholder mesh (capsule body — no flat base)
 	VisualMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMesh"));
 	if (VisualMesh)
 	{
 		VisualMesh->SetupAttachment(GetRootComponent());
-		VisualMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
-		VisualMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.0f));  // Bigger so visible from RTS camera
+		VisualMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -50.0f));
+		VisualMesh->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.8f));
 		VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-		// Use engine built-in cylinder mesh
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder"));
-		if (CylinderMesh.Succeeded())
+		// Use Sphere for body — no flat base visible
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMesh(TEXT("/Engine/BasicShapes/Sphere"));
+		if (BodyMesh.Succeeded())
 		{
-			VisualMesh->SetStaticMesh(CylinderMesh.Object);
+			VisualMesh->SetStaticMesh(BodyMesh.Object);
 		}
 	}
 
-	// Create selection decal (ring under unit when selected) - use a flat cylinder as selection ring
+	// Create selection decal (ring under unit when selected)
 	SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
 	if (SelectionDecal)
 	{
@@ -55,18 +55,19 @@ AUnitBase::AUnitBase()
 		SelectionDecal->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
 		SelectionDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
 		SelectionDecal->DecalSize = FVector(64.0f, 64.0f, 64.0f);
-		SelectionDecal->SetVisibility(false); // Hidden until selected
+		SelectionDecal->SetVisibility(false);
 	}
 
-	// Create visible selection ring (flat green cylinder)
+	// Create selection ring (flat disc - hidden until selected)
 	SelectionRingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SelectionRing"));
 	if (SelectionRingMesh)
 	{
 		SelectionRingMesh->SetupAttachment(GetRootComponent());
-		SelectionRingMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -94.0f));
-		SelectionRingMesh->SetRelativeScale3D(FVector(2.5f, 2.5f, 0.05f)); // Flat disc
+		SelectionRingMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -95.0f));
+		SelectionRingMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 0.02f));
 		SelectionRingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SelectionRingMesh->SetVisibility(false); // Hidden until selected
+		SelectionRingMesh->SetHiddenInGame(true); // Truly hidden
 
 		static ConstructorHelpers::FObjectFinder<UStaticMesh> RingMesh(TEXT("/Engine/BasicShapes/Cylinder"));
 		if (RingMesh.Succeeded())

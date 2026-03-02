@@ -50,11 +50,13 @@ void ARomanEmpireHUD::DrawHUD()
 		DrawBuildingMenu();
 	}
 
+	DrawHealthBars();
+
 	// Version display (bottom-right)
 	UFont* Font = GEngine->GetSmallFont();
 	if (Font)
 	{
-		DrawText(TEXT("v0.1.1"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
+		DrawText(TEXT("v0.1.2"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
 			Canvas->SizeX - 70.0f, Canvas->SizeY - 25.0f, Font);
 
 		// Faction name (below resource bar, row 2)
@@ -286,4 +288,50 @@ void ARomanEmpireHUD::UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 
 void ARomanEmpireHUD::OnZoomLevelChanged(float ZoomLevel)
 {
 	CurrentZoomLevel = ZoomLevel;
+}
+
+void ARomanEmpireHUD::DrawHealthBars()
+{
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC) return;
+
+	UFont* Font = GEngine->GetSmallFont();
+
+	TArray<AActor*> AllUnits;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
+
+	for (AActor* Actor : AllUnits)
+	{
+		AUnitBase* Unit = Cast<AUnitBase>(Actor);
+		if (!Unit || !Unit->IsAlive()) continue;
+
+		// Project world location to screen
+		FVector WorldPos = Unit->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f); // Above head
+		FVector2D ScreenPos;
+		if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos))
+		{
+			// Only draw if on-screen
+			if (ScreenPos.X < 0 || ScreenPos.X > Canvas->SizeX ||
+				ScreenPos.Y < 0 || ScreenPos.Y > Canvas->SizeY) continue;
+
+			float BarWidth = 60.0f;
+			float BarHeight = 6.0f;
+			float BarX = ScreenPos.X - BarWidth / 2.0f;
+			float BarY = ScreenPos.Y - BarHeight;
+
+			float HealthPct = (float)Unit->GetCurrentHealth() / FMath::Max(1, Unit->GetMaxHealth());
+
+			// Background (red)
+			DrawRect(FLinearColor(0.6f, 0.0f, 0.0f, 0.8f), BarX, BarY, BarWidth, BarHeight);
+
+			// Foreground (green)
+			FLinearColor HealthColor = FLinearColor::LerpUsingHSV(
+				FLinearColor(0.8f, 0.0f, 0.0f), FLinearColor(0.0f, 0.8f, 0.0f), HealthPct);
+			DrawRect(HealthColor, BarX, BarY, BarWidth * HealthPct, BarHeight);
+
+			// Border
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), BarX, BarY, BarWidth, 1.0f);
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), BarX, BarY + BarHeight - 1.0f, BarWidth, 1.0f);
+		}
+	}
 }

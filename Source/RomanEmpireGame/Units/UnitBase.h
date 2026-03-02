@@ -100,6 +100,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
 	int32 GetCurrentHealth() const { return CurrentHealth; }
 
+	UFUNCTION(BlueprintPure, Category = "Unit|Health")
+	int32 GetMaxHealth() const { return UnitData.BaseStats.MaxHealth; }
+
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
 	int32 GetCurrentMorale() const { return CurrentMorale; }
 

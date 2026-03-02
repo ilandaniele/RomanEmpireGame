@@ -516,7 +516,6 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 {
 	if (bIsInFirstPersonMode)
 	{
-		// In FPS mode, left click = attack
 		OnAttackPressed();
 		return;
 	}
@@ -525,6 +524,11 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 	{
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
 		{
+			// Deduct resources on placement
+			if (GameMode)
+			{
+				GameMode->SubtractGold(200); // Building cost
+			}
 			BuildingPlacementComponent->ConfirmPlacement();
 			CurrentSelectionMode = ERomanSelectionMode::None;
 		}
@@ -574,19 +578,48 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 			{
 				FVector Dest = HitResult.Location;
 
-				// On-screen debug
-				if (GEngine)
+				// Check if we clicked on an enemy unit
+				AUnitBase* HitUnit = Cast<AUnitBase>(HitResult.GetActor());
+				if (!HitUnit)
 				{
-					GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
-						FString::Printf(TEXT("Move %d units to: %.0f, %.0f, %.0f"),
-							SelectedUnits.Num(), Dest.X, Dest.Y, Dest.Z));
+					// Try parent actor
+					if (HitResult.GetActor())
+					{
+						HitUnit = Cast<AUnitBase>(HitResult.GetActor()->GetOwner());
+					}
 				}
 
-				for (AUnitBase* Unit : SelectedUnits)
+				if (HitUnit && HitUnit->GetOwnerFaction() != EFactionID::Rome && HitUnit->IsAlive())
 				{
-					if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+					// Attack enemy!
+					if (GEngine)
 					{
-						Unit->CommandMoveTo(Dest);
+						GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+							FString::Printf(TEXT("Attacking: %s"), *HitUnit->GetName()));
+					}
+					for (AUnitBase* Unit : SelectedUnits)
+					{
+						if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+						{
+							Unit->CommandAttack(HitUnit);
+						}
+					}
+				}
+				else
+				{
+					// Move to location
+					if (GEngine)
+					{
+						GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+							FString::Printf(TEXT("Move %d units to: %.0f, %.0f"),
+								SelectedUnits.Num(), Dest.X, Dest.Y));
+					}
+					for (AUnitBase* Unit : SelectedUnits)
+					{
+						if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+						{
+							Unit->CommandMoveTo(Dest);
+						}
 					}
 				}
 			}

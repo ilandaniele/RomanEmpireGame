@@ -49,7 +49,8 @@ protected:
 	bool bFPSMode;
 	float CurrentZoomLevel;
 
-	// Cached resource values
+public:
+	// Resource values (public for GameMode access)
 	int32 DisplayGold;
 	int32 DisplayFood;
 	int32 DisplayIron;
@@ -71,4 +72,5 @@ private:
 	void DrawMinimap();
 	void DrawSelectionBoxes();
 	void DrawControlsHelp();
+	void DrawHealthBars();
 };
