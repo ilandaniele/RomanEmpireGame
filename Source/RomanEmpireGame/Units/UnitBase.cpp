@@ -743,6 +743,12 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 
 void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 {
+	// Rome units are player-controlled — no AI movement
+	if (OwnerFaction == EFactionID::Rome)
+	{
+		return;
+	}
+
 	// Check if we have an attack target and are in range
 	if (AttackTarget && IsValid(AttackTarget))
 	{
@@ -795,8 +801,8 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 		}
 	}
 
-	// If no attack target and no move command, patrol randomly
-	if (!bHasMoveCommand && FMath::FRand() < 0.005f) // ~0.5% chance per frame = patrol occasionally
+	// If no attack target and no move command, patrol randomly (enemies only)
+	if (!bHasMoveCommand && OwnerFaction != EFactionID::Rome && FMath::FRand() < 0.005f)
 	{
 		FVector PatrolOffset = FVector(FMath::RandRange(-500.0f, 500.0f), FMath::RandRange(-500.0f, 500.0f), 0.0f);
 		CommandMoveTo(GetActorLocation() + PatrolOffset);

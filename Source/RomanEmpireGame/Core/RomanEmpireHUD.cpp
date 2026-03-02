@@ -49,6 +49,18 @@ void ARomanEmpireHUD::DrawHUD()
 	{
 		DrawBuildingMenu();
 	}
+
+	// Version display (bottom-right)
+	UFont* Font = GEngine->GetSmallFont();
+	if (Font)
+	{
+		DrawText(TEXT("v0.1"), FLinearColor(0.5f, 0.5f, 0.5f, 0.6f),
+			Canvas->SizeX - 60.0f, Canvas->SizeY - 20.0f, Font);
+
+		// Faction name (top-center)
+		DrawText(TEXT("ROMAN EMPIRE"), FLinearColor(0.9f, 0.2f, 0.1f),
+			Canvas->SizeX / 2.0f - 50.0f, 8.0f, Font);
+	}
 }
 
 void ARomanEmpireHUD::DrawResourceBar()

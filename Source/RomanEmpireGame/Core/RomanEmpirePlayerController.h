@@ -64,6 +64,11 @@ public:
 	void CancelBuildingPlacement();
 
 	void OnBuildingKey1Pressed();
+	void OnBuildingKey2Pressed();
+	void OnBuildingKey3Pressed();
+	void OnBuildingKey4Pressed();
+	void OnBuildingKey5Pressed();
+	void OnBuildingKey6Pressed();
 
 	// FPS Mode
 	UFUNCTION(BlueprintCallable, Category = "FPS")
@@ -119,6 +124,21 @@ protected:
 
 	UPROPERTY()
 	UInputAction* IA_BuildKey1;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey2;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey3;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey4;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey5;
+
+	UPROPERTY()
+	UInputAction* IA_BuildKey6;
 
 	// Selection state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")

@@ -46,6 +46,11 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_Block = nullptr;
 	IA_EndTurn = nullptr;
 	IA_BuildKey1 = nullptr;
+	IA_BuildKey2 = nullptr;
+	IA_BuildKey3 = nullptr;
+	IA_BuildKey4 = nullptr;
+	IA_BuildKey5 = nullptr;
+	IA_BuildKey6 = nullptr;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -141,6 +146,27 @@ void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
 	IA_BuildKey1->ValueType = EInputActionValueType::Boolean;
 	FEnhancedActionKeyMapping& BuildKey1Mapping = DefaultMappingContext->MapKey(IA_BuildKey1, EKeys::One);
 
+	// 2-6 = Other buildings
+	IA_BuildKey2 = NewObject<UInputAction>(this, TEXT("IA_BuildKey2"));
+	IA_BuildKey2->ValueType = EInputActionValueType::Boolean;
+	DefaultMappingContext->MapKey(IA_BuildKey2, EKeys::Two);
+
+	IA_BuildKey3 = NewObject<UInputAction>(this, TEXT("IA_BuildKey3"));
+	IA_BuildKey3->ValueType = EInputActionValueType::Boolean;
+	DefaultMappingContext->MapKey(IA_BuildKey3, EKeys::Three);
+
+	IA_BuildKey4 = NewObject<UInputAction>(this, TEXT("IA_BuildKey4"));
+	IA_BuildKey4->ValueType = EInputActionValueType::Boolean;
+	DefaultMappingContext->MapKey(IA_BuildKey4, EKeys::Four);
+
+	IA_BuildKey5 = NewObject<UInputAction>(this, TEXT("IA_BuildKey5"));
+	IA_BuildKey5->ValueType = EInputActionValueType::Boolean;
+	DefaultMappingContext->MapKey(IA_BuildKey5, EKeys::Five);
+
+	IA_BuildKey6 = NewObject<UInputAction>(this, TEXT("IA_BuildKey6"));
+	IA_BuildKey6->ValueType = EInputActionValueType::Boolean;
+	DefaultMappingContext->MapKey(IA_BuildKey6, EKeys::Six);
+
 	UE_LOG(LogRomanEmpire, Log, TEXT("Input actions and mappings created programmatically"));
 }
 
@@ -211,6 +237,26 @@ void ARomanEmpirePlayerController::BeginPlay()
 		if (IA_BuildKey1)
 		{
 			EIC->BindAction(IA_BuildKey1, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey1Pressed);
+		}
+		if (IA_BuildKey2)
+		{
+			EIC->BindAction(IA_BuildKey2, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey2Pressed);
+		}
+		if (IA_BuildKey3)
+		{
+			EIC->BindAction(IA_BuildKey3, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey3Pressed);
+		}
+		if (IA_BuildKey4)
+		{
+			EIC->BindAction(IA_BuildKey4, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey4Pressed);
+		}
+		if (IA_BuildKey5)
+		{
+			EIC->BindAction(IA_BuildKey5, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey5Pressed);
+		}
+		if (IA_BuildKey6)
+		{
+			EIC->BindAction(IA_BuildKey6, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey6Pressed);
 		}
 		UE_LOG(LogRomanEmpire, Log, TEXT("All input actions bound in BeginPlay"));
 	}
@@ -643,9 +689,38 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 {
-	// Build Barracks
 	StartBuildingPlacement(ABarracks::StaticClass());
-	UE_LOG(LogRomanEmpire, Log, TEXT("Building selection: Barracks"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Barracks"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey2Pressed()
+{
+	StartBuildingPlacement(ABuildingBase::StaticClass());
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Farm"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
+{
+	StartBuildingPlacement(ABuildingBase::StaticClass());
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Mine"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
+{
+	StartBuildingPlacement(ABuildingBase::StaticClass());
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Mill"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
+{
+	StartBuildingPlacement(ABuildingBase::StaticClass());
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Wall"));
+}
+
+void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
+{
+	StartBuildingPlacement(ABuildingBase::StaticClass());
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Temple"));
 }
 
 void ARomanEmpirePlayerController::OnAttackPressed()
