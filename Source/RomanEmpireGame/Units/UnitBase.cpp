@@ -334,7 +334,18 @@ void AUnitBase::Tick(float DeltaSeconds)
 			if (Dist > 80.0f)
 			{
 				Dir.Normalize();
-				AddMovementInput(Dir, 1.0f);
+
+				// Direct position update — bypasses CharacterMovementComponent
+				float MoveSpeed = 300.0f; // units per second
+				if (GetCharacterMovement())
+				{
+					MoveSpeed = GetCharacterMovement()->MaxWalkSpeed;
+				}
+				float StepSize = MoveSpeed * DeltaSeconds;
+				if (StepSize > Dist) StepSize = Dist;
+
+				FVector NewLoc = CurrentLoc + Dir * StepSize;
+				SetActorLocation(NewLoc, true); // sweep for collision
 
 				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();

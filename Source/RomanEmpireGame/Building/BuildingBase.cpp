@@ -4,6 +4,8 @@
 #include "../RomanEmpireGame.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 ABuildingBase::ABuildingBase()
 {
@@ -17,6 +19,14 @@ ABuildingBase::ABuildingBase()
 	BuildingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BuildingMesh"));
 	BuildingMesh->SetupAttachment(RootScene);
 	BuildingMesh->SetCollisionProfileName(TEXT("BlockAll"));
+
+	// Assign a visible cube mesh
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube"));
+	if (CubeMesh.Succeeded())
+	{
+		BuildingMesh->SetStaticMesh(CubeMesh.Object);
+		BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f)); // 200x200x200cm building
+	}
 
 	// Create collision box
 	CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
