@@ -363,6 +363,13 @@ void AUnitBase::Tick(float DeltaSeconds)
 						float Dmg = FMath::Max(10.0f, (float)UnitData.BaseStats.MeleeAttack);
 						Target->TakeCombatDamage(Dmg, this, false);
 						AttackCooldownRemaining = 1.5f;
+
+						// Attack arm swing animation
+						if (RightArmMesh)
+						{
+							RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+						}
+
 						if (GEngine)
 						{
 							GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red,

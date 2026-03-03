@@ -219,11 +219,11 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 
 float ASeamlessZoomCamera::GetTargetHeight() const
 {
-	// Strategic View: 0.0–0.25 → height 500000→12000
+	// Strategic View: 0.0–0.25 → height 3000000→12000 (30km max)
 	if (CurrentZoomLevel <= 0.25f)
 	{
 		float Alpha = CurrentZoomLevel / 0.25f;
-		return FMath::Lerp(500000.0f, 12000.0f, Alpha);
+		return FMath::Lerp(3000000.0f, 12000.0f, Alpha);
 	}
 	// Tactical View: 0.25–0.70 → height 12000→500
 	else if (CurrentZoomLevel <= 0.70f)

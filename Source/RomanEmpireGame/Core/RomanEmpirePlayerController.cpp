@@ -685,9 +685,9 @@ void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 	// Fixed step per scroll notch
 	float ScrollVal = Value.Get<float>();
 	if (ScrollVal > 0.0f)
-		SetTargetZoom(CurrentZoomLevel + 0.08f);
+		SetTargetZoom(CurrentZoomLevel + 0.03f);
 	else if (ScrollVal < 0.0f)
-		SetTargetZoom(CurrentZoomLevel - 0.08f);
+		SetTargetZoom(CurrentZoomLevel - 0.03f);
 }
 
 void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)

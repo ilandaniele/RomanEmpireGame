@@ -15,7 +15,7 @@ class UStaticMeshComponent;
  * Base class for all placeable buildings in the game
  * Handles construction progress, health, production, and garrisoning
  */
-UCLASS(Abstract, Blueprintable)
+UCLASS(Blueprintable)
 class ROMANEMPIREGAME_API ABuildingBase : public AActor
 {
 	GENERATED_BODY()
