@@ -314,6 +314,7 @@ void AUnitBase::BeginPlay()
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit spawned: %s"), *UnitData.DisplayName.ToString());
 	ApplyFactionColor();  // Apply faction color on spawn
 	AttackCooldown = 0.0f;
+	AttackCooldownRemaining = 0.0f;
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
@@ -344,8 +345,8 @@ void AUnitBase::Tick(float DeltaSeconds)
 			AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
 			if (Target && Target->IsAlive())
 			{
-				float Distance = FVector::Distance(GetActorLocation(), Target->GetActorLocation());
-				if (Distance <= 250.0f) // Attack range
+				float Distance = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
+				if (Distance <= 350.0f) // Attack range (2D)
 				{
 					// In range — attack on cooldown
 					bHasMoveCommand = false;
@@ -398,7 +399,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 				if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
 				if (OtherUnit->GetOwnerFaction() == EFactionID::Rome) continue; // Same team
 
-				float Dist = FVector::Distance(GetActorLocation(), OtherUnit->GetActorLocation());
+				float Dist = FVector::Dist2D(GetActorLocation(), OtherUnit->GetActorLocation());
 				if (Dist < ClosestDist)
 				{
 					ClosestDist = Dist;
@@ -434,7 +435,8 @@ void AUnitBase::Tick(float DeltaSeconds)
 				if (StepSize > Dist) StepSize = Dist;
 
 				FVector NewLoc = CurrentLoc + Dir * StepSize;
-				SetActorLocation(NewLoc, false);
+				NewLoc.Z = CurrentLoc.Z; // Keep same Z
+				SetActorLocation(NewLoc, true); // sweep=true for collision
 
 				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();
@@ -841,9 +843,9 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	// Check if we have an attack target and are in range
 	if (AttackTarget && IsValid(AttackTarget))
 	{
-		float Distance = FVector::Distance(GetActorLocation(), AttackTarget->GetActorLocation());
+		float Distance = FVector::Dist2D(GetActorLocation(), AttackTarget->GetActorLocation());
 		
-		if (Distance <= 250.0f)  // Hardcoded attack range
+		if (Distance <= 350.0f)  // Hardcoded attack range (2D)
 		{
 			// In attack range - stop and deal damage directly
 			bHasMoveCommand = false;
@@ -895,7 +897,7 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 			if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
 			if (OtherUnit->GetOwnerFaction() == OwnerFaction) continue; // Same team
 
-			float Dist = FVector::Distance(GetActorLocation(), OtherUnit->GetActorLocation());
+			float Dist = FVector::Dist2D(GetActorLocation(), OtherUnit->GetActorLocation());
 			if (Dist < ClosestDist)
 			{
 				ClosestDist = Dist;
