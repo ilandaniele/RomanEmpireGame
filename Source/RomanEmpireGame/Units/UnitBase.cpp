@@ -382,6 +382,35 @@ void AUnitBase::Tick(float DeltaSeconds)
 				AttackTarget = nullptr;
 			}
 		}
+		// Rome units: AUTO-DETECT nearby enemies when idle
+		else if (OwnerFaction == EFactionID::Rome && !AttackTarget && !bHasMoveCommand)
+		{
+			const float DetectRange = 1500.0f;
+			AUnitBase* ClosestEnemy = nullptr;
+			float ClosestDist = DetectRange;
+
+			TArray<AActor*> AllActors;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
+
+			for (AActor* Actor : AllActors)
+			{
+				AUnitBase* OtherUnit = Cast<AUnitBase>(Actor);
+				if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
+				if (OtherUnit->GetOwnerFaction() == EFactionID::Rome) continue; // Same team
+
+				float Dist = FVector::Distance(GetActorLocation(), OtherUnit->GetActorLocation());
+				if (Dist < ClosestDist)
+				{
+					ClosestDist = Dist;
+					ClosestEnemy = OtherUnit;
+				}
+			}
+
+			if (ClosestEnemy)
+			{
+				CommandAttack(ClosestEnemy);
+			}
+		}
 
 		// Direct movement toward destination (no NavMesh needed)
 		if (bHasMoveCommand)

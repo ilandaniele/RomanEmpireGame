@@ -55,6 +55,15 @@ void UBuildingPlacementComponent::StartPlacement(TSubclassOf<ABuildingBase> Buil
 
 	CreatePreviewBuilding();
 
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.0f,
+			PreviewBuilding ? FColor::Green : FColor::Red,
+			FString::Printf(TEXT("BuildPlace: %s preview=%s"),
+				*BuildingClass->GetName(),
+				PreviewBuilding ? TEXT("OK") : TEXT("FAILED")));
+	}
+
 	UE_LOG(LogRomanEmpire, Log, TEXT("Started placing building: %s"), *BuildingClass->GetName());
 }
 
