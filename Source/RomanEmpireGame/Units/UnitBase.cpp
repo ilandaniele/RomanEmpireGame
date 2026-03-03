@@ -385,7 +385,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 		// Rome units: AUTO-DETECT nearby enemies when idle
 		else if (OwnerFaction == EFactionID::Rome && !AttackTarget && !bHasMoveCommand)
 		{
-			const float DetectRange = 1500.0f;
+			const float DetectRange = 5000.0f;
 			AUnitBase* ClosestEnemy = nullptr;
 			float ClosestDist = DetectRange;
 
@@ -843,11 +843,31 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	{
 		float Distance = FVector::Distance(GetActorLocation(), AttackTarget->GetActorLocation());
 		
-		if (Distance <= UnitData.AttackRange)
+		if (Distance <= 250.0f)  // Hardcoded attack range
 		{
-			// In attack range - stop and attack
+			// In attack range - stop and deal damage directly
 			bHasMoveCommand = false;
-			PerformAttack();
+			AttackCooldownRemaining -= GetWorld()->GetDeltaSeconds();
+			if (AttackCooldownRemaining <= 0.0f)
+			{
+				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+				if (Target && Target->IsAlive())
+				{
+					float Dmg = FMath::Max(10.0f, (float)UnitData.BaseStats.MeleeAttack);
+					Target->TakeCombatDamage(Dmg, this, false);
+					AttackCooldownRemaining = 1.5f;
+					if (GEngine)
+					{
+						GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Orange,
+							FString::Printf(TEXT("AI %s hits %s for %.0f dmg (HP: %d)"),
+								*GetName(), *Target->GetName(), Dmg, Target->GetCurrentHealth()));
+					}
+				}
+				else
+				{
+					AttackTarget = nullptr;
+				}
+			}
 			return;
 		}
 		else
@@ -862,7 +882,7 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	if (OwnerFaction != EFactionID::None && OwnerFaction != EFactionID::Rome)
 	{
 		// Enemy AI: scan for nearby Roman units
-		const float DetectRange = 2000.0f;
+		const float DetectRange = 5000.0f;
 		AUnitBase* ClosestEnemy = nullptr;
 		float ClosestDist = DetectRange;
 
