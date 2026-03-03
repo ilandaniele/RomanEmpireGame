@@ -347,13 +347,20 @@ void AUnitBase::Tick(float DeltaSeconds)
 				float Distance = FVector::Distance(GetActorLocation(), Target->GetActorLocation());
 				if (Distance <= 250.0f) // Attack range
 				{
-					// In range — attack every 1.5 seconds
+					// In range — attack on cooldown
 					bHasMoveCommand = false;
-					AttackCooldown -= DeltaSeconds;
-					if (AttackCooldown <= 0.0f)
+					AttackCooldownRemaining -= DeltaSeconds;
+					if (AttackCooldownRemaining <= 0.0f)
 					{
-						Target->TakeCombatDamage(UnitData.BaseStats.MeleeAttack, this, false);
-						AttackCooldown = 1.5f;
+						float Dmg = FMath::Max(10.0f, (float)UnitData.BaseStats.MeleeAttack);
+						Target->TakeCombatDamage(Dmg, this, false);
+						AttackCooldownRemaining = 1.5f;
+						if (GEngine)
+						{
+							GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red,
+								FString::Printf(TEXT("%s hits %s for %.0f dmg (HP: %d)"),
+									*GetName(), *Target->GetName(), Dmg, Target->GetCurrentHealth()));
+						}
 					}
 					// Face target
 					FVector Dir = Target->GetActorLocation() - GetActorLocation();
@@ -372,7 +379,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 			}
 			else
 			{
-				AttackTarget = nullptr; // Target dead or invalid
+				AttackTarget = nullptr;
 			}
 		}
 

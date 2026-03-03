@@ -314,13 +314,31 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 		FVector WorldPos, WorldDir;
 		if (DeprojectMousePositionToWorld(WorldPos, WorldDir))
 		{
-			FVector TraceEnd = WorldPos + WorldDir * 50000.0f;
+			FVector TraceEnd = WorldPos + WorldDir * 100000.0f;
 			FHitResult HitResult;
 			FCollisionQueryParams Params;
 			Params.bTraceComplex = false;
 			if (GetWorld()->LineTraceSingleByChannel(HitResult, WorldPos, TraceEnd, ECC_WorldStatic, Params))
 			{
 				BuildingPlacementComponent->UpdatePreview(HitResult.Location);
+			}
+			else if (GetWorld()->LineTraceSingleByChannel(HitResult, WorldPos, TraceEnd, ECC_Visibility, Params))
+			{
+				BuildingPlacementComponent->UpdatePreview(HitResult.Location);
+			}
+			else
+			{
+				// Fallback: project onto Z=0 plane
+				if (FMath::Abs(WorldDir.Z) > 0.001f)
+				{
+					float T = -WorldPos.Z / WorldDir.Z;
+					if (T > 0.0f)
+					{
+						FVector GroundPos = WorldPos + WorldDir * T;
+						GroundPos.Z = 0.0f;
+						BuildingPlacementComponent->UpdatePreview(GroundPos);
+					}
+				}
 			}
 		}
 	}
@@ -495,6 +513,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Exited FPS mode — camera restored"));
 }
+
 
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
