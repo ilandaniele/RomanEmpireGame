@@ -315,6 +315,13 @@ void AUnitBase::BeginPlay()
 	ApplyFactionColor();  // Apply faction color on spawn
 	AttackCooldown = 0.0f;
 	AttackCooldownRemaining = 0.0f;
+
+	// Enable unit-to-unit avoidance so they don't overlap
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->bUseRVOAvoidance = true;
+		GetCharacterMovement()->AvoidanceWeight = 0.5f;
+	}
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
@@ -436,7 +443,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 
 				FVector NewLoc = CurrentLoc + Dir * StepSize;
 				NewLoc.Z = CurrentLoc.Z; // Keep same Z
-				SetActorLocation(NewLoc, true); // sweep=true for collision
+				SetActorLocation(NewLoc, false); // sweep=false to avoid ground collision blocking
 
 				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();
