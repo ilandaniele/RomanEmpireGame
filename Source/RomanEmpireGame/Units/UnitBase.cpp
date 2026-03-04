@@ -353,16 +353,16 @@ void AUnitBase::Tick(float DeltaSeconds)
 			if (Target && Target->IsAlive())
 			{
 				float Distance = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
-				if (Distance <= 350.0f) // Attack range (2D)
+				if (Distance <= 500.0f) // Attack range (2D, generous)
 				{
 					// In range — attack on cooldown
 					bHasMoveCommand = false;
 					AttackCooldownRemaining -= DeltaSeconds;
 					if (AttackCooldownRemaining <= 0.0f)
 					{
-						float Dmg = FMath::Max(10.0f, (float)UnitData.BaseStats.MeleeAttack);
+						float Dmg = FMath::Max(15.0f, (float)UnitData.BaseStats.MeleeAttack);
 						Target->TakeCombatDamage(Dmg, this, false);
-						AttackCooldownRemaining = 1.5f;
+						AttackCooldownRemaining = 1.2f;
 
 						// Attack arm swing animation
 						if (RightArmMesh)
@@ -859,19 +859,26 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	{
 		float Distance = FVector::Dist2D(GetActorLocation(), AttackTarget->GetActorLocation());
 		
-		if (Distance <= 350.0f)  // Hardcoded attack range (2D)
+		if (Distance <= 500.0f)  // Hardcoded attack range (2D)
 		{
 			// In attack range - stop and deal damage directly
 			bHasMoveCommand = false;
-			AttackCooldownRemaining -= GetWorld()->GetDeltaSeconds();
+			AttackCooldownRemaining -= DeltaSeconds;
 			if (AttackCooldownRemaining <= 0.0f)
 			{
 				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
 				if (Target && Target->IsAlive())
 				{
-					float Dmg = FMath::Max(10.0f, (float)UnitData.BaseStats.MeleeAttack);
+					float Dmg = FMath::Max(15.0f, (float)UnitData.BaseStats.MeleeAttack);
 					Target->TakeCombatDamage(Dmg, this, false);
-					AttackCooldownRemaining = 1.5f;
+					AttackCooldownRemaining = 1.2f;
+
+					// Attack arm swing
+					if (RightArmMesh)
+					{
+						RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+					}
+
 					if (GEngine)
 					{
 						GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Orange,

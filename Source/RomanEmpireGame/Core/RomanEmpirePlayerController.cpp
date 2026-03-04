@@ -52,6 +52,8 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_BuildKey5 = nullptr;
 	IA_BuildKey6 = nullptr;
 	CurrentBuildingCost = 0;
+	TargetZoomLevel = 0.5f;
+	CurrentZoomLevel = 0.5f;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -301,6 +303,20 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	
 	UpdateZoom(DeltaSeconds);
+
+	// Smooth zoom interpolation
+	if (FMath::Abs(CurrentZoomLevel - TargetZoomLevel) > 0.001f)
+	{
+		CurrentZoomLevel = FMath::FInterpTo(CurrentZoomLevel, TargetZoomLevel, DeltaSeconds, 5.0f);
+		if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
+		{
+			CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
+		}
+		if (GameMode)
+		{
+			GameMode->OnZoomLevelChanged(CurrentZoomLevel);
+		}
+	}
 	
 	// Edge scrolling in RTS mode
 	if (!bIsInFirstPersonMode)
@@ -518,17 +534,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
 	// Cap at 0.70 — Tactical max. FPS is explicit mode only.
-	CurrentZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.70f);
-
-	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
-	{
-		CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
-	}
-
-	if (GameMode)
-	{
-		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
-	}
+	TargetZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.70f);
 }
 
 void ARomanEmpirePlayerController::OnSelectPressed()

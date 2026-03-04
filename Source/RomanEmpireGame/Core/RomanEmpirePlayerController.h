@@ -154,6 +154,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	float CurrentZoomLevel;
 
+	float TargetZoomLevel;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera")
 	float ZoomSpeed;
 

@@ -58,6 +58,36 @@ void ABuildingBase::BeginPlay()
 	Super::BeginPlay();
 	
 	CurrentHealth = BuildingData.MaxHealth;
+
+	// Differentiate building shapes by type
+	if (BuildingMesh)
+	{
+		switch (BuildingData.BuildingType)
+		{
+		case EBuildingType::Barracks:
+			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 2.5f, 3.0f));
+			BuildingMesh->SetMaterial(0, nullptr); // Default grey
+			break;
+		case EBuildingType::Farm:
+			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 0.5f)); // Flat
+			break;
+		case EBuildingType::Mine:
+			BuildingMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.5f)); // Tall narrow
+			break;
+		case EBuildingType::Lumbercamp:
+			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 1.5f, 2.0f)); // Rectangular
+			break;
+		case EBuildingType::Wall:
+			BuildingMesh->SetRelativeScale3D(FVector(0.5f, 5.0f, 3.0f)); // Wall shape
+			break;
+		case EBuildingType::Temple:
+			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 4.0f)); // Grand
+			break;
+		default:
+			BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
+			break;
+		}
+	}
 	UpdateVisuals();
 }
 
