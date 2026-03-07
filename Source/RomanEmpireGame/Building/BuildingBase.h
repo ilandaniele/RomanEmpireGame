@@ -36,6 +36,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Building")
 	EBuildingState GetBuildingState() const { return CurrentState; }
 
+	// Set building type after spawn (for generic ABuildingBase placed by keys 2-6)
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	void SetBuildingTypeData(EBuildingType NewType);
+
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Building")
 	EFactionID GetOwnerFaction() const { return OwnerFaction; }

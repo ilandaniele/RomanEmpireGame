@@ -341,91 +341,68 @@ void AUnitBase::Tick(float DeltaSeconds)
 		return; // Dead units skip all other logic
 	}
 
-	if (!bIsPossessedByPlayer)
-	{
-		// RTS mode - AI movement
-		UpdateAIMovement(DeltaSeconds);
-
-		// Rome units: handle player-commanded attack
-		if (OwnerFaction == EFactionID::Rome && AttackTarget && IsValid(AttackTarget))
+		if (!bIsPossessedByPlayer)
 		{
-			AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
-			if (Target && Target->IsAlive())
+			// === UNIFIED COMBAT (all factions) ===
+			if (AttackTarget && IsValid(AttackTarget))
 			{
-				float Distance = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
-				if (Distance <= 500.0f) // Attack range (2D, generous)
+				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+				if (Target && Target->IsAlive())
 				{
-					// In range — attack on cooldown
-					bHasMoveCommand = false;
-					AttackCooldownRemaining -= DeltaSeconds;
-					if (AttackCooldownRemaining <= 0.0f)
+					float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
+					if (Dist2D <= 500.0f)
 					{
-						float Dmg = FMath::Max(15.0f, (float)UnitData.BaseStats.MeleeAttack);
-						Target->TakeCombatDamage(Dmg, this, false);
-						AttackCooldownRemaining = 1.2f;
-
-						// Attack arm swing animation
-						if (RightArmMesh)
+						// In range: stop, countdown, FIRE
+						bHasMoveCommand = false;
+						AttackCooldownRemaining -= DeltaSeconds;
+						if (AttackCooldownRemaining <= 0.0f)
 						{
-							RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
-						}
+							// GUARANTEED DAMAGE - bypasses all reduction for debug
+							float Dmg = FMath::Max(20.0f, (float)UnitData.BaseStats.MeleeAttack);
+							// Direct health subtract (bypass CalculateDamageReduction which may be blocking)
+							Target->CurrentHealth = FMath::Max(0, Target->CurrentHealth - (int32)Dmg);
+							AttackCooldownRemaining = 1.0f;
 
-						if (GEngine)
-						{
-							GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red,
-								FString::Printf(TEXT("%s hits %s for %.0f dmg (HP: %d)"),
-									*GetName(), *Target->GetName(), Dmg, Target->GetCurrentHealth()));
+							// Arm swing
+							if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+
+							// Visible debug
+							if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f,
+								(OwnerFaction == EFactionID::Rome) ? FColor::Cyan : FColor::Yellow,
+								FString::Printf(TEXT("%s->%s DMG:%.0f HP:%d"),
+									*GetName(), *Target->GetName(), Dmg, Target->CurrentHealth));
+
+							// Kill if dead
+							if (Target->CurrentHealth <= 0) Target->OnDeath();
 						}
 					}
-					// Face target
-					FVector Dir = Target->GetActorLocation() - GetActorLocation();
-					Dir.Z = 0.0f;
-					if (!Dir.IsNearlyZero())
+					else
 					{
-						SetActorRotation(FMath::RInterpTo(GetActorRotation(), Dir.Rotation(), DeltaSeconds, 10.0f));
+						// Out of range: walk toward target
+						MoveDestination = Target->GetActorLocation();
+						bHasMoveCommand = true;
 					}
 				}
-				else
+				else AttackTarget = nullptr;  // Target dead, clear
+			}
+			else if (!bHasMoveCommand)
+			{
+				// Auto-detect nearest enemy within 5000
+				AUnitBase* ClosestEnemy = nullptr;
+				float ClosestDist = 5000.0f;
+				TArray<AActor*> AllActors;
+				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
+				for (AActor* Actor : AllActors)
 				{
-					// Move toward target
-					MoveDestination = Target->GetActorLocation();
-					bHasMoveCommand = true;
+					AUnitBase* Other = Cast<AUnitBase>(Actor);
+					if (!Other || Other == this || !Other->IsAlive()) continue;
+					if (Other->GetOwnerFaction() == OwnerFaction) continue; // Same team
+					if (Other->GetOwnerFaction() == EFactionID::None) continue; // Neutral
+					float D = FVector::Dist2D(GetActorLocation(), Other->GetActorLocation());
+					if (D < ClosestDist) { ClosestDist = D; ClosestEnemy = Other; }
 				}
+				if (ClosestEnemy) CommandAttack(ClosestEnemy);
 			}
-			else
-			{
-				AttackTarget = nullptr;
-			}
-		}
-		// Rome units: AUTO-DETECT nearby enemies when idle
-		else if (OwnerFaction == EFactionID::Rome && !AttackTarget && !bHasMoveCommand)
-		{
-			const float DetectRange = 5000.0f;
-			AUnitBase* ClosestEnemy = nullptr;
-			float ClosestDist = DetectRange;
-
-			TArray<AActor*> AllActors;
-			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
-
-			for (AActor* Actor : AllActors)
-			{
-				AUnitBase* OtherUnit = Cast<AUnitBase>(Actor);
-				if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
-				if (OtherUnit->GetOwnerFaction() == EFactionID::Rome) continue; // Same team
-
-				float Dist = FVector::Dist2D(GetActorLocation(), OtherUnit->GetActorLocation());
-				if (Dist < ClosestDist)
-				{
-					ClosestDist = Dist;
-					ClosestEnemy = OtherUnit;
-				}
-			}
-
-			if (ClosestEnemy)
-			{
-				CommandAttack(ClosestEnemy);
-			}
-		}
 
 		// Direct movement toward destination (no NavMesh needed)
 		if (bHasMoveCommand)

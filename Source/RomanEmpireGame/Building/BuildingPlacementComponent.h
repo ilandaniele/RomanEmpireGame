@@ -50,6 +50,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
 	TSubclassOf<ABuildingBase> GetCurrentBuildingClass() const { return CurrentBuildingClass; }
 
+	// Set building cost and type for current placement
+	void SetBuildingCost(int32 Cost) { CurrentBuildingCost = Cost; }
+	void SetBuildingTypeForPlacement(EBuildingType Type) { CurrentBuildingType = Type; }
+
 protected:
 	// Currently placing
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
@@ -76,6 +80,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Placement")
 	bool bSnapToGrid;
+
+	// Cost and type for current placement
+	int32 CurrentBuildingCost;
+	EBuildingType CurrentBuildingType;
 
 	// Events
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingPlaced, ABuildingBase*, Building);

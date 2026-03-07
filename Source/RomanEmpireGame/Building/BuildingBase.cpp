@@ -91,6 +91,45 @@ void ABuildingBase::BeginPlay()
 	UpdateVisuals();
 }
 
+void ABuildingBase::SetBuildingTypeData(EBuildingType NewType)
+{
+	BuildingData.BuildingType = NewType;
+
+	// Re-apply shape and color by type
+	if (BuildingMesh)
+	{
+		UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+		UMaterialInstanceDynamic* MID = Base ? UMaterialInstanceDynamic::Create(Base, this) : nullptr;
+
+		switch (NewType)
+		{
+		case EBuildingType::Farm:
+			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 0.4f));
+			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.8f, 0.2f)); BuildingMesh->SetMaterial(0, MID); }
+			break;
+		case EBuildingType::Mine:
+			BuildingMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.5f));
+			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.5f, 0.5f)); BuildingMesh->SetMaterial(0, MID); }
+			break;
+		case EBuildingType::Lumbercamp:
+			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 1.5f, 2.0f));
+			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.4f, 0.2f, 0.05f)); BuildingMesh->SetMaterial(0, MID); }
+			break;
+		case EBuildingType::Wall:
+			BuildingMesh->SetRelativeScale3D(FVector(0.4f, 5.0f, 3.0f));
+			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.8f, 0.8f, 0.8f)); BuildingMesh->SetMaterial(0, MID); }
+			break;
+		case EBuildingType::Temple:
+			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 4.5f));
+			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.9f, 0.8f, 0.1f)); BuildingMesh->SetMaterial(0, MID); }
+			break;
+		default:
+			BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
+			break;
+		}
+	}
+}
+
 void ABuildingBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

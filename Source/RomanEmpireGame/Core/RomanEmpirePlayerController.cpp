@@ -772,13 +772,23 @@ void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 {
 	CurrentBuildingCost = 120;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(120);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Lumbercamp);
+	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Mill (120 Gold)"));
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Camp (120 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 {
 	CurrentBuildingCost = 80;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(80);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Wall);
+	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Wall (80 Gold)"));
 }
@@ -786,6 +796,11 @@ void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 {
 	CurrentBuildingCost = 300;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(300);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Temple);
+	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Temple (300 Gold)"));
 }

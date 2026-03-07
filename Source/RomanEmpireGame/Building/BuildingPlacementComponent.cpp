@@ -1,8 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingPlacementComponent.h"
+#include "BuildingBase.h"
 #include "../RomanEmpireGame.h"
-#include "../Building/BuildingBase.h"
+#include "../Core/RomanEmpireGameMode.h"
 #include "Kismet/GameplayStatics.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
@@ -16,6 +17,8 @@ UBuildingPlacementComponent::UBuildingPlacementComponent()
 	CurrentRotation = 0.0f;
 	GridSize = 100.0f;   // 1 meter grid
 	bSnapToGrid = true;
+	CurrentBuildingCost = 0;
+	CurrentBuildingType = EBuildingType::None;
 }
 
 void UBuildingPlacementComponent::BeginPlay()
@@ -134,6 +137,13 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	if (NewBuilding)
 	{
+		// Resource check and deduction
+		ARomanEmpireGameMode* GM = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+		if (GM) GM->SubtractGold(CurrentBuildingCost);
+
+		// Set building type on spawned building
+		NewBuilding->SetBuildingTypeData(CurrentBuildingType);
+
 		// Set owner faction
 		NewBuilding->SetOwnerFaction(EFactionID::Rome);
 		

@@ -219,28 +219,22 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 
 float ASeamlessZoomCamera::GetTargetHeight() const
 {
-	// Strategic View: 0.0–0.25 → height 3000000→12000 (30km max)
-	if (CurrentZoomLevel <= 0.25f)
-	{
-		float Alpha = CurrentZoomLevel / 0.25f;
-		return FMath::Lerp(3000000.0f, 12000.0f, Alpha);
-	}
-	// Tactical View: 0.25–0.70 → height 12000→500
-	else if (CurrentZoomLevel <= 0.70f)
-	{
-		float Alpha = (CurrentZoomLevel - 0.25f) / 0.45f;
-		return FMath::Lerp(12000.0f, 500.0f, Alpha);
-	}
-	// Ground View: 0.70–0.80 → height 500→180
-	else if (CurrentZoomLevel <= 0.80f)
-	{
-		float Alpha = (CurrentZoomLevel - 0.70f) / 0.10f;
-		return FMath::Lerp(500.0f, 180.0f, Alpha);
-	}
-	else
-	{
-		return 180.0f;
-	}
+	// Single smooth exponential curve: zoom 0.0 = 30km, zoom 0.70 = 500, no hard breaks
+	// Use log interpolation for perceptually smooth zoom
+	const float ZoomLow = 0.0f;
+	const float ZoomHigh = 0.70f;
+	const float HeightAtLow = 3000000.0f;  // 30km at full zoom out
+	const float HeightAtHigh = 500.0f;     // 5m at full zoom in
+
+	// Clamp zoom to valid range
+	float Z = FMath::Clamp(CurrentZoomLevel, ZoomLow, ZoomHigh);
+	float T = (Z - ZoomLow) / (ZoomHigh - ZoomLow); // 0.0..1.0
+
+	// Exponential: log-lerp between min and max heights
+	float LogLow = FMath::Loge(HeightAtLow);
+	float LogHigh = FMath::Loge(HeightAtHigh);
+	float LogH = FMath::Lerp(LogLow, LogHigh, T);
+	return FMath::Exp(LogH);
 }
 
 float ASeamlessZoomCamera::GetTargetPitch() const
