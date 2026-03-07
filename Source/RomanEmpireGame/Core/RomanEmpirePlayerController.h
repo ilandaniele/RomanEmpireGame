@@ -12,6 +12,8 @@ class UInputMappingContext;
 class UInputAction;
 class AUnitBase;
 class ABuildingBase;
+class ABarracks;
+class ALegionary;
 class UBuildingPlacementComponent;
 class ASeamlessZoomCamera;
 
@@ -86,6 +88,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Camera")
 	float GetCurrentZoom() const { return CurrentZoomLevel; }
+
+	// Selected building (for info panel / training)
+	class ABuildingBase* SelectedBuilding;
+
+	// Barracks training state
+	bool bIsTrainingUnit;
+	float TrainingStartTime;
+	float TrainingDuration;
+
+	virtual void PlayerTick(float DeltaTime) override;
+
+	// Building select / training
+	void OnTrainButtonClicked();
 
 protected:
 	// Enhanced Input — created programmatically, no Blueprint assets needed

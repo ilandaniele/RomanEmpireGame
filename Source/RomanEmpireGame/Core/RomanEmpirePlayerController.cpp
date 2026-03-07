@@ -5,6 +5,7 @@
 #include "RomanEmpireHUD.h"
 #include "../RomanEmpireGame.h"
 #include "../Units/UnitBase.h"
+#include "../Units/Legionary.h"
 #include "../Building/BuildingBase.h"
 #include "../Building/Barracks.h"
 #include "../Building/BuildingPlacementComponent.h"
@@ -54,6 +55,10 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	CurrentBuildingCost = 0;
 	TargetZoomLevel = 0.5f;
 	CurrentZoomLevel = 0.5f;
+	SelectedBuilding = nullptr;
+	bIsTrainingUnit = false;
+	TrainingStartTime = 0.0f;
+	TrainingDuration = 5.0f;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -757,14 +762,22 @@ void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey2Pressed()
 {
-	CurrentBuildingCost = 100;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(100);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Farm);
+	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Farm (100 Gold)"));
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 {
-	CurrentBuildingCost = 150;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(150);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Mine);
+	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Mine (150 Gold)"));
 }
@@ -879,14 +892,45 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 	
 	if (Distance < 10.0f)
 	{
-		// Single click selection
+		// Single click selection — check unit first, then building
 		AActor* HitActor = GetActorUnderCursor();
 		if (AUnitBase* Unit = Cast<AUnitBase>(HitActor))
 		{
+			SelectedBuilding = nullptr;
+			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->HUDSelectedBuilding = nullptr;
 			SelectUnit(Unit);
+		}
+		else if (ABuildingBase* Building = Cast<ABuildingBase>(HitActor))
+		{
+			// Building clicked — show its panel
+			ClearSelection();
+			SelectedBuilding = Building;
+			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
+			{
+				REHUD->HUDSelectedBuilding = Building;
+			}
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::White,
+				FString::Printf(TEXT("Selected building: %s"), *Building->GetName()));
+
+			// Check if TRAIN button was clicked (Barracks panel)
+			if (ABarracks* Bar = Cast<ABarracks>(Building))
+			{
+				if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
+				{
+					float MX, MY;
+					GetMousePosition(MX, MY);
+					if (MX >= REHUD->TrainButtonMin.X && MX <= REHUD->TrainButtonMax.X &&
+						MY >= REHUD->TrainButtonMin.Y && MY <= REHUD->TrainButtonMax.Y)
+					{
+						OnTrainButtonClicked();
+					}
+				}
+			}
 		}
 		else
 		{
+			SelectedBuilding = nullptr;
+			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->HUDSelectedBuilding = nullptr;
 			ClearSelection();
 		}
 	}
@@ -925,9 +969,63 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 {
 	FHitResult HitResult;
-	if (GetHitResultUnderCursor(ECC_Pawn, true, HitResult))
+	// First try Pawn channel (units)
+	if (GetHitResultUnderCursor(ECC_Pawn, true, HitResult) && HitResult.GetActor())
+	{
+		return HitResult.GetActor();
+	}
+	// Fallback: WorldDynamic channel (buildings)
+	if (GetHitResultUnderCursor(ECC_WorldDynamic, true, HitResult) && HitResult.GetActor())
 	{
 		return HitResult.GetActor();
 	}
 	return nullptr;
+}
+
+void ARomanEmpirePlayerController::OnTrainButtonClicked()
+{
+	if (!GameMode || !SelectedBuilding) return;
+	if (bIsTrainingUnit)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Already training!"));
+		return;
+	}
+	// Cost: 150 Gold + 50 Food
+	const int32 GoldCost = 150;
+	const int32 FoodCost = 50;
+	if (GameMode->GetPlayerGold() < GoldCost)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Not enough Gold! (Need 150)"));
+		return;
+	}
+	GameMode->SubtractGold(GoldCost);
+	// TODO: subtract food when SubtractFood exists
+	bIsTrainingUnit = true;
+	TrainingStartTime = GetWorld()->GetTimeSeconds();
+	TrainingDuration = 5.0f;
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Training Legionary... (5s)"));
+}
+
+void ARomanEmpirePlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	// Training timer — spawn unit when done
+	if (bIsTrainingUnit && SelectedBuilding && IsValid(SelectedBuilding))
+	{
+		float Elapsed = GetWorld()->GetTimeSeconds() - TrainingStartTime;
+		if (Elapsed >= TrainingDuration)
+		{
+			bIsTrainingUnit = false;
+			FVector SpawnLoc = SelectedBuilding->GetActorLocation() + FVector(250.0f, 0.0f, 50.0f);
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			ALegionary* NewUnit = GetWorld()->SpawnActor<ALegionary>(ALegionary::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
+			if (NewUnit)
+			{
+				NewUnit->SetOwnerFaction(EFactionID::Rome);
+				NewUnit->ApplyFactionColor();
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green, TEXT("Legionary trained!"));
+			}
+		}
+	}
 }

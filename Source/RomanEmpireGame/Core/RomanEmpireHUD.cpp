@@ -3,7 +3,10 @@
 #include "RomanEmpireHUD.h"
 #include "../RomanEmpireGame.h"
 #include "../Units/UnitBase.h"
+#include "../Building/BuildingBase.h"
+#include "../Building/Barracks.h"
 #include "RomanEmpireGameMode.h"
+#include "RomanEmpirePlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
@@ -22,6 +25,13 @@ ARomanEmpireHUD::ARomanEmpireHUD()
 	DisplayPopulation = 0;
 
 	CachedGameMode = nullptr;
+	HUDSelectedBuilding = nullptr;
+	bVictory = false;
+	bDefeated = false;
+	EnemiesKilled = 0;
+	LastVictoryCheckTime = 0.0f;
+	TrainButtonMin = FVector2D::ZeroVector;
+	TrainButtonMax = FVector2D::ZeroVector;
 }
 
 void ARomanEmpireHUD::BeginPlay()
@@ -51,12 +61,19 @@ void ARomanEmpireHUD::DrawHUD()
 	}
 
 	DrawHealthBars();
+	DrawBuildingPanel();
+	CheckVictoryCondition();
+	DrawVictoryOverlay();
 
-	// Version display (bottom-right)
+	// Version (bottom-right)
 	UFont* Font = GEngine->GetSmallFont();
 	if (Font)
 	{
-		DrawText(TEXT("v0.3"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
+		// Kill counter
+		DrawText(FString::Printf(TEXT("Kills: %d"), EnemiesKilled),
+			FLinearColor(1.0f, 0.8f, 0.0f), Canvas->SizeX - 90.0f, 45.0f, Font);
+
+		DrawText(TEXT("v0.4"), FLinearColor(0.7f, 0.7f, 0.7f, 0.8f),
 			Canvas->SizeX - 60.0f, Canvas->SizeY - 25.0f, Font);
 
 		// Faction name (below resource bar)
@@ -338,5 +355,125 @@ void ARomanEmpireHUD::DrawHealthBars()
 			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), BarX, BarY, BarWidth, 1.0f);
 			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), BarX, BarY + BarHeight - 1.0f, BarWidth, 1.0f);
 		}
+	}
+}
+
+void ARomanEmpireHUD::DrawBuildingPanel()
+{
+	if (!HUDSelectedBuilding || !IsValid(HUDSelectedBuilding)) return;
+	UFont* Font = GEngine->GetSmallFont();
+	if (!Font) return;
+
+	const float PanelW = 420.0f;
+	const float PanelH = 120.0f;
+	const float PanelX = (Canvas->SizeX - PanelW) * 0.5f;
+	const float PanelY = Canvas->SizeY - PanelH - 10.0f;
+
+	// Background
+	DrawRect(FLinearColor(0.05f, 0.05f, 0.15f, 0.92f), PanelX, PanelY, PanelW, PanelH);
+	DrawRect(FLinearColor(0.6f, 0.5f, 0.1f, 0.8f), PanelX, PanelY, PanelW, 2.0f); // Top border
+
+	// Building name
+	FString Title = HUDSelectedBuilding->GetClass()->GetName().Replace(TEXT("A"), TEXT(""));
+	DrawText(Title.ToUpper(), FLinearColor(1.0f, 0.9f, 0.3f), PanelX + 10.0f, PanelY + 8.0f, Font);
+
+	// Check if it's a Barracks
+	if (Cast<ABarracks>(HUDSelectedBuilding))
+	{
+		DrawText(TEXT("[ Legionary - 150g 50f ]"), FLinearColor(0.9f, 0.9f, 0.9f), PanelX + 10.0f, PanelY + 28.0f, Font);
+
+		// TRAIN button
+		const float BtnX = PanelX + PanelW - 100.0f;
+		const float BtnY = PanelY + 22.0f;
+		const float BtnW = 85.0f;
+		const float BtnH = 24.0f;
+		DrawRect(FLinearColor(0.1f, 0.5f, 0.1f, 0.9f), BtnX, BtnY, BtnW, BtnH);
+		DrawText(TEXT("[ TRAIN ]"), FLinearColor(0.2f, 1.0f, 0.3f), BtnX + 6.0f, BtnY + 5.0f, Font);
+		TrainButtonMin = FVector2D(BtnX, BtnY);
+		TrainButtonMax = FVector2D(BtnX + BtnW, BtnY + BtnH);
+
+		// Training progress bar
+		ARomanEmpirePlayerController* PC = Cast<ARomanEmpirePlayerController>(GetOwningPlayerController());
+		if (PC && PC->bIsTrainingUnit)
+		{
+			float Elapsed = GetWorld()->GetTimeSeconds() - PC->TrainingStartTime;
+			float Pct = FMath::Clamp(Elapsed / PC->TrainingDuration, 0.0f, 1.0f);
+			const float ProgX = PanelX + 10.0f;
+			const float ProgY = PanelY + 58.0f;
+			const float ProgW = PanelW - 130.0f;
+			DrawRect(FLinearColor(0.2f, 0.2f, 0.2f, 0.8f), ProgX, ProgY, ProgW, 14.0f);
+			DrawRect(FLinearColor(0.2f, 0.8f, 0.2f, 0.9f), ProgX, ProgY, ProgW * Pct, 14.0f);
+			float Remaining = FMath::Max(0.0f, PC->TrainingDuration - Elapsed);
+			DrawText(FString::Printf(TEXT("Training: %.1fs"), Remaining),
+				FLinearColor(0.8f, 1.0f, 0.8f), ProgX, ProgY + 18.0f, Font);
+		}
+		else
+		{
+			DrawText(TEXT("Idle — click TRAIN to begin"),
+				FLinearColor(0.5f, 0.5f, 0.5f), PanelX + 10.0f, PanelY + 58.0f, Font);
+		}
+	}
+	else
+	{
+		// Generic building info
+		DrawText(TEXT("Owner: Rome"), FLinearColor(0.8f, 0.3f, 0.2f), PanelX + 10.0f, PanelY + 28.0f, Font);
+		DrawText(TEXT("Status: Operational"), FLinearColor(0.3f, 0.9f, 0.4f), PanelX + 10.0f, PanelY + 48.0f, Font);
+		TrainButtonMin = TrainButtonMax = FVector2D::ZeroVector;
+	}
+}
+
+void ARomanEmpireHUD::CheckVictoryCondition()
+{
+	float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (Now - LastVictoryCheckTime < 2.0f) return;
+	LastVictoryCheckTime = Now;
+
+	if (bVictory || bDefeated) return;
+
+	TArray<AActor*> AllUnits;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
+
+	bool bRomeAlive = false;
+	bool bEnemyAlive = false;
+	for (AActor* A : AllUnits)
+	{
+		AUnitBase* U = Cast<AUnitBase>(A);
+		if (!U || !U->IsAlive()) continue;
+		if (U->GetOwnerFaction() == EFactionID::Rome) bRomeAlive = true;
+		else if (U->GetOwnerFaction() != EFactionID::None) bEnemyAlive = true;
+	}
+
+	if (!bEnemyAlive && bRomeAlive) bVictory = true;
+	if (!bRomeAlive && bEnemyAlive) bDefeated = true;
+}
+
+void ARomanEmpireHUD::DrawVictoryOverlay()
+{
+	if (!bVictory && !bDefeated) return;
+	if (!Canvas) return;
+
+	// Dark overlay
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+
+	UFont* BigFont = GEngine->GetLargeFont();
+	if (!BigFont) BigFont = GEngine->GetSmallFont();
+
+	if (bVictory)
+	{
+		// Gold VICTORIA text — centered
+		FString Msg = TEXT("VICTORIA!");
+		DrawText(Msg, FLinearColor(1.0f, 0.85f, 0.0f),
+			Canvas->SizeX * 0.5f - 120.0f, Canvas->SizeY * 0.5f - 40.0f, BigFont, 3.0f);
+		DrawText(FString::Printf(TEXT("Enemies defeated: %d"), EnemiesKilled),
+			FLinearColor(0.9f, 0.9f, 0.9f),
+			Canvas->SizeX * 0.5f - 80.0f, Canvas->SizeY * 0.5f + 20.0f, BigFont, 1.5f);
+	}
+	else
+	{
+		DrawText(TEXT("DERROTA"), FLinearColor(0.9f, 0.1f, 0.1f),
+			Canvas->SizeX * 0.5f - 90.0f, Canvas->SizeY * 0.5f - 40.0f, BigFont, 3.0f);
+		DrawText(TEXT("All Roman units defeated"),
+			FLinearColor(0.7f, 0.7f, 0.7f),
+			Canvas->SizeX * 0.5f - 80.0f, Canvas->SizeY * 0.5f + 20.0f, BigFont, 1.5f);
 	}
 }

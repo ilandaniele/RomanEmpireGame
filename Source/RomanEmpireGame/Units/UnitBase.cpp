@@ -341,70 +341,75 @@ void AUnitBase::Tick(float DeltaSeconds)
 		return; // Dead units skip all other logic
 	}
 
-		if (!bIsPossessedByPlayer)
+	if (!bIsPossessedByPlayer)
+	{
+		// === UNIFIED COMBAT (all factions) ===
+		if (AttackTarget && IsValid(AttackTarget))
 		{
-			// === UNIFIED COMBAT (all factions) ===
-			if (AttackTarget && IsValid(AttackTarget))
+			AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+			if (Target && Target->IsAlive())
 			{
-				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
-				if (Target && Target->IsAlive())
+				float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
+				if (Dist2D <= 500.0f)
 				{
-					float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
-					if (Dist2D <= 500.0f)
+					// In range: STOP moving, countdown, FIRE
+					bHasMoveCommand = false;
+					AttackCooldownRemaining -= DeltaSeconds;
+					if (AttackCooldownRemaining <= 0.0f)
 					{
-						// In range: stop, countdown, FIRE
-						bHasMoveCommand = false;
-						AttackCooldownRemaining -= DeltaSeconds;
-						if (AttackCooldownRemaining <= 0.0f)
-						{
-							// GUARANTEED DAMAGE - bypasses all reduction for debug
-							float Dmg = FMath::Max(20.0f, (float)UnitData.BaseStats.MeleeAttack);
-							// Direct health subtract (bypass CalculateDamageReduction which may be blocking)
-							Target->CurrentHealth = FMath::Max(0, Target->CurrentHealth - (int32)Dmg);
-							AttackCooldownRemaining = 1.0f;
+						float Dmg = FMath::Max(20.0f, (float)UnitData.BaseStats.MeleeAttack);
+						Target->CurrentHealth = FMath::Max(0, Target->CurrentHealth - (int32)Dmg);
+						AttackCooldownRemaining = 1.0f;
 
-							// Arm swing
-							if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+						// Arm swing
+						if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
 
-							// Visible debug
-							if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f,
-								(OwnerFaction == EFactionID::Rome) ? FColor::Cyan : FColor::Yellow,
-								FString::Printf(TEXT("%s->%s DMG:%.0f HP:%d"),
-									*GetName(), *Target->GetName(), Dmg, Target->CurrentHealth));
+						// BRIGHT GREEN — impossible to miss on screen
+						if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+							FString::Printf(TEXT("HIT! %s->%s DMG:%.0f HP:%d/%d"),
+								*UnitData.DisplayName.ToString(),
+								*Target->UnitData.DisplayName.ToString(),
+								Dmg, Target->CurrentHealth,
+								Target->UnitData.BaseStats.MaxHealth));
 
-							// Kill if dead
-							if (Target->CurrentHealth <= 0) Target->OnDeath();
-						}
+						// Kill if dead
+						if (Target->CurrentHealth <= 0) Target->OnDeath();
 					}
-					else
-					{
-						// Out of range: walk toward target
-						MoveDestination = Target->GetActorLocation();
-						bHasMoveCommand = true;
-					}
+					// Face target while fighting
+					FVector FaceDir = Target->GetActorLocation() - GetActorLocation();
+					FaceDir.Z = 0.0f;
+					if (!FaceDir.IsNearlyZero())
+						SetActorRotation(FMath::RInterpTo(GetActorRotation(), FaceDir.Rotation(), DeltaSeconds, 10.0f));
 				}
-				else AttackTarget = nullptr;  // Target dead, clear
+				else
+				{
+					// Out of range: walk toward target
+					MoveDestination = Target->GetActorLocation();
+					bHasMoveCommand = true;
+				}
 			}
-			else if (!bHasMoveCommand)
+			else AttackTarget = nullptr; // Target dead, clear
+		}
+		else if (!bHasMoveCommand)
+		{
+			// Auto-detect nearest enemy within 5000
+			AUnitBase* ClosestEnemy = nullptr;
+			float ClosestDist = 5000.0f;
+			TArray<AActor*> AllActors;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
+			for (AActor* Actor : AllActors)
 			{
-				// Auto-detect nearest enemy within 5000
-				AUnitBase* ClosestEnemy = nullptr;
-				float ClosestDist = 5000.0f;
-				TArray<AActor*> AllActors;
-				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
-				for (AActor* Actor : AllActors)
-				{
-					AUnitBase* Other = Cast<AUnitBase>(Actor);
-					if (!Other || Other == this || !Other->IsAlive()) continue;
-					if (Other->GetOwnerFaction() == OwnerFaction) continue; // Same team
-					if (Other->GetOwnerFaction() == EFactionID::None) continue; // Neutral
-					float D = FVector::Dist2D(GetActorLocation(), Other->GetActorLocation());
-					if (D < ClosestDist) { ClosestDist = D; ClosestEnemy = Other; }
-				}
-				if (ClosestEnemy) CommandAttack(ClosestEnemy);
+				AUnitBase* Other = Cast<AUnitBase>(Actor);
+				if (!Other || Other == this || !Other->IsAlive()) continue;
+				if (Other->GetOwnerFaction() == OwnerFaction) continue;
+				if (Other->GetOwnerFaction() == EFactionID::None) continue;
+				float D = FVector::Dist2D(GetActorLocation(), Other->GetActorLocation());
+				if (D < ClosestDist) { ClosestDist = D; ClosestEnemy = Other; }
 			}
+			if (ClosestEnemy) CommandAttack(ClosestEnemy);
+		}
 
-		// Direct movement toward destination (no NavMesh needed)
+		// === MOVEMENT (inside bIsPossessedByPlayer check) ===
 		if (bHasMoveCommand)
 		{
 			FVector CurrentLoc = GetActorLocation();
@@ -415,8 +420,6 @@ void AUnitBase::Tick(float DeltaSeconds)
 			if (Dist > 80.0f)
 			{
 				Dir.Normalize();
-
-				// Direct position update
 				float MoveSpeed = 300.0f;
 				if (GetCharacterMovement())
 				{
@@ -426,10 +429,9 @@ void AUnitBase::Tick(float DeltaSeconds)
 				if (StepSize > Dist) StepSize = Dist;
 
 				FVector NewLoc = CurrentLoc + Dir * StepSize;
-				NewLoc.Z = CurrentLoc.Z; // Keep same Z
-				SetActorLocation(NewLoc, false); // sweep=false to avoid ground collision blocking
+				NewLoc.Z = CurrentLoc.Z;
+				SetActorLocation(NewLoc, false);
 
-				// Face movement direction
 				FRotator TargetRot = Dir.Rotation();
 				SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaSeconds, 10.0f));
 			}
@@ -438,7 +440,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 				bHasMoveCommand = false;
 			}
 		}
-	}
+	} // END if (!bIsPossessedByPlayer)
 
 	// Procedural walking animation (limb swinging)
 	bool bIsMoving = (GetVelocity().SizeSquared2D() > 100.0f);

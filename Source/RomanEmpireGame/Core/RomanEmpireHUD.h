@@ -8,6 +8,8 @@
 
 class AUnitBase;
 class ARomanEmpireGameMode;
+class ABuildingBase;
+class ABarracks;
 
 /**
  * Main HUD class using Canvas-based drawing (no Widget Blueprints needed)
@@ -64,6 +66,19 @@ public:
 	// Cache
 	ARomanEmpireGameMode* CachedGameMode;
 
+	// Selected building
+	ABuildingBase* HUDSelectedBuilding;
+
+	// Victory / kill tracking
+	bool bVictory;
+	bool bDefeated;
+	int32 EnemiesKilled;
+	float LastVictoryCheckTime;
+
+	// Train button rect (so PlayerController can detect clicks)
+	FVector2D TrainButtonMin;
+	FVector2D TrainButtonMax;
+
 private:
 	void DrawResourceBar();
 	void DrawPhaseIndicator();
@@ -72,5 +87,8 @@ private:
 	void DrawMinimap();
 	void DrawSelectionBoxes();
 	void DrawControlsHelp();
-	void DrawHealthBars();
+	void DrawHealthBars();         // floating bars above all units
+	void DrawBuildingPanel();      // info / training panel for selected building
+	void DrawVictoryOverlay();     // win/lose screen
+	void CheckVictoryCondition();  // every 2s
 };

@@ -58,6 +58,12 @@ void UBuildingPlacementComponent::StartPlacement(TSubclassOf<ABuildingBase> Buil
 
 	CreatePreviewBuilding();
 
+	// Apply building type shape/color to preview immediately
+	if (PreviewBuilding)
+	{
+		PreviewBuilding->SetBuildingTypeData(CurrentBuildingType);
+	}
+
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 3.0f,
