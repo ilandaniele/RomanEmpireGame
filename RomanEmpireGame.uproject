@@ -23,9 +23,20 @@
 			"Name": "AISupport",
 			"Enabled": true
 		},
-
 		{
 			"Name": "Landmass",
+			"Enabled": true
+		},
+		{
+			"Name": "RemoteControl",
+			"Enabled": true
+		},
+		{
+			"Name": "RemoteControlWebInterface",
+			"Enabled": true
+		},
+		{
+			"Name": "AutomationDriver",
 			"Enabled": true
 		}
 	],

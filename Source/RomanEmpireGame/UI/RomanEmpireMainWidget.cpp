@@ -11,6 +11,9 @@
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/Border.h"
+// Automation Driver — stable widget IDs for E2E testing (unreal-engine-automation skill)
+#include "AutomationDriver/Public/IDriverElement.h"
+#include "AutomationDriver/Public/DriverConfiguration.h"
 
 void URomanEmpireMainWidget::NativeConstruct()
 {
@@ -32,7 +35,50 @@ void URomanEmpireMainWidget::NativeConstruct()
 
 	SetupBuildingButtons();
 
-	UE_LOG(LogRomanEmpire, Log, TEXT("Main Widget constructed"));
+	// ── Automation IDs (unreal-engine-automation skill) ──────────────────────
+	// Attach FDriverMetaData::Id to each Slate widget for By::Id selectors.
+	// These IDs are used by test_romanempire_e2e.py and Automation Driver.
+	auto SetId = [](UWidget* W, FName Id)
+	{
+		if (!W) return;
+		TSharedPtr<SWidget> Slate = W->GetCachedWidget();
+		if (Slate.IsValid())
+		{
+			Slate->AddMetadata(MakeShared<FDriverMetaData::Id>(Id));
+		}
+	};
+
+	// Resource bar labels
+	SetId(GoldText,       FName("lbl_gold"));
+	SetId(FoodText,       FName("lbl_food"));
+	SetId(IronText,       FName("lbl_iron"));
+	SetId(WoodText,       FName("lbl_wood"));
+	SetId(StoneText,      FName("lbl_stone"));
+	SetId(PopulationText, FName("lbl_population"));
+
+	// Building menu container
+	SetId(BuildingMenuPanel, FName("panel_build_menu"));
+
+	// Unit panel
+	SetId(UnitPanel,     FName("panel_unit"));
+	SetId(UnitNameText,  FName("lbl_unit_name"));
+	SetId(UnitHealthBar, FName("bar_unit_health"));
+
+	// FPS HUD elements
+	SetId(FPSOverlay,    FName("overlay_fps"));
+	SetId(CrosshairImage,FName("img_crosshair"));
+	SetId(HealthBar,     FName("bar_health"));
+	SetId(StaminaBar,    FName("bar_stamina"));
+
+	// Minimap
+	SetId(MinimapContainer, FName("panel_minimap"));
+	SetId(MinimapImage,     FName("img_minimap"));
+
+	// Strategic overlay
+	SetId(StrategicOverlay, FName("overlay_strategic"));
+	// ─────────────────────────────────────────────────────────────────────────
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("Main Widget constructed — Automation IDs assigned"));
 }
 
 void URomanEmpireMainWidget::ShowBuildingMenu()

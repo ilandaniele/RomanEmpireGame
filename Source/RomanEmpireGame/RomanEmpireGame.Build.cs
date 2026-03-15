@@ -20,7 +20,10 @@ public class RomanEmpireGame : ModuleRules
 			"AIModule",
 			"NavigationSystem",
 			"GameplayTasks",
-			"UMG"
+			"UMG",
+			"HTTP",
+			"Json",
+			"JsonUtilities"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
