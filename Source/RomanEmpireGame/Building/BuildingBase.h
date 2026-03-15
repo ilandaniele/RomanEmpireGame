@@ -82,6 +82,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void SetPlacementMode(bool bPlacing, bool bValidPlacement);
 
+	// Called by BuildingPlacementComponent to configure type-specific visuals
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	virtual void SetBuildingTypeData(EBuildingType InType) { BuildingData.BuildingType = InType; }
+
 protected:
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

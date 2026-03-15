@@ -7,13 +7,14 @@
 #include "RomanEmpireHUD.generated.h"
 
 class AUnitBase;
-class ARomanEmpireGameMode;
 class ABuildingBase;
 class ABarracks;
+class ARomanEmpireGameMode;
 
 /**
- * Main HUD class using Canvas-based drawing (no Widget Blueprints needed)
- * Draws resource bar, phase indicator, unit info, and minimap directly
+ * Main HUD - fully Canvas-based (no Widget Blueprint required)
+ * Draws resource bar, phase indicator, building menu, unit panels,
+ * health bars, building panel, and victory overlay.
  */
 UCLASS()
 class ROMANEMPIREGAME_API ARomanEmpireHUD : public AHUD
@@ -40,55 +41,91 @@ public:
 	void UpdateUnitSelection(const TArray<AUnitBase*>& SelectedUnits);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void ShowFPSOverlay(bool bShow);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void OnZoomLevelChanged(float ZoomLevel);
 
-protected:
-	// State
-	bool bBuildingMenuVisible;
-	bool bFPSMode;
-	float CurrentZoomLevel;
+	// Building selection (called by player controller on click)
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void SetSelectedBuilding(ABuildingBase* Building) { HUDSelectedBuilding = Building; }
 
-public:
-	// Resource values (public for GameMode access)
-	int32 DisplayGold;
-	int32 DisplayFood;
-	int32 DisplayIron;
-	int32 DisplayWood;
-	int32 DisplayStone;
-	int32 DisplayPopulation;
+	// Kill tracking (called externally when enemy dies)
+	UFUNCTION(BlueprintCallable, Category = "HUD")
+	void IncrementKills() { EnemiesKilled++; }
 
-	// Cached selections
-	TArray<AUnitBase*> CurrentSelectedUnits;
-
-	// Cache
-	ARomanEmpireGameMode* CachedGameMode;
-
-	// Selected building
-	ABuildingBase* HUDSelectedBuilding;
-
-	// Victory / kill tracking
-	bool bVictory;
-	bool bDefeated;
-	int32 EnemiesKilled;
-	float LastVictoryCheckTime;
-
-	// Train button rect (so PlayerController can detect clicks)
+	// Train button bounds (read by PlayerController for hit-testing)
 	FVector2D TrainButtonMin;
 	FVector2D TrainButtonMax;
 
+protected:
+	// State
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
+	bool bBuildingMenuVisible;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
+	bool bFPSMode;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
+	float CurrentZoomLevel;
+
+	// Displayed resource values (updated via UpdateResources)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayGold;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayFood;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayIron;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayWood;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayStone;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
+	int32 DisplayPopulation;
+
+	// Currently selected units
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Selection")
+	TArray<AUnitBase*> CurrentSelectedUnits;
+
+	// Currently selected building
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Selection")
+	ABuildingBase* HUDSelectedBuilding;
+
+	// Victory state
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Victory")
+	bool bVictory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Victory")
+	bool bDefeated;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Victory")
+	int32 EnemiesKilled;
+
+	// Cached references
+	UPROPERTY()
+	ARomanEmpireGameMode* CachedGameMode;
+
 private:
+	float LastVictoryCheckTime;
+
+	// Draw sub-routines
 	void DrawResourceBar();
 	void DrawPhaseIndicator();
+	void DrawControlsHelp();
 	void DrawUnitPanel();
 	void DrawBuildingMenu();
 	void DrawMinimap();
 	void DrawSelectionBoxes();
-	void DrawControlsHelp();
-	void DrawHealthBars();         // floating bars above all units
-	void DrawBuildingPanel();      // info / training panel for selected building
-	void DrawVictoryOverlay();     // win/lose screen
-	void CheckVictoryCondition();  // every 2s
+	void DrawHealthBars();
+	void DrawBuildingPanel();
+	void DrawVictoryOverlay();
+	void CheckVictoryCondition();
 };
