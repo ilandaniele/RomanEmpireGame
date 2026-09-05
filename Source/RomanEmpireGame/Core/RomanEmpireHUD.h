@@ -40,12 +40,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void UpdateUnitSelection(const TArray<AUnitBase*>& SelectedUnits);
 
-	UFUNCTION(BlueprintCallable, Category = "HUD")
-	void ShowFPSOverlay(bool bShow);
-
-	UFUNCTION(BlueprintCallable, Category = "HUD")
-	void OnZoomLevelChanged(float ZoomLevel);
-
 	// Building selection (called by player controller on click)
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void SetSelectedBuilding(ABuildingBase* Building) { HUDSelectedBuilding = Building; }
@@ -62,12 +56,6 @@ protected:
 	// State
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
 	bool bBuildingMenuVisible;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
-	bool bFPSMode;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
-	float CurrentZoomLevel;
 
 	// Currently selected units
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Selection")

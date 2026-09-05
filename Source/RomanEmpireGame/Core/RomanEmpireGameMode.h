@@ -3,6 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Camera/ZoomConfiguration.h"
+#include "Campaign/CampaignTurn.h"
+#include "Core/GameplayMode.h"
 #include "GameFramework/GameModeBase.h"
 #include "Math/RandomStream.h"
 #include "RomanEmpireGameMode.generated.h"
@@ -10,18 +13,6 @@
 class AFactionManager;
 class AWorldMapManager;
 class ACampaignManager;
-
-/**
- * Game phase representing the current mode of gameplay
- */
-UENUM(BlueprintType)
-enum class EGamePhase : uint8
-{
-	Strategic	UMETA(DisplayName = "Strategic Phase"),    // Campaign map, managing factions
-	Tactical	UMETA(DisplayName = "Tactical Phase"),     // RTS mode with building/units
-	Combat		UMETA(DisplayName = "Combat Phase"),       // Battle happening
-	FirstPerson UMETA(DisplayName = "First Person Phase")  // FPS mode controlling a soldier
-};
 
 /**
  * Main game mode for Roman Empire Game
@@ -37,20 +28,20 @@ public:
 
 	virtual void BeginPlay() override;
 
-	// Phase management
-	UFUNCTION(BlueprintCallable, Category = "Game Phase")
-	void SetGamePhase(EGamePhase NewPhase);
+	// Explicit gameplay mode. Possession is never inferred from a raw zoom value.
+	UFUNCTION(BlueprintCallable, Category = "Gameplay Mode")
+	void SetGameplayMode(EGameplayMode NewMode);
 
-	UFUNCTION(BlueprintPure, Category = "Game Phase")
-	EGamePhase GetCurrentPhase() const { return CurrentPhase; }
+	UFUNCTION(BlueprintPure, Category = "Gameplay Mode")
+	EGameplayMode GetCurrentGameplayMode() const { return CurrentGameplayMode; }
 
-	// Called when zoom level changes to update game phase
-	UFUNCTION(BlueprintCallable, Category = "Game Phase")
-	void OnZoomLevelChanged(float ZoomLevel);
+	// Applies exploration-mode policy from a semantic camera band, never from a float threshold.
+	UFUNCTION(BlueprintCallable, Category = "Gameplay Mode")
+	void SetExplorationModeForZoomLevel(EZoomLevel ZoomLevel);
 
-	// End turn in strategic phase
+	// Execute the canonical campaign turn pipeline.
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
-	void EndTurn();
+	FCampaignTurnResult EndTurn();
 
 	// Manager getters
 	UFUNCTION(BlueprintPure, Category = "Managers")
@@ -63,14 +54,11 @@ public:
 	ACampaignManager* GetCampaignManager() const { return CampaignManager; }
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
-	int32 GetCurrentTurn() const { return CurrentTurn; }
+	int32 GetCurrentTurn() const;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
-	EGamePhase CurrentPhase;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
-	int32 CurrentTurn;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Gameplay Mode")
+	EGameplayMode CurrentGameplayMode;
 
 	// Manager references
 	UPROPERTY()
@@ -82,11 +70,14 @@ protected:
 	UPROPERTY()
 	TObjectPtr<ACampaignManager> CampaignManager;
 
-	// Phase change delegate
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGamePhaseChanged, EGamePhase, OldPhase, EGamePhase, NewPhase);
+	// Gameplay mode change delegate
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnGameplayModeChanged,
+		EGameplayMode, OldMode,
+		EGameplayMode, NewMode);
 	
-	UPROPERTY(BlueprintAssignable, Category = "Game Phase")
-	FOnGamePhaseChanged OnGamePhaseChanged;
+	UPROPERTY(BlueprintAssignable, Category = "Gameplay Mode")
+	FOnGameplayModeChanged OnGameplayModeChanged;
 
 private:
 	static constexpr int32 PrototypeRandomSeed = 1337;
@@ -96,6 +87,5 @@ private:
 	void SpawnInitialUnits();
 	void SpawnInitialBuildings();
 	void SpawnWorldTerrain();
-	EGamePhase DeterminePhaseFromZoom(float ZoomLevel) const;
 };
 

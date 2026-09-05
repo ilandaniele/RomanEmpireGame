@@ -305,7 +305,7 @@ Implementation evidence recorded 2026-09-05:
 - Repository validation enforces the resource types, rejects the legacy resource/authority paths, and asserts one placement spend plus one training spend call.
 - UE 5.8.2 Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass. The exported automation report at `Artifacts/Automation/20260905_150636_277` contains 3 successes and 0 failures.
 - Development BuildCookRun cooked 516 packages into `Artifacts/Packages/M2_1`; the archived player loaded `L_VerticalSlice`, initialized the gameplay framework/managers/armies, closed through the viewport, left no game process, and produced 0 smoke failure signatures.
-- M2.1 is complete; M2.2 is the active implementation package.
+- M2.1 is complete; its canonical resource contract is the foundation used by later M2 packages.
 
 #### M2.2 Turn and phase model
 
@@ -313,6 +313,20 @@ Implementation evidence recorded 2026-09-05:
 - Define an ordered turn pipeline: validate request, production, upkeep, AI actions, conflict resolution, victory evaluation, increment, event broadcast, autosave.
 - Define `Strategic`, `Tactical`, and `Possessed` modes independently of raw zoom thresholds.
 - Store zoom thresholds/configuration in one location and update documentation/tests from it.
+
+Implementation evidence recorded 2026-09-05:
+
+- `ACampaignManager` is the sole runtime owner of `CurrentTurn`; GameMode and HUD expose/read that value without maintaining a synchronized copy.
+- `RomanEmpireCampaign::GetCanonicalTurnPipeline()` defines the nine required stages in one ordered contract. `ProcessTurn()` validates its dependencies, executes production, upkeep, AI actions, conflict resolution, victory evaluation, increment, completion broadcast, and autosave request in that exact order, and returns `FCampaignTurnResult` with a typed failure and failed-step value.
+- Enemy strategic unit movement now belongs to the AI stage instead of a second GameMode turn path. Upkeep and conflict resolution are explicit no-op policy seams until their later milestone rules exist.
+- `EGameplayMode` is the explicit `Strategic`/`Tactical`/`Possessed` authority. Camera framing may choose Strategic or Tactical exploration presentation, but first-person framing alone cannot imply possession; entering and leaving possession changes the gameplay mode explicitly.
+- `FZoomConfiguration` is the only owner of zoom limits, semantic boundaries, default tactical framing, user input step, and classification. The camera is the only owner of current/target zoom state; controller, GameMode, and HUD no longer keep parallel zoom values or hard-coded thresholds.
+- Repository validation enforces one turn counter, the exact pipeline cases, the public mode/config contracts, camera-owned zoom state, and removal of the legacy `EGamePhase`, `bIsInFirstPersonMode`, and `ZOOM_*` paths.
+- UE 5.8.2 Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass. The post-change automation report at `Artifacts/Automation/20260905_162130_576` contains 5 successes and 0 failures, including canonical turn-order and gameplay-mode/zoom-boundary tests.
+- Development BuildCookRun compiled, cooked 516 packages, staged, packaged, and archived successfully into `Artifacts/Packages/M2_2`. An Editor-hosted `-game` smoke loaded `/Game/Maps/L_VerticalSlice`, instantiated `ARomanEmpireGameMode`, brought the world up for play, initialized the engine, and produced 0 smoke failure signatures.
+- A direct smoke of the newly built unsigned player is blocked before Unreal starts by this workstation's Smart App Control policy (Code Integrity events 3033/3077, policy `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`); the same machine still launches the previously trusted M1/M2.1 binaries. Security was not weakened. Signing or a controlled build runner is required to restore this specific packaged-player gate.
+- The autosave stage currently emits the canonical request and reaches the existing persistence placeholder. Actual versioned local `USaveGame` serialization remains deliberately assigned to M5.4.
+- M2.2 is complete; M2.3 is the active implementation package.
 
 #### M2.3 Territory and diplomacy model
 

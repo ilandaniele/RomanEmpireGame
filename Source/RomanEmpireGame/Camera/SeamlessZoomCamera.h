@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Camera/ZoomConfiguration.h"
 #include "GameFramework/Pawn.h"
 #include "SeamlessZoomCamera.generated.h"
 
@@ -10,19 +11,6 @@ class UCameraComponent;
 class USceneComponent;
 class USpringArmComponent;
 class UFloatingPawnMovement;
-
-/**
- * Zoom level enum representing the current camera state
- */
-UENUM(BlueprintType)
-enum class EZoomLevel : uint8
-{
-	World		UMETA(DisplayName = "World View"),       // 0-20% - Continental/world view
-	Territory	UMETA(DisplayName = "Territory View"),   // 20-40% - Regional view
-	City		UMETA(DisplayName = "City View"),        // 40-60% - Settlement/RTS view
-	Ground		UMETA(DisplayName = "Ground View"),      // 60-80% - Third-person view
-	FirstPerson	UMETA(DisplayName = "First Person View") // 80-100% - FPS view
-};
 
 /**
  * Camera pawn that handles seamless zooming from world map to first-person view
@@ -51,6 +39,9 @@ public:
 	float GetZoomLevel() const { return CurrentZoomLevel; }
 
 	UFUNCTION(BlueprintPure, Category = "Camera|Zoom")
+	float GetTargetZoomLevel() const { return TargetZoomLevel; }
+
+	UFUNCTION(BlueprintPure, Category = "Camera|Zoom")
 	EZoomLevel GetZoomLevelEnum() const;
 
 	// Camera focus
@@ -64,27 +55,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera|Movement")
 	void PanCamera(const FVector2D& Direction);
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnZoomLevelChanged,
+		EZoomLevel, OldLevel,
+		EZoomLevel, NewLevel);
+
+	UPROPERTY(BlueprintAssignable, Category = "Camera|Events")
+	FOnZoomLevelChanged OnZoomLevelChanged;
+
 protected:
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USceneComponent* RootScene;
+	TObjectPtr<USceneComponent> RootScene;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USpringArmComponent* CameraArm;
+	TObjectPtr<USpringArmComponent> CameraArm;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCameraComponent* Camera;
+	TObjectPtr<UCameraComponent> Camera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UFloatingPawnMovement* MovementComponent;
+	TObjectPtr<UFloatingPawnMovement> MovementComponent;
 
 	// Zoom settings
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Zoom")
-	float MinZoom;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Zoom")
-	float MaxZoom;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Zoom")
 	float ZoomInterpSpeed;
 
@@ -135,7 +128,7 @@ protected:
 	float TargetZoomLevel;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|State")
-	AActor* FocusedActor;
+	TObjectPtr<AActor> FocusedActor;
 
 	// Pan speed per zoom level
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Movement")
@@ -143,12 +136,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Movement")
 	float CityPanSpeed;
-
-	// Events
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnZoomLevelChanged, EZoomLevel, OldLevel, EZoomLevel, NewLevel);
-	
-	UPROPERTY(BlueprintAssignable, Category = "Camera|Events")
-	FOnZoomLevelChanged OnZoomLevelChanged;
 
 private:
 	EZoomLevel LastZoomLevel;

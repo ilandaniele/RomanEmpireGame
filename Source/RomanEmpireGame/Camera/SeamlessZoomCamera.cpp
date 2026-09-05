@@ -37,8 +37,6 @@ ASeamlessZoomCamera::ASeamlessZoomCamera()
 	MovementComponent->MaxSpeed = 5000.0f;
 
 	// Initialize zoom settings
-	MinZoom = 0.0f;
-	MaxZoom = 1.0f;
 	ZoomInterpSpeed = 50.0f;  // Near-instant camera catch-up
 
 	// Height settings (in Unreal units, 1 unit = 1 cm)
@@ -64,10 +62,11 @@ ASeamlessZoomCamera::ASeamlessZoomCamera()
 	CityPanSpeed = 2000.0f;          // Slower pan when zoomed in
 
 	// Initialize state
-	CurrentZoomLevel = 0.55f;         // Start at city/tactical view
-	TargetZoomLevel = 0.55f;
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+	CurrentZoomLevel = Zoom.DefaultTactical;
+	TargetZoomLevel = Zoom.DefaultTactical;
 	FocusedActor = nullptr;
-	LastZoomLevel = EZoomLevel::City;
+	LastZoomLevel = Zoom.Classify(CurrentZoomLevel);
 }
 
 void ASeamlessZoomCamera::BeginPlay()
@@ -121,7 +120,8 @@ void ASeamlessZoomCamera::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 void ASeamlessZoomCamera::SetZoomLevel(float NewZoomLevel)
 {
-	CurrentZoomLevel = FMath::Clamp(NewZoomLevel, MinZoom, MaxZoom);
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+	CurrentZoomLevel = FMath::Clamp(NewZoomLevel, Zoom.Minimum, Zoom.Maximum);
 	TargetZoomLevel = CurrentZoomLevel;
 	
 	// Immediately update camera
@@ -130,28 +130,13 @@ void ASeamlessZoomCamera::SetZoomLevel(float NewZoomLevel)
 
 void ASeamlessZoomCamera::SetTargetZoomLevel(float NewTargetZoom)
 {
-	TargetZoomLevel = FMath::Clamp(NewTargetZoom, MinZoom, MaxZoom);
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+	TargetZoomLevel = FMath::Clamp(NewTargetZoom, Zoom.Minimum, Zoom.Maximum);
 }
 
 EZoomLevel ASeamlessZoomCamera::GetZoomLevelEnum() const
 {
-	// Three user-facing views with clear separation
-	if (CurrentZoomLevel <= 0.25f)
-	{
-		return EZoomLevel::World; // Strategic View (0.0–0.25)
-	}
-	else if (CurrentZoomLevel <= 0.70f)
-	{
-		return EZoomLevel::City; // Tactical View (0.25–0.70)
-	}
-	else if (CurrentZoomLevel <= 0.80f)
-	{
-		return EZoomLevel::Ground; // Close Ground View (0.70–0.80)
-	}
-	else
-	{
-		return EZoomLevel::FirstPerson; // Combat / FPS
-	}
+	return RomanEmpireCamera::GetDefaultZoomConfiguration().Classify(CurrentZoomLevel);
 }
 
 void ASeamlessZoomCamera::FocusOnLocation(const FVector& Location)
@@ -221,16 +206,15 @@ void ASeamlessZoomCamera::UpdateCameraFromZoom(float DeltaSeconds)
 
 float ASeamlessZoomCamera::GetTargetHeight() const
 {
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
 	// Single smooth exponential curve: zoom 0.0 = 30km, zoom 0.70 = 500, no hard breaks
 	// Use log interpolation for perceptually smooth zoom
-	const float ZoomLow = 0.0f;
-	const float ZoomHigh = 0.70f;
 	const float HeightAtLow = 3000000.0f;  // 30km at full zoom out
 	const float HeightAtHigh = 500.0f;     // 5m at full zoom in
 
 	// Clamp zoom to valid range
-	float Z = FMath::Clamp(CurrentZoomLevel, ZoomLow, ZoomHigh);
-	float T = (Z - ZoomLow) / (ZoomHigh - ZoomLow); // 0.0..1.0
+	const float Z = FMath::Clamp(CurrentZoomLevel, Zoom.Minimum, Zoom.TacticalMaximum);
+	const float T = (Z - Zoom.Minimum) / (Zoom.TacticalMaximum - Zoom.Minimum); // 0.0..1.0
 
 	// Exponential: log-lerp between min and max heights
 	float LogLow = FMath::Loge(HeightAtLow);
@@ -241,22 +225,26 @@ float ASeamlessZoomCamera::GetTargetHeight() const
 
 float ASeamlessZoomCamera::GetTargetPitch() const
 {
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
 	// Strategic: -85 → -70
-	if (CurrentZoomLevel <= 0.25f)
+	if (CurrentZoomLevel <= Zoom.StrategicMaximum)
 	{
-		float Alpha = CurrentZoomLevel / 0.25f;
+		const float Alpha = (CurrentZoomLevel - Zoom.Minimum) /
+			(Zoom.StrategicMaximum - Zoom.Minimum);
 		return FMath::Lerp(-85.0f, -70.0f, Alpha);
 	}
 	// Tactical: -70 → -45
-	else if (CurrentZoomLevel <= 0.70f)
+	else if (CurrentZoomLevel <= Zoom.TacticalMaximum)
 	{
-		float Alpha = (CurrentZoomLevel - 0.25f) / 0.45f;
+		const float Alpha = (CurrentZoomLevel - Zoom.StrategicMaximum) /
+			(Zoom.TacticalMaximum - Zoom.StrategicMaximum);
 		return FMath::Lerp(-70.0f, -45.0f, Alpha);
 	}
 	// Ground: -45 → 0
-	else if (CurrentZoomLevel <= 0.80f)
+	else if (CurrentZoomLevel <= Zoom.GroundMaximum)
 	{
-		float Alpha = (CurrentZoomLevel - 0.70f) / 0.10f;
+		const float Alpha = (CurrentZoomLevel - Zoom.TacticalMaximum) /
+			(Zoom.GroundMaximum - Zoom.TacticalMaximum);
 		return FMath::Lerp(-45.0f, 0.0f, Alpha);
 	}
 	else

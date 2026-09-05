@@ -39,8 +39,12 @@ $requiredFiles = @(
     'PRODUCT_BRIEF.md',
     'THIRD_PARTY_NOTICES.md',
     '.agents\ue-project-context.md',
+    'Source\RomanEmpireGame\Public\Camera\ZoomConfiguration.h',
+    'Source\RomanEmpireGame\Public\Campaign\CampaignTurn.h',
+    'Source\RomanEmpireGame\Public\Core\GameplayMode.h',
     'Source\RomanEmpireGame\Public\Faction\FactionData.h',
     'Source\RomanEmpireGameTests\RomanEmpireGameTests.Build.cs',
+    'Source\RomanEmpireGameTests\Private\CampaignStateRulesTests.cpp',
     'Source\RomanEmpireGameTests\Private\ContentPathValidationTests.cpp',
     'Source\RomanEmpireGameTests\Private\FactionResourceRulesTests.cpp'
 )
@@ -167,8 +171,14 @@ Assert-True -Condition ($testBuildRules -notmatch 'IWYUSupport\.None') `
 $testSource = Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'Source\RomanEmpireGameTests') -Recurse -File -Include '*.h', '*.cpp'
 foreach ($file in $testSource) {
     $text = Read-Utf8 -Path $file.FullName
-    if ($text -match '(?m)^#include\s+"(?:Assets|Audio|Building|Camera|Core|Online|UI|Units|World)/') {
-        Add-Failure -Message "The test module may not import private runtime headers: $($file.FullName)"
+    foreach ($includeMatch in [regex]::Matches($text, '(?m)^#include\s+"([^"]+)"')) {
+        $includePath = $includeMatch.Groups[1].Value.Replace('/', '\')
+        $privateCandidate = Join-Path $runtimeRoot $includePath
+        $publicCandidate = Join-Path (Join-Path $runtimeRoot 'Public') $includePath
+        if ((Test-Path -LiteralPath $privateCandidate -PathType Leaf) -and
+            -not (Test-Path -LiteralPath $publicCandidate -PathType Leaf)) {
+            Add-Failure -Message "The test module may not import private runtime header '$includePath': $($file.FullName)"
+        }
     }
 }
 
@@ -228,8 +238,8 @@ Assert-True -Condition ($buildingSetterCount -eq 1) `
     -Message "BuildingBase.h must declare SetBuildingTypeData exactly once; found $buildingSetterCount."
 
 $hudSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireHUD.cpp')
-Assert-True -Condition ($hudSource -match 'void\s+ARomanEmpireHUD::ShowFPSOverlay\s*\(') `
-    -Message 'ARomanEmpireHUD::ShowFPSOverlay is declared but not implemented.'
+Assert-True -Condition ($hudSource -notmatch '\bCurrentZoomLevel\b') `
+    -Message 'HUD gameplay-mode presentation may not infer authority from a local zoom value.'
 
 $gameModeSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireGameMode.cpp')
 Assert-True -Condition ($gameModeSource -notmatch 'HUD->DisplayGold') `
@@ -251,6 +261,8 @@ Assert-True -Condition ($controllerSource -notmatch 'REHUD->HUDSelectedBuilding'
     -Message 'PlayerController must use the HUD public building-selection API.'
 Assert-True -Condition ($controllerSource -notmatch '\b(?:TrainingProgress|TrainingTimeRemaining|UnitBeingTrained)\b') `
     -Message 'PlayerController may not own duplicate unit-training state.'
+Assert-True -Condition ($controllerSource -notmatch '\b(?:CurrentZoomLevel|TargetZoomLevel|bIsInFirstPersonMode)\b') `
+    -Message 'PlayerController may not own duplicate zoom or gameplay-mode state.'
 Assert-True -Condition ($controllerSource -match 'if\s*\(\s*BuildingPlacementComponent->ConfirmPlacement\(\)\s*\)\s*\{\s*CurrentSelectionMode\s*=\s*ERomanSelectionMode::None') `
     -Message 'Building placement mode must clear only after ConfirmPlacement succeeds.'
 
@@ -263,6 +275,40 @@ $barracksSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\Barracks.cpp
 $trainingSpendCount = [regex]::Matches($barracksSource, '\bTrySpendFactionResources\s*\(').Count
 Assert-True -Condition ($trainingSpendCount -eq 1) `
     -Message "Barracks training acceptance must perform exactly one canonical spend call; found $trainingSpendCount."
+
+$runtimeHeaderText = ($runtimeSource | Where-Object { $_.Extension -eq '.h' } | ForEach-Object {
+    Read-Utf8 -Path $_.FullName
+}) -join "`n"
+$turnCounterCount = [regex]::Matches($runtimeHeaderText, '\bint32\s+CurrentTurn\s*;').Count
+Assert-True -Condition ($turnCounterCount -eq 1) `
+    -Message "Runtime code must declare exactly one canonical CurrentTurn field; found $turnCounterCount."
+Assert-True -Condition ($runtimeHeaderText -notmatch '\bEGamePhase\b|\bbIsInFirstPersonMode\b') `
+    -Message 'Legacy zoom-derived phase and duplicate possession-mode state must not be reintroduced.'
+
+$campaignSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'World\CampaignManager.cpp')
+Assert-True -Condition ($campaignSource -match 'RomanEmpireCampaign::GetCanonicalTurnPipeline\s*\(') `
+    -Message 'CampaignManager must execute the canonical turn pipeline definition.'
+foreach ($turnStep in @(
+    'ValidateRequest',
+    'Production',
+    'Upkeep',
+    'AIActions',
+    'ConflictResolution',
+    'VictoryEvaluation',
+    'IncrementTurn',
+    'BroadcastTurnCompleted',
+    'Autosave'
+)) {
+    $stepCount = [regex]::Matches($campaignSource, "case\s+ECampaignTurnStep::$turnStep\s*:").Count
+    Assert-True -Condition ($stepCount -eq 1) `
+        -Message "CampaignManager must execute $turnStep exactly once in its step dispatcher; found $stepCount."
+}
+
+$zoomCameraSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Camera\SeamlessZoomCamera.cpp')
+Assert-True -Condition ($zoomCameraSource -match 'GetDefaultZoomConfiguration\(\)\.Classify\(CurrentZoomLevel\)') `
+    -Message 'SeamlessZoomCamera must classify zoom through the canonical configuration.'
+Assert-True -Condition ($runtimeHeaderText -notmatch '\bZOOM_(?:WORLD|TERRITORY|CITY|GROUND|FPS)') `
+    -Message 'Legacy parallel zoom thresholds must not be reintroduced.'
 
 $supabaseSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Online\SupabaseSubsystem.cpp')
 Assert-True -Condition ($supabaseSource -notmatch 'LogRomanEmpireGame') `

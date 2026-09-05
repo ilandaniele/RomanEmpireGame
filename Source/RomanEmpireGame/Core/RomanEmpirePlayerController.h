@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Camera/ZoomConfiguration.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
 #include "RomanEmpirePlayerController.generated.h"
@@ -80,17 +81,18 @@ public:
 	void ExitFirstPersonMode();
 
 	UFUNCTION(BlueprintPure, Category = "FPS")
-	bool IsInFirstPersonMode() const { return bIsInFirstPersonMode; }
+	bool IsInFirstPersonMode() const;
 
 	// Zoom control
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetTargetZoom(float NewZoom);
 
 	UFUNCTION(BlueprintPure, Category = "Camera")
-	float GetCurrentZoom() const { return CurrentZoomLevel; }
+	float GetCurrentZoom() const;
 
 	// Selected building (for info panel / training)
-	class ABuildingBase* SelectedBuilding;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building")
+	TObjectPtr<ABuildingBase> SelectedBuilding;
 
 	// Building select / training
 	void OnTrainButtonClicked();
@@ -155,29 +157,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
 	ERomanSelectionMode CurrentSelectionMode;
 
-	// Zoom state
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
-	float CurrentZoomLevel;
-
-	float TargetZoomLevel;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera")
-	float ZoomSpeed;
-
-	// FPS state
+	// Possession target; the canonical mode itself lives in GameMode.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FPS")
-	bool bIsInFirstPersonMode;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FPS")
-	AUnitBase* PossessedUnit;
+	TObjectPtr<AUnitBase> PossessedUnit;
 
 	// Cached camera pawn for restoring after FPS mode
 	UPROPERTY()
-	ASeamlessZoomCamera* CachedCameraPawn;
+	TObjectPtr<ASeamlessZoomCamera> CachedCameraPawn;
 
 	// Building placement
 	UPROPERTY()
-	UBuildingPlacementComponent* BuildingPlacementComponent;
+	TObjectPtr<UBuildingPlacementComponent> BuildingPlacementComponent;
 
 	// Input handlers
 	void OnSelectPressed();
@@ -193,6 +183,9 @@ protected:
 	void OnBlockReleased();
 	void OnEndTurnPressed();
 
+	UFUNCTION()
+	void HandleCameraZoomLevelChanged(EZoomLevel OldLevel, EZoomLevel NewLevel);
+
 	// Edge scroll for RTS camera
 	void HandleEdgeScroll(float DeltaTime);
 
@@ -202,10 +195,10 @@ private:
 	bool bIsBoxSelecting;
 
 	// Cache game mode
-	ARomanEmpireGameMode* GameMode;
+	UPROPERTY()
+	TObjectPtr<ARomanEmpireGameMode> GameMode;
 
 	void CreateInputActionsAndMappings();
-	void UpdateZoom(float DeltaTime);
 	void PerformBoxSelect();
 	AActor* GetActorUnderCursor() const;
 };

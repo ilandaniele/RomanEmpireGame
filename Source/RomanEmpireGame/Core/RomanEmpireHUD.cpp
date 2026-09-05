@@ -16,8 +16,6 @@
 ARomanEmpireHUD::ARomanEmpireHUD()
 {
 	bBuildingMenuVisible = false;
-	bFPSMode = false;
-	CurrentZoomLevel = 0.3f;
 
 	CachedGameMode = nullptr;
 	HUDSelectedBuilding = nullptr;
@@ -75,9 +73,22 @@ void ARomanEmpireHUD::DrawHUD()
 		DrawText(TEXT("ROMAN EMPIRE"), FLinearColor(0.9f, 0.2f, 0.1f),
 			10.0f, 30.0f, Font);
 
-		// View mode label (right side, below resource bar)
-		FString ViewLabel = CurrentZoomLevel <= 0.25f ? TEXT("STRATEGIC VIEW") : TEXT("TACTICAL VIEW");
-		FLinearColor ViewColor = CurrentZoomLevel <= 0.25f ? FLinearColor(0.3f, 0.6f, 1.0f) : FLinearColor(0.2f, 0.8f, 0.3f);
+		// Gameplay-mode label comes from the explicit authority, never a local zoom threshold.
+		const EGameplayMode Mode = CachedGameMode
+			? CachedGameMode->GetCurrentGameplayMode()
+			: EGameplayMode::Tactical;
+		FString ViewLabel = TEXT("TACTICAL MODE");
+		FLinearColor ViewColor(0.2f, 0.8f, 0.3f);
+		if (Mode == EGameplayMode::Strategic)
+		{
+			ViewLabel = TEXT("STRATEGIC MODE");
+			ViewColor = FLinearColor(0.3f, 0.6f, 1.0f);
+		}
+		else if (Mode == EGameplayMode::Possessed)
+		{
+			ViewLabel = TEXT("POSSESSED MODE");
+			ViewColor = FLinearColor(0.2f, 1.0f, 0.2f);
+		}
 		DrawText(ViewLabel, ViewColor, Canvas->SizeX - 160.0f, 30.0f, Font);
 	}
 }
@@ -142,22 +153,18 @@ void ARomanEmpireHUD::DrawPhaseIndicator()
 
 	if (CachedGameMode)
 	{
-		switch (CachedGameMode->GetCurrentPhase())
+		switch (CachedGameMode->GetCurrentGameplayMode())
 		{
-		case EGamePhase::Strategic:
-			PhaseText = TEXT("STRATEGIC VIEW");
+		case EGameplayMode::Strategic:
+			PhaseText = TEXT("STRATEGIC MODE");
 			PhaseColor = FLinearColor(0.3f, 0.6f, 1.0f);
 			break;
-		case EGamePhase::Tactical:
-			PhaseText = TEXT("TACTICAL VIEW");
+		case EGameplayMode::Tactical:
+			PhaseText = TEXT("TACTICAL MODE");
 			PhaseColor = FLinearColor(1.0f, 0.8f, 0.2f);
 			break;
-		case EGamePhase::Combat:
-			PhaseText = TEXT("COMBAT");
-			PhaseColor = FLinearColor(1.0f, 0.2f, 0.2f);
-			break;
-		case EGamePhase::FirstPerson:
-			PhaseText = TEXT("FIRST PERSON");
+		case EGameplayMode::Possessed:
+			PhaseText = TEXT("POSSESSED MODE");
 			PhaseColor = FLinearColor(0.2f, 1.0f, 0.2f);
 			break;
 		}
@@ -298,16 +305,6 @@ void ARomanEmpireHUD::ToggleBuildingMenu()
 void ARomanEmpireHUD::UpdateUnitSelection(const TArray<AUnitBase*>& SelectedUnits)
 {
 	CurrentSelectedUnits = SelectedUnits;
-}
-
-void ARomanEmpireHUD::ShowFPSOverlay(bool bShow)
-{
-	bFPSMode = bShow;
-}
-
-void ARomanEmpireHUD::OnZoomLevelChanged(float ZoomLevel)
-{
-	CurrentZoomLevel = ZoomLevel;
 }
 
 void ARomanEmpireHUD::DrawHealthBars()

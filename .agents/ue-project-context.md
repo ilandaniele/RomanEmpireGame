@@ -3,7 +3,7 @@
 *Last updated: 2026-09-05*
 *Audit baseline: `89d8d66e5051d303dea9c965317cdb961d8a52f6`*
 *M1 baseline: `0b74ad1566306d7487629812de68bc6abd7f0594`*
-*Status: M1 complete and clean-clone proven; M2.1 resource authority complete, M2.2 active*
+*Status: M1 complete and clean-clone proven; M2.1 resource authority and M2.2 turn/mode authority complete; M2.3 active*
 
 ## Engine & Project Overview
 
@@ -48,7 +48,7 @@
 - Both modules explicitly set UE 5.8's current `IWYUSupport.Full` policy. `BuildProject.ps1 -Action IWYU` performs the strict non-unity/no-PCH Editor build once the toolchain is installed.
 - No general-purpose editor/developer module exists. Automation Driver remains disabled and has no dependency from either current module.
 
-**Source organization:** One runtime module organized by domain. The cross-module faction/resource contract lives under `Public/Faction`; the module root is a private include path so legacy runtime-only headers and implementations remain internal. New cross-module contracts must go under `Public`, while implementation-only code remains private.
+**Source organization:** One runtime module organized by domain. Cross-module contracts live under `Public` (`Faction`, `Campaign`, `Camera`, and `Core`); the module root is a private include path so runtime implementations remain internal. New cross-module contracts must go under `Public`, while implementation-only code remains private.
 
 ## Plugin Dependencies
 
@@ -101,7 +101,7 @@
 
 **Current framework classes:**
 
-- GameMode: `ARomanEmpireGameMode`.
+- GameMode: `ARomanEmpireGameMode`, which delegates canonical turn processing to `ACampaignManager` and owns the explicit `EGameplayMode` selection.
 - GameState: `AGameStateBase`, assigned explicitly by `ARomanEmpireGameMode`; a custom canonical GameState is planned in M2.
 - PlayerController: `ARomanEmpirePlayerController`.
 - Default Pawn: `ASeamlessZoomCamera`.
@@ -117,8 +117,8 @@
 
 **Current actor-managed systems:**
 
-- `AFactionManager` — faction definitions/resources/diplomacy and a separate territory map.
-- `ACampaignManager` — campaign turn processing and victory scaffolding.
+- `AFactionManager` — canonical faction resource wallets plus legacy diplomacy/territory state scheduled for M2.3 consolidation.
+- `ACampaignManager` — sole turn counter and ordered nine-stage campaign pipeline; its autosave stage currently emits a request to the M5.4 persistence placeholder.
 - `AWorldMapManager` / `ATerritoryRegion` — runtime territory actors and ownership presentation/state.
 - `AAudioManager` and `AMaterialManager` — currently unspawned/unconfigured helpers.
 - `AProceduralMeshGenerators` — currently unused procedural geometry helper.
@@ -127,7 +127,7 @@
 
 ## Data, UI, Input, and Save Conventions
 
-**Current data model:** Resource wallets are canonical in `AFactionManager`; zero-default amount/delta structs and typed atomic transaction results are shared contracts. Other gameplay definitions remain mostly C++ structs and hard-coded values duplicated across GameMode, controller, HUD, managers, and widgets.
+**Current data model:** Resource wallets are canonical in `AFactionManager`; zero-default amount/delta structs and typed atomic transaction results are shared contracts. `ACampaignManager` owns the sole turn counter and the shared turn-result/pipeline contract; `EGameplayMode` and `FZoomConfiguration` define explicit mode state and all zoom policy. Territory ownership and diplomacy remain the next duplicated state to consolidate. Other gameplay definitions remain mostly C++ structs and hard-coded values duplicated across controller, managers, and widgets.
 **Planned data model:** Primary Data Assets for faction, unit, building, and territory definitions; Data Tables only for large flat tabular data; stable IDs in runtime state and saves.
 **Current UI:** Assigned Canvas HUD plus UMG classes that are not instantiated.
 **Planned UI:** UMG is the only production UI; Canvas becomes debug-only and is removed from gameplay interactions.
@@ -140,15 +140,15 @@
 
 **Current build entrypoint:** `BuildProject.ps1`, with UE 5.8 discovery, optional `-EngineRoot`, Visual Studio/Git LFS prerequisite checks, and UBT/UAT actions. UBA is disabled by default because the audited workstation's Smart App Control policy rejects its locally generated unsigned Editor DLL; `-UseBuildAcceleration` is an explicit opt-in for compatible machines. `build.bat` is a compatibility wrapper.
 **Current local editor/toolchain:** VS Code 1.136.1 with Microsoft's C/C++ Extension Pack, Visual Studio Build Tools 2022 17.14, MSVC 14.44, the .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100. VS Code remains the selected editor while Build Tools supplies the compiler and SDK.
-**Latest build evidence:** Repository validation and VS Code generation succeed. UE 5.8.2 builds Development Editor, Development Game, Shipping Game, and the strict non-unity/no-PCH Editor target. On 2026-09-05, approved M1 commit `0b74ad1566306d7487629812de68bc6abd7f0594` reproduced from a clean clone: LFS pull/fsck, validators, all four build gates, 2 succeeded/0 failed native tests, UAT cook/package of 516 packages, a packaged `L_VerticalSlice` smoke launch, player-receipt inspection, and shutdown hygiene all passed. M2.1 then passed the same four build targets, 3 succeeded/0 failed tests, a 516-package Development BuildCookRun, and an archived-player smoke launch with 0 failure signatures and clean shutdown.
+**Latest build evidence:** Repository validation and VS Code generation succeed. UE 5.8.2 builds Development Editor, Development Game, Shipping Game, and the strict non-unity/no-PCH Editor target. On 2026-09-05, approved M1 commit `0b74ad1566306d7487629812de68bc6abd7f0594` reproduced from a clean clone: LFS pull/fsck, validators, all four build gates, 2 succeeded/0 failed native tests, UAT cook/package of 516 packages, a packaged `L_VerticalSlice` smoke launch, player-receipt inspection, and shutdown hygiene all passed. M2.1 passed the same four build targets, 3 succeeded/0 failed tests, a 516-package Development BuildCookRun, and an archived-player smoke launch with 0 failure signatures. M2.2 passed all four build targets and 5 succeeded/0 failed tests (`Artifacts/Automation/20260905_162130_576`); its Development BuildCookRun cooked and archived 516 packages in `Artifacts/Packages/M2_2`, and the signed Unreal Editor host loaded `L_VerticalSlice` in `-game` mode with 0 smoke failure signatures. Direct launch of the newly generated unsigned player is externally blocked before engine initialization by Smart App Control policy events 3033/3077; older trusted M1/M2.1 player hashes still launch, and the protection was not weakened.
 **Custom engine fork:** None recorded.
 **Third-party C++ libraries:** None recorded beyond engine modules.
-**Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output.
+**Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output. This workstation can also reject newly generated unsigned player executables even after a successful package; release candidates therefore require signing or execution on a controlled runner whose application-control policy trusts the build output.
 
 **Current tests:**
 
 - The broken Python/pytest Remote Control scenarios were retired; `scripts/README.md` records why and names their replacements.
-- One Editor-only native automation module with three passing tests: zero-default/explicit-starting resources, atomic typed resource transactions, and required content paths/map/framework defaults.
+- One Editor-only native automation module with five passing tests: required content paths/map/framework defaults, zero-default/explicit-starting resources, atomic typed resource transactions, exact campaign turn order, and canonical gameplay-mode/zoom boundaries.
 - `L_Testbed` is the deterministic world/PIE test map; dedicated Functional Test actors and scenarios remain planned.
 - The retired Python/Remote Control files remain recoverable from Git history but are not part of the supported test path.
 
@@ -191,7 +191,7 @@
 ## Known Baseline Blockers
 
 - M1 is closed at approved commit `0b74ad1566306d7487629812de68bc6abd7f0594`; its clean-clone/LFS reproduction passed and no remote push was performed.
-- Resource ownership and spending are canonical in `AFactionManager`; M2.2 must now eliminate the duplicate turn/phase paths before territory, data-asset, UI, and input consolidation.
+- Resource ownership/spending and turn/mode/zoom authority are canonical after M2.1–M2.2. M2.3 must now eliminate disconnected territory ownership and asymmetric diplomacy state before data-asset, UI, and input consolidation.
 - Production gameplay, UI, audio, and art assets remain future milestone work and require provenance/licensing records.
 
 Update this context after M0 decisions, every engine/module/plugin migration, and any change to authoritative system ownership.

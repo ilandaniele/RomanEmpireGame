@@ -25,8 +25,7 @@ ARomanEmpireGameMode::ARomanEmpireGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	
-	CurrentPhase = EGamePhase::Tactical;  // Start in tactical, not strategic
-	CurrentTurn = 1;
+	CurrentGameplayMode = EGameplayMode::Tactical;
 	
 	FactionManager = nullptr;
 	WorldMapManager = nullptr;
@@ -44,9 +43,8 @@ void ARomanEmpireGameMode::BeginPlay()
 	Super::BeginPlay();
 	PrototypeRandomStream.Initialize(PrototypeRandomSeed);
 	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Roman Empire Game Mode started - Turn %d"), CurrentTurn);
-	
 	InitializeManagers();
+	UE_LOG(LogRomanEmpire, Log, TEXT("Roman Empire Game Mode started - Turn %d"), GetCurrentTurn());
 	SpawnWorldTerrain();
 	SpawnInitialUnits();
 	SpawnInitialBuildings();
@@ -55,74 +53,50 @@ void ARomanEmpireGameMode::BeginPlay()
 	ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (CameraPawn)
 	{
-		CameraPawn->SetZoomLevel(0.55f);  // City view - units clearly visible
+		const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+		CameraPawn->SetZoomLevel(Zoom.DefaultTactical);
 		CameraPawn->SetActorLocation(FVector(0.0f, 0.0f, 0.0f));
-		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to tactical zoom 0.55"));
+		SetExplorationModeForZoomLevel(CameraPawn->GetZoomLevelEnum());
+		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to tactical zoom %.2f"), Zoom.DefaultTactical);
 	}
 }
 
-void ARomanEmpireGameMode::SetGamePhase(EGamePhase NewPhase)
+void ARomanEmpireGameMode::SetGameplayMode(EGameplayMode NewMode)
 {
-	if (CurrentPhase != NewPhase)
+	if (CurrentGameplayMode != NewMode)
 	{
-		EGamePhase OldPhase = CurrentPhase;
-		CurrentPhase = NewPhase;
-		UE_LOG(LogRomanEmpire, Log, TEXT("Game phase changed from %d to %d"), 
-			static_cast<int32>(OldPhase), static_cast<int32>(NewPhase));
-		OnGamePhaseChanged.Broadcast(OldPhase, NewPhase);
+		const EGameplayMode OldMode = CurrentGameplayMode;
+		CurrentGameplayMode = NewMode;
+		UE_LOG(LogRomanEmpire, Log, TEXT("Gameplay mode changed from %s to %s"),
+			RomanEmpireGameplay::GetGameplayModeName(OldMode),
+			RomanEmpireGameplay::GetGameplayModeName(NewMode));
+		OnGameplayModeChanged.Broadcast(OldMode, NewMode);
 	}
 }
 
-void ARomanEmpireGameMode::OnZoomLevelChanged(float ZoomLevel)
+void ARomanEmpireGameMode::SetExplorationModeForZoomLevel(EZoomLevel ZoomLevel)
 {
-	EGamePhase NewPhase = DeterminePhaseFromZoom(ZoomLevel);
-	SetGamePhase(NewPhase);
-}
-
-EGamePhase ARomanEmpireGameMode::DeterminePhaseFromZoom(float ZoomLevel) const
-{
-	using namespace RomanEmpireConstants;
-	if (ZoomLevel <= ZOOM_TERRITORY_MAX) return EGamePhase::Strategic;
-	else if (ZoomLevel <= ZOOM_CITY_MAX) return EGamePhase::Tactical;
-	else if (ZoomLevel <= ZOOM_GROUND_MAX) return EGamePhase::Combat;
-	else return EGamePhase::FirstPerson;
-}
-
-void ARomanEmpireGameMode::EndTurn()
-{
-	CurrentTurn++;
-	UE_LOG(LogRomanEmpire, Log, TEXT("Turn %d started"), CurrentTurn);
-	if (CampaignManager) CampaignManager->ProcessTurn();
-
-	// Enemy AI: all non-Rome units advance toward Rome's territory (origin area)
-	TArray<AActor*> AllUnits;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
-
-	for (AActor* Actor : AllUnits)
+	if (CurrentGameplayMode != EGameplayMode::Possessed)
 	{
-		AUnitBase* Unit = Cast<AUnitBase>(Actor);
-		if (Unit && Unit->IsAlive() && Unit->GetOwnerFaction() != EFactionID::Rome && Unit->GetOwnerFaction() != EFactionID::None)
-		{
-			// Move toward origin (Roman base area) with some randomness
-			FVector CurrentPos = Unit->GetActorLocation();
-			FVector ToRome = FVector(0.0f, 0.0f, 0.0f) - CurrentPos;
-			ToRome.Z = 0.0f;
-			if (ToRome.SizeSquared() > 10000.0f)
-			{
-				ToRome.Normalize();
-				float AdvanceDistance = PrototypeRandomStream.FRandRange(500.0f, 2000.0f);
-				FVector NewDest = CurrentPos + ToRome * AdvanceDistance;
-				NewDest.Z = CurrentPos.Z;
-				Unit->CommandMoveTo(NewDest);
-			}
-		}
+		SetGameplayMode(RomanEmpireGameplay::GetExplorationModeForZoomLevel(ZoomLevel));
+	}
+}
+
+int32 ARomanEmpireGameMode::GetCurrentTurn() const
+{
+	return CampaignManager ? CampaignManager->GetCurrentTurn() : 0;
+}
+
+FCampaignTurnResult ARomanEmpireGameMode::EndTurn()
+{
+	if (CampaignManager)
+	{
+		return CampaignManager->ProcessTurn();
 	}
 
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Cyan,
-			FString::Printf(TEXT("Turn %d — Enemy forces advancing!"), CurrentTurn));
-	}
+	FCampaignTurnResult Result;
+	Result.Failure = ECampaignTurnFailure::MissingCampaignManager;
+	return Result;
 }
 
 void ARomanEmpireGameMode::InitializeManagers()

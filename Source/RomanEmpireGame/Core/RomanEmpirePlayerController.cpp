@@ -32,9 +32,6 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	DefaultMouseCursor = EMouseCursor::Default;
 	
 	CurrentSelectionMode = ERomanSelectionMode::None;
-	CurrentZoomLevel = 0.3f;
-	ZoomSpeed = 2.0f;
-	bIsInFirstPersonMode = false;
 	bIsBoxSelecting = false;
 	PossessedUnit = nullptr;
 	GameMode = nullptr;
@@ -57,8 +54,6 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_BuildKey4 = nullptr;
 	IA_BuildKey5 = nullptr;
 	IA_BuildKey6 = nullptr;
-	TargetZoomLevel = 0.5f;
-	CurrentZoomLevel = 0.5f;
 	SelectedBuilding = nullptr;
 }
 
@@ -276,6 +271,16 @@ void ARomanEmpirePlayerController::BeginPlay()
 	
 	// Cache game mode
 	GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+	CachedCameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
+	if (CachedCameraPawn)
+	{
+		CachedCameraPawn->OnZoomLevelChanged.AddDynamic(
+			this, &ARomanEmpirePlayerController::HandleCameraZoomLevelChanged);
+		if (GameMode)
+		{
+			GameMode->SetExplorationModeForZoomLevel(CachedCameraPawn->GetZoomLevelEnum());
+		}
+	}
 	
 	// Create building placement component
 	BuildingPlacementComponent = NewObject<UBuildingPlacementComponent>(this);
@@ -308,24 +313,8 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	UpdateZoom(DeltaSeconds);
-
-	// Smooth zoom interpolation
-	if (FMath::Abs(CurrentZoomLevel - TargetZoomLevel) > 0.001f)
-	{
-		CurrentZoomLevel = FMath::FInterpTo(CurrentZoomLevel, TargetZoomLevel, DeltaSeconds, 5.0f);
-		if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
-		{
-			CameraPawn->SetTargetZoomLevel(CurrentZoomLevel);
-		}
-		if (GameMode)
-		{
-			GameMode->OnZoomLevelChanged(CurrentZoomLevel);
-		}
-	}
-	
 	// Edge scrolling in RTS mode
-	if (!bIsInFirstPersonMode)
+	if (!IsInFirstPersonMode())
 	{
 		HandleEdgeScroll(DeltaSeconds);
 	}
@@ -477,7 +466,6 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	}
 
 	PossessedUnit = UnitToPossess;
-	bIsInFirstPersonMode = true;
 	bShowMouseCursor = false;
 
 	// Mark unit as player-possessed
@@ -490,7 +478,7 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 
 	if (GameMode)
 	{
-		GameMode->SetGamePhase(EGamePhase::FirstPerson);
+		GameMode->SetGameplayMode(EGameplayMode::Possessed);
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Entered FPS mode with unit: %s"), *UnitToPossess->GetName());
@@ -498,12 +486,10 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 
 void ARomanEmpirePlayerController::ExitFirstPersonMode()
 {
-	if (!bIsInFirstPersonMode)
+	if (!IsInFirstPersonMode())
 	{
 		return;
 	}
-
-	bIsInFirstPersonMode = false;
 
 	// Unpossess the unit
 	if (PossessedUnit)
@@ -530,7 +516,10 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 
 	if (GameMode)
 	{
-		GameMode->OnZoomLevelChanged(CurrentZoomLevel);
+		const EZoomLevel ZoomLevel = CachedCameraPawn
+			? CachedCameraPawn->GetZoomLevelEnum()
+			: EZoomLevel::City;
+		GameMode->SetGameplayMode(RomanEmpireGameplay::GetExplorationModeForZoomLevel(ZoomLevel));
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Exited FPS mode — camera restored"));
@@ -539,20 +528,39 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 
 void ARomanEmpirePlayerController::SetTargetZoom(float NewZoom)
 {
-	// Cap at 0.70 — Tactical max. FPS is explicit mode only.
-	TargetZoomLevel = FMath::Clamp(NewZoom, 0.0f, 0.70f);
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+	if (ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn()))
+	{
+		CameraPawn->SetTargetZoomLevel(
+			FMath::Clamp(NewZoom, Zoom.Minimum, Zoom.UserControlledMaximum));
+	}
+}
+
+float ARomanEmpirePlayerController::GetCurrentZoom() const
+{
+	const ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
+	return CameraPawn
+		? CameraPawn->GetZoomLevel()
+		: RomanEmpireCamera::GetDefaultZoomConfiguration().DefaultTactical;
+}
+
+bool ARomanEmpirePlayerController::IsInFirstPersonMode() const
+{
+	return GameMode
+		? GameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed
+		: PossessedUnit != nullptr;
 }
 
 void ARomanEmpirePlayerController::OnSelectPressed()
 {
-	if (bIsInFirstPersonMode)
+	if (IsInFirstPersonMode())
 	{
 		OnAttackPressed();
 		return;
 	}
 
-	// Block interactions in Strategic view (zoom < 0.25)
-	if (CurrentZoomLevel < 0.25f)
+	// Gameplay permissions depend on the explicit mode, not a raw zoom threshold.
+	if (GameMode && GameMode->GetCurrentGameplayMode() == EGameplayMode::Strategic)
 	{
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, TEXT("Zoom in for Tactical View to interact"));
 		return;
@@ -585,7 +593,7 @@ void ARomanEmpirePlayerController::OnSelectReleased()
 
 void ARomanEmpirePlayerController::OnCommandPressed()
 {
-	if (bIsInFirstPersonMode)
+	if (IsInFirstPersonMode())
 	{
 		OnBlockPressed();
 		return;
@@ -692,17 +700,27 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 {
-	// Fixed step per scroll notch
-	float ScrollVal = Value.Get<float>();
+	const ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
+	if (!CameraPawn)
+	{
+		return;
+	}
+
+	const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
+	const float ScrollVal = Value.Get<float>();
 	if (ScrollVal > 0.0f)
-		SetTargetZoom(CurrentZoomLevel + 0.03f);
+	{
+		SetTargetZoom(CameraPawn->GetTargetZoomLevel() + Zoom.InputStep);
+	}
 	else if (ScrollVal < 0.0f)
-		SetTargetZoom(CurrentZoomLevel - 0.03f);
+	{
+		SetTargetZoom(CameraPawn->GetTargetZoomLevel() - Zoom.InputStep);
+	}
 }
 
 void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
 {
-	if (bIsInFirstPersonMode && PossessedUnit)
+	if (IsInFirstPersonMode() && PossessedUnit)
 	{
 		FVector2D MoveValue = Value.Get<FVector2D>();
 		PossessedUnit->MoveInput(MoveValue);
@@ -721,7 +739,7 @@ void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
 
 void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
 {
-	if (bIsInFirstPersonMode && PossessedUnit)
+	if (IsInFirstPersonMode() && PossessedUnit)
 	{
 		FVector2D LookValue = Value.Get<FVector2D>();
 		PossessedUnit->LookInput(LookValue);
@@ -730,7 +748,7 @@ void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
 
 void ARomanEmpirePlayerController::OnEnterFPSPressed()
 {
-	if (bIsInFirstPersonMode)
+	if (IsInFirstPersonMode())
 	{
 		ExitFirstPersonMode();
 	}
@@ -832,7 +850,7 @@ void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 
 void ARomanEmpirePlayerController::OnAttackPressed()
 {
-	if (bIsInFirstPersonMode && PossessedUnit)
+	if (IsInFirstPersonMode() && PossessedUnit)
 	{
 		// FPS melee attack: line trace 200cm forward from camera
 		FVector CamLoc;
@@ -867,7 +885,7 @@ void ARomanEmpirePlayerController::OnAttackPressed()
 
 void ARomanEmpirePlayerController::OnBlockPressed()
 {
-	if (bIsInFirstPersonMode && PossessedUnit)
+	if (IsInFirstPersonMode() && PossessedUnit)
 	{
 		PossessedUnit->StartBlocking();
 	}
@@ -875,7 +893,7 @@ void ARomanEmpirePlayerController::OnBlockPressed()
 
 void ARomanEmpirePlayerController::OnBlockReleased()
 {
-	if (bIsInFirstPersonMode && PossessedUnit)
+	if (IsInFirstPersonMode() && PossessedUnit)
 	{
 		PossessedUnit->StopBlocking();
 	}
@@ -885,14 +903,31 @@ void ARomanEmpirePlayerController::OnEndTurnPressed()
 {
 	if (GameMode)
 	{
-		GameMode->EndTurn();
-		UE_LOG(LogRomanEmpire, Log, TEXT("Turn ended by player"));
+		const FCampaignTurnResult Result = GameMode->EndTurn();
+		if (Result.WasSuccessful())
+		{
+			UE_LOG(LogRomanEmpire, Log, TEXT("Turn %d ended by player; turn %d active"),
+				Result.StartingTurn, Result.CompletedTurn);
+		}
+		else
+		{
+			UE_LOG(LogRomanEmpire, Warning, TEXT("End-turn request rejected (%s)"),
+				RomanEmpireCampaign::GetTurnFailureName(Result.Failure));
+		}
 	}
 }
 
-void ARomanEmpirePlayerController::UpdateZoom(float DeltaTime)
+void ARomanEmpirePlayerController::HandleCameraZoomLevelChanged(
+	EZoomLevel OldLevel,
+	EZoomLevel NewLevel)
 {
-	// Smooth zoom interpolation handled by camera component
+	if (GameMode)
+	{
+		GameMode->SetExplorationModeForZoomLevel(NewLevel);
+	}
+
+	UE_LOG(LogRomanEmpire, Verbose, TEXT("Camera zoom band changed from %d to %d"),
+		static_cast<int32>(OldLevel), static_cast<int32>(NewLevel));
 }
 
 void ARomanEmpirePlayerController::PerformBoxSelect()

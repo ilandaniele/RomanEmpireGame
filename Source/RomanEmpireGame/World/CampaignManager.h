@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Campaign/CampaignTurn.h"
 #include "GameFramework/Actor.h"
 #include "Faction/FactionData.h"
+#include "Math/RandomStream.h"
 #include "CampaignManager.generated.h"
 
 class AFactionManager;
@@ -38,7 +40,7 @@ public:
 
 	// Turn management
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
-	void ProcessTurn();
+	FCampaignTurnResult ProcessTurn();
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentTurn() const { return CurrentTurn; }
@@ -59,6 +61,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsCampaignActive() const { return bCampaignActive; }
+
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	int32 GetLastAutosaveRequestedTurn() const { return LastAutosaveRequestedTurn; }
 
 	// Save/Load (placeholder)
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
@@ -83,20 +88,34 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campaign")
 	int32 EconomicVictoryGold;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
+	int32 LastAutosaveRequestedTurn;
+
 	// References
 	UPROPERTY()
-	AFactionManager* FactionManager;
+	TObjectPtr<AFactionManager> FactionManager;
 
 	UPROPERTY()
-	AWorldMapManager* WorldMapManager;
+	TObjectPtr<AWorldMapManager> WorldMapManager;
 
 	// Events
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnTurnStepStarted,
+		int32, TurnNumber,
+		ECampaignTurnStep, Step);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnProcessed, int32, TurnNumber);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignAutosaveRequested, int32, TurnNumber);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnVictory, EFactionID, WinningFaction, EVictoryCondition, Condition);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefeat, EFactionID, LosingFaction);
 
 	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnTurnStepStarted OnTurnStepStarted;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
 	FOnTurnProcessed OnTurnProcessed;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnCampaignAutosaveRequested OnCampaignAutosaveRequested;
 
 	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
 	FOnVictory OnVictory;
@@ -105,8 +124,16 @@ protected:
 	FOnDefeat OnDefeat;
 
 private:
-	void ProcessResourceProduction();
-	void ProcessAIFactions();
+	static constexpr int32 PrototypeTurnRandomSeed = 1337;
+	FRandomStream TurnRandomStream;
+
+	ECampaignTurnFailure ExecuteTurnStep(ECampaignTurnStep Step);
+	ECampaignTurnFailure ValidateTurnRequest() const;
+	ECampaignTurnFailure ProcessResourceProduction();
+	ECampaignTurnFailure ProcessUpkeep();
+	ECampaignTurnFailure ProcessAIFactions();
+	ECampaignTurnFailure ResolveTurnConflicts();
+	ECampaignTurnFailure RequestAutosave();
 	void CheckAllVictoryConditions();
 };
 
