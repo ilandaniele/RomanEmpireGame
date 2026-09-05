@@ -4,10 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "HttpModule.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
 #include "SupabaseSubsystem.generated.h"
+
+class IHttpRequest;
 
 USTRUCT(BlueprintType)
 struct FLeaderboardEntry
@@ -71,9 +70,17 @@ public:
 	void FetchLeaderboard(FOnLeaderboardFetched OnFetched);
 
 	UFUNCTION(BlueprintPure, Category = "Online")
-	bool IsConfigured() const { return !SupabaseURL.IsEmpty() && !AnonKey.IsEmpty(); }
+	bool IsConfigured() const
+	{
+		return bEnabled &&
+			SupabaseURL.StartsWith(TEXT("https://")) &&
+			!SupabaseURL.Contains(TEXT("YOUR_")) &&
+			!AnonKey.IsEmpty() &&
+			!AnonKey.Contains(TEXT("YOUR_"));
+	}
 
 private:
+	bool bEnabled = false;
 	FString SupabaseURL;
 	FString AnonKey;
 

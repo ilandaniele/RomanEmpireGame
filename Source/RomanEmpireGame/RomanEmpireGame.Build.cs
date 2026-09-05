@@ -7,34 +7,24 @@ public class RomanEmpireGame : ModuleRules
 	public RomanEmpireGame(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-		
-		// Disable IWYU (Include What You Use) enforcement
-		IWYUSupport = IWYUSupport.None;
+		IWYUSupport = IWYUSupport.Full;
+		PrivateIncludePaths.Add(ModuleDirectory);
 
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core", 
 			"CoreUObject", 
 			"Engine", 
-			"InputCore",
 			"EnhancedInput",
-			"AIModule",
-			"NavigationSystem",
-			"GameplayTasks",
-			"UMG",
-			"HTTP",
-			"Json",
-			"JsonUtilities"
+			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"InputCore",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
+			"HTTP",
+			"Json",
+			"ProceduralMeshComponent"
 		});
-
-		// Uncomment if using procedural mesh
-		PublicDependencyModuleNames.Add("ProceduralMeshComponent");
-		
-		// Uncomment if using online features
-		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 	}
 }

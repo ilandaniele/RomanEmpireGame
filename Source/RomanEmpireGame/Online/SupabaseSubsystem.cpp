@@ -1,26 +1,38 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "SupabaseSubsystem.h"
-#include "../../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
+#include "HttpModule.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
+#include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
 void USupabaseSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
+	GConfig->GetBool(TEXT("Supabase"), TEXT("bEnabled"), bEnabled, GGameIni);
 	GConfig->GetString(TEXT("Supabase"), TEXT("URL"),     SupabaseURL, GGameIni);
 	GConfig->GetString(TEXT("Supabase"), TEXT("AnonKey"), AnonKey,     GGameIni);
 
-	if (SupabaseURL.IsEmpty())
+	if (!IsConfigured())
 	{
-		UE_LOG(LogRomanEmpireGame, Warning,
-			TEXT("USupabaseSubsystem: No URL configured. Add [Supabase] URL=... AnonKey=... to DefaultGame.ini"));
+		if (bEnabled)
+		{
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Supabase was enabled without a valid HTTPS URL and key; disabling it"));
+		}
+		SupabaseURL.Reset();
+		AnonKey.Reset();
+		bEnabled = false;
+		UE_LOG(LogRomanEmpire, Log, TEXT("Supabase is disabled; local persistence remains authoritative"));
 	}
 	else
 	{
-		UE_LOG(LogRomanEmpireGame, Log, TEXT("USupabaseSubsystem initialized: %s"), *SupabaseURL);
+		UE_LOG(LogRomanEmpire, Log, TEXT("USupabaseSubsystem initialized: %s"), *SupabaseURL);
 	}
 }
 

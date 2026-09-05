@@ -1,21 +1,14 @@
-# Roman Empire Game — Orchestrator
+# Development Tools
 
-## Overview
-Automated test and iteration system for the Roman Empire Game.
-Launches the game, collects logs, identifies issues, and creates reports.
+The M1 toolchain has two authoritative entry points:
 
-## Usage
 ```powershell
-# From project root:
-.\Tools\orchestrator.ps1 -Action test      # Run full test suite
-.\Tools\orchestrator.ps1 -Action launch     # Launch in game mode
-.\Tools\orchestrator.ps1 -Action log        # Analyze latest log
-.\Tools\orchestrator.ps1 -Action build      # Build and test
+.\Tools\validate_repository.ps1
+.\BuildProject.ps1 -Action Validate
 ```
 
-## What it Tests
-1. **Build** — Compiles and checks for errors
-2. **Launch** — Runs game in standalone mode with logging
-3. **Log Analysis** — Parses logs for our custom `LogRomanEmpire` messages
-4. **Verification** — Checks that GameMode, Camera, HUD, Units all initialized
-5. **Report** — Generates test report with pass/fail status
+`Tools/orchestrator.ps1` is a compatibility wrapper with only `validate`, `build`, and `test` actions. It delegates to those entry points and does not infer success from log strings.
+
+`Tools/dev_orchestrator.ps1` is an intentional failure shim. The previous prototype could send the codebase to an external API, overwrite files from unreviewed model output, stage all changes, commit, and push directly to `main`; that behavior is not part of the controlled implementation workflow.
+
+Generated validation reports belong under `Tools/Reports/` and are ignored. A result is release evidence only when its command, revision, environment, exit status, assertions, and artifacts are recorded by the milestone gate.

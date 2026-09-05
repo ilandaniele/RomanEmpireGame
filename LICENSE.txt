@@ -1,0 +1,11 @@
+Copyright (c) 2026 Roman Empire Game contributors. All rights reserved.
+
+This repository and all original code, documentation, artwork, audio, designs,
+and other content in it are proprietary unless an individual file or an entry in
+THIRD_PARTY_NOTICES.md explicitly states otherwise.
+
+No permission is granted to copy, modify, publish, distribute, sublicense, sell,
+or create derivative works from this material. Access to the source repository
+does not grant a license to use its contents.
+
+Third-party software and content remain subject to their respective licenses.

@@ -8,6 +8,7 @@
 #include "AudioManager.generated.h"
 
 class UAudioComponent;
+class USceneComponent;
 
 /**
  * Centralized audio manager for all game sounds

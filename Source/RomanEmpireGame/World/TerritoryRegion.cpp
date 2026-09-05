@@ -1,9 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "TerritoryRegion.h"
-#include "../RomanEmpireGame.h"
-#include "../Building/BuildingBase.h"
-#include "../Units/UnitBase.h"
+#include "RomanEmpireGame.h"
+#include "Building/BuildingBase.h"
+#include "Units/UnitBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"

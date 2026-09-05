@@ -1,14 +1,16 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireHUD.h"
-#include "../RomanEmpireGame.h"
-#include "../Units/UnitBase.h"
-#include "../Building/BuildingBase.h"
-#include "../Building/Barracks.h"
+#include "RomanEmpireGame.h"
+#include "Units/UnitBase.h"
+#include "Building/BuildingBase.h"
+#include "Building/Barracks.h"
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpirePlayerController.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 ARomanEmpireHUD::ARomanEmpireHUD()
@@ -295,6 +297,11 @@ void ARomanEmpireHUD::ToggleBuildingMenu()
 void ARomanEmpireHUD::UpdateUnitSelection(const TArray<AUnitBase*>& SelectedUnits)
 {
 	CurrentSelectedUnits = SelectedUnits;
+}
+
+void ARomanEmpireHUD::ShowFPSOverlay(bool bShow)
+{
+	bFPSMode = bShow;
 }
 
 void ARomanEmpireHUD::UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population)

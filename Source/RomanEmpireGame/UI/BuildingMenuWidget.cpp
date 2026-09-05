@@ -1,14 +1,11 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingMenuWidget.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
 #include "Components/VerticalBox.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
-// Automation Driver — stable IDs (unreal-engine-automation skill)
-#include "AutomationDriver/Public/IDriverElement.h"
-#include "AutomationDriver/Public/DriverConfiguration.h"
 
 void UBuildingMenuWidget::NativeConstruct()
 {
@@ -31,27 +28,6 @@ void UBuildingMenuWidget::NativeConstruct()
 	{
 		DefenseTabButton->OnClicked.AddDynamic(this, &UBuildingMenuWidget::OnDefenseTabClicked);
 	}
-
-	// ── Automation IDs (unreal-engine-automation skill) ──────────────────────
-	auto SetId = [](UWidget* W, FName Id)
-	{
-		if (!W) return;
-		TSharedPtr<SWidget> Slate = W->GetCachedWidget();
-		if (Slate.IsValid()) Slate->AddMetadata(MakeShared<FDriverMetaData::Id>(Id));
-	};
-
-	// Category tab buttons
-	SetId(MilitaryTabButton,  FName("btn_tab_military"));
-	SetId(EconomicTabButton,  FName("btn_tab_economic"));
-	SetId(CivilTabButton,     FName("btn_tab_civil"));
-	SetId(DefenseTabButton,   FName("btn_tab_defense"));
-
-	// Building category containers
-	SetId(MilitaryBuildingsBox,  FName("box_military_buildings"));
-	SetId(EconomicBuildingsBox,  FName("box_economic_buildings"));
-	SetId(CivilBuildingsBox,     FName("box_civil_buildings"));
-	SetId(DefenseBuildingsBox,   FName("box_defense_buildings"));
-	// ───────────────────────────────────────────────────────────────────────
 
 	CurrentCategory = EBuildingCategory::Military;
 	PopulateBuildingList();

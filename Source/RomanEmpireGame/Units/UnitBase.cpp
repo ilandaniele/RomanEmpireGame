@@ -1,15 +1,21 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "UnitBase.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
+#include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 AUnitBase::AUnitBase()

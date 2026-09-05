@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "UnitTypes.h"
-#include "../Faction/FactionData.h"
+#include "Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
 class UCapsuleComponent;
@@ -13,6 +13,7 @@ class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UCameraComponent;
 class USpringArmComponent;
+class UDecalComponent;
 
 /**
  * Base class for all military units in the game
@@ -105,15 +106,6 @@ public:
 	// Accessors used by HUD
 	UFUNCTION(BlueprintPure, Category = "Unit")
 	FString GetUnitDisplayName() const { return UnitData.DisplayName.ToString(); }
-
-	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	int32 GetCurrentHealth() const { return CurrentHealth; }
-
-	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	int32 GetMaxHealth() const { return UnitData.BaseStats.MaxHealth; }
-
-	UFUNCTION(BlueprintPure, Category = "Unit|State")
-	int32 GetCurrentMorale() const { return CurrentMorale; }
 
 	UFUNCTION(BlueprintCallable, Category = "Unit|Health")
 	void SetCurrentHealth(int32 NewHealth) { CurrentHealth = FMath::Clamp(NewHealth, 0, UnitData.BaseStats.MaxHealth); }

@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "UnitTypes.generated.h"
 
+class UTexture2D;
+
 /**
  * Unit type category
  */

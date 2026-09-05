@@ -7,6 +7,7 @@
 #include "SeamlessZoomCamera.generated.h"
 
 class UCameraComponent;
+class USceneComponent;
 class USpringArmComponent;
 class UFloatingPawnMovement;
 

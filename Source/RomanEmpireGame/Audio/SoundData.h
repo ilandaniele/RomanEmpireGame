@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "SoundData.generated.h"
 
+class USoundBase;
+
 /**
  * Sound category for organization
  */
@@ -129,9 +131,10 @@ struct FMusicTrackData
 	bool bLoop;
 
 	FMusicTrackData()
-		: FadeInTime(2.0f)
-		, FadeOutTime(2.0f)
+		: TrackID(NAME_None)
 		, Track(nullptr)
+		, FadeInTime(2.0f)
+		, FadeOutTime(2.0f)
 		, bLoop(true)
 	{}
 };

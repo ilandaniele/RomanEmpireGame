@@ -1,19 +1,24 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireGameMode.h"
-#include "../RomanEmpireGame.h"
-#include "../Faction/FactionManager.h"
-#include "../World/WorldMapManager.h"
-#include "../World/CampaignManager.h"
-#include "../Camera/SeamlessZoomCamera.h"
+#include "RomanEmpireGame.h"
+#include "Faction/FactionManager.h"
+#include "World/WorldMapManager.h"
+#include "World/CampaignManager.h"
+#include "Camera/SeamlessZoomCamera.h"
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireHUD.h"
-#include "../Units/Legionary.h"
-#include "../Units/UnitBase.h"
+#include "Units/Legionary.h"
+#include "Units/UnitBase.h"
+#include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/GameStateBase.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 ARomanEmpireGameMode::ARomanEmpireGameMode()
@@ -22,20 +27,22 @@ ARomanEmpireGameMode::ARomanEmpireGameMode()
 	
 	CurrentPhase = EGamePhase::Tactical;  // Start in tactical, not strategic
 	CurrentTurn = 1;
-	PlayerGold = 1000;
 	
 	FactionManager = nullptr;
 	WorldMapManager = nullptr;
 	CampaignManager = nullptr;
+	PrototypeRandomStream.Initialize(PrototypeRandomSeed);
 
 	DefaultPawnClass = ASeamlessZoomCamera::StaticClass();
 	PlayerControllerClass = ARomanEmpirePlayerController::StaticClass();
+	GameStateClass = AGameStateBase::StaticClass();
 	HUDClass = ARomanEmpireHUD::StaticClass();
 }
 
 void ARomanEmpireGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	PrototypeRandomStream.Initialize(PrototypeRandomSeed);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Roman Empire Game Mode started - Turn %d"), CurrentTurn);
 	
@@ -119,7 +126,7 @@ void ARomanEmpireGameMode::EndTurn()
 			if (ToRome.SizeSquared() > 10000.0f)
 			{
 				ToRome.Normalize();
-				float AdvanceDistance = FMath::RandRange(500.0f, 2000.0f);
+				float AdvanceDistance = PrototypeRandomStream.FRandRange(500.0f, 2000.0f);
 				FVector NewDest = CurrentPos + ToRome * AdvanceDistance;
 				NewDest.Z = CurrentPos.Z;
 				Unit->CommandMoveTo(NewDest);
@@ -228,8 +235,8 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 	
 	for (int32 i = 0; i < 30; i++)
 	{
-		float X = FMath::RandRange(-8000.0f, 8000.0f);
-		float Y = FMath::RandRange(-8000.0f, 8000.0f);
+		float X = PrototypeRandomStream.FRandRange(-8000.0f, 8000.0f);
+		float Y = PrototypeRandomStream.FRandRange(-8000.0f, 8000.0f);
 		
 		// Skip if too close to base
 		if (FMath::Abs(X) < 1500.0f && FMath::Abs(Y) < 1500.0f) continue;
@@ -251,14 +258,14 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 		// Tree canopy
 		if (SphereMesh)
 		{
-			float CanopySize = FMath::RandRange(1.5f, 3.0f);
+			float CanopySize = PrototypeRandomStream.FRandRange(1.5f, 3.0f);
 			AStaticMeshActor* Canopy = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector(X, Y, 300), FRotator::ZeroRotator, SP);
 			if (Canopy)
 			{
 				Canopy->GetStaticMeshComponent()->SetStaticMesh(SphereMesh);
 				Canopy->SetActorScale3D(FVector(CanopySize, CanopySize, CanopySize * 0.7f));
 				Canopy->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-				float Green = FMath::RandRange(0.2f, 0.5f);
+				float Green = PrototypeRandomStream.FRandRange(0.2f, 0.5f);
 				UMaterialInstanceDynamic* LeafMat = MakeColorMaterial(Canopy, FLinearColor(0.05f, Green, 0.05f));
 				if (LeafMat) Canopy->GetStaticMeshComponent()->SetMaterial(0, LeafMat);
 			}
@@ -344,7 +351,7 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 			for (int32 LogIdx = 0; LogIdx < 3; LogIdx++)
 			{
 				FVector WoodPos = Lumber.Pos + FVector(LogIdx * 80.0f - 80.0f, 0, 30.0f + LogIdx * 15.0f);
-				FRotator WoodRot = FRotator(0, FMath::RandRange(0.0f, 30.0f), 90.0f);
+				FRotator WoodRot = FRotator(0, PrototypeRandomStream.FRandRange(0.0f, 30.0f), 90.0f);
 
 				AStaticMeshActor* WoodActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), WoodPos, WoodRot, SP);
 				if (WoodActor)
@@ -395,8 +402,8 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 	for (int32 i = 0; i < 10; i++)
 	{
 		FVector SpawnLoc = EnemyBase + FVector(
-			FMath::RandRange(-400.0f, 400.0f),
-			FMath::RandRange(-400.0f, 400.0f),
+			PrototypeRandomStream.FRandRange(-400.0f, 400.0f),
+			PrototypeRandomStream.FRandRange(-400.0f, 400.0f),
 			0.0f
 		);
 		
@@ -520,8 +527,8 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 	// Camp walls (long thin cubes forming a perimeter)
 	for (int32 w = 0; w < 4; w++)
 	{
-		FVector WallPos;
-		FVector WallScale;
+		FVector WallPos = FVector::ZeroVector;
+		FVector WallScale = FVector::OneVector;
 		switch(w) {
 			case 0: WallPos = FVector(0, -2000, 75); WallScale = FVector(30.0f, 0.3f, 1.5f); break;   // South
 			case 1: WallPos = FVector(0, 1500, 75); WallScale = FVector(30.0f, 0.3f, 1.5f); break;    // North
@@ -591,22 +598,42 @@ void ARomanEmpireGameMode::UpdateHUDResources()
 
 void ARomanEmpireGameMode::SubtractGold(int32 Amount)
 {
-	PlayerGold = FMath::Max(0, PlayerGold - Amount);
-
-	// Update HUD immediately
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (PC)
+	if (!FactionManager || Amount <= 0)
 	{
-		ARomanEmpireHUD* HUD = Cast<ARomanEmpireHUD>(PC->GetHUD());
-		if (HUD)
-		{
-			HUD->DisplayGold = FMath::Max(0, HUD->DisplayGold - Amount);
-		}
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot spend gold: invalid manager or amount (%d)"), Amount);
+		return;
 	}
 
+	FFactionResources Cost;
+	Cost.Gold = Amount;
+	Cost.Food = 0;
+	Cost.Iron = 0;
+	Cost.Wood = 0;
+	Cost.Stone = 0;
+	Cost.Population = 0;
+
+	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
+	if (!FactionManager->DeductFactionResources(PlayerFaction, Cost))
+	{
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Faction cannot afford %d gold"), Amount);
+		return;
+	}
+
+	UpdateHUDResources();
+	const int32 RemainingGold = GetPlayerGold();
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
-			FString::Printf(TEXT("-%d Gold (Remaining: %d)"), Amount, PlayerGold));
+			FString::Printf(TEXT("-%d Gold (Remaining: %d)"), Amount, RemainingGold));
 	}
+}
+
+int32 ARomanEmpireGameMode::GetPlayerGold() const
+{
+	if (!FactionManager)
+	{
+		return 0;
+	}
+
+	return FactionManager->GetFactionResources(FactionManager->GetPlayerFaction()).Gold;
 }

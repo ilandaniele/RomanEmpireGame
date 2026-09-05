@@ -1,17 +1,18 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.7",
+	"EngineAssociation": "5.8",
 	"Category": "Games",
 	"Description": "Roman Empire Strategy Game - Hybrid RTS/FPS prototype",
 	"Modules": [
 		{
 			"Name": "RomanEmpireGame",
 			"Type": "Runtime",
-			"LoadingPhase": "Default",
-			"AdditionalDependencies": [
-				"Engine",
-				"AIModule"
-			]
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "RomanEmpireGameTests",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
 		}
 	],
 	"Plugins": [
@@ -21,23 +22,55 @@
 		},
 		{
 			"Name": "AISupport",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "Landmass",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "RemoteControl",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "RemoteControlWebInterface",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "AutomationDriver",
+			"Enabled": false
+		},
+		{
+			"Name": "ProceduralMeshComponent",
 			"Enabled": true
+		},
+		{
+			"Name": "ModelContextProtocol",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "AllToolsets",
+			"Enabled": false,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "EditorToolset",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "AutomationTestToolset",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
 		}
 	],
 	"TargetPlatforms": [

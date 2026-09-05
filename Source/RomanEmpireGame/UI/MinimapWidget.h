@@ -9,6 +9,8 @@
 class UImage;
 class UCanvasPanel;
 class UBorder;
+class UWidget;
+class AActor;
 class AWorldMapManager;
 class ATerritoryRegion;
 

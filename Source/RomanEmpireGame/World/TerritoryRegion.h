@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "../Faction/FactionData.h"
+#include "Faction/FactionData.h"
 #include "TerritoryRegion.generated.h"
 
 class ABuildingBase;
 class AUnitBase;
 class UBoxComponent;
+class UStaticMeshComponent;
 
 /**
  * Terrain type affecting movement and building

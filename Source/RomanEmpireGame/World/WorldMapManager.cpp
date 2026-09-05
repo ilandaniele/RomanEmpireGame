@@ -1,8 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "WorldMapManager.h"
-#include "../RomanEmpireGame.h"
-#include "../World/TerritoryRegion.h"
+#include "RomanEmpireGame.h"
+#include "World/TerritoryRegion.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 AWorldMapManager::AWorldMapManager()

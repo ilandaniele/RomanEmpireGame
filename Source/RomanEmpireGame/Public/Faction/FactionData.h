@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "FactionData.generated.h"
 
+class UTexture2D;
+
 /**
  * Faction identifier enum
  */
@@ -51,7 +53,7 @@ enum class EResourceType : uint8
  * Data structure holding faction information
  */
 USTRUCT(BlueprintType)
-struct FFactionInfo
+struct ROMANEMPIREGAME_API FFactionInfo
 {
 	GENERATED_BODY()
 
@@ -102,7 +104,7 @@ struct FFactionInfo
  * Resources owned by a faction
  */
 USTRUCT(BlueprintType)
-struct FFactionResources
+struct ROMANEMPIREGAME_API FFactionResources
 {
 	GENERATED_BODY()
 
@@ -158,7 +160,7 @@ struct FFactionResources
  * Diplomatic relationship data
  */
 USTRUCT(BlueprintType)
-struct FDiplomaticRelation
+struct ROMANEMPIREGAME_API FDiplomaticRelation
 {
 	GENERATED_BODY()
 

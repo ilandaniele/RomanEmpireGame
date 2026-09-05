@@ -1,97 +1,90 @@
-# Roman Empire Strategy Game
+# Roman Empire Game
 
-Prototype in Unreal Engine 5 — Rome Total War + Age of Empires + FPS — all in one seamless camera.
+Roman Empire Game is an Unreal Engine 5.8 single-player Windows project combining a campaign layer, real-time tactical command, settlement development, and explicit first-person possession of a soldier.
 
-## Zoom-based gameplay zones
+The M1 technical gate is complete on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The user approved M1 on 2026-09-05; its dedicated local commit and clean-clone/LFS reproduction are the remaining closure steps before M2 begins.
 
-```
-Zoom 0.8–1.0  →  Campaign (global map, factions, diplomacy, turns)
-Zoom 0.3–0.8  →  Regional (territories, cities, building overview)
-Zoom 0.1–0.3  →  Tactical/Battle (RTS, unit control, building placement)
-Zoom 0.0–0.1  →  FPS (possess a soldier, first-person combat)
-```
+## Product target
 
-## Project structure
+The first playable slice is one complete Rome-versus-Carthage loop: build a barracks, recruit and command a small force, possess a legionary, capture an objective, resolve the territory result, save, exit, and restore.
 
-```
-Source/RomanEmpireGame/
-├── Camera/         SeamlessZoomCamera
-├── Core/           GameMode, PlayerController, HUD
-├── Faction/        FactionData, FactionManager
-├── Building/       BuildingBase, Barracks, BuildingPlacement, BuildingTypes
-├── Units/          UnitBase, Legionary
-├── World/          TerritoryRegion, WorldMapManager, CampaignManager
-├── UI/             MainWidget, BuildingMenu, Minimap
-├── Assets/         MaterialManager, ProceduralMeshGenerators
-├── Audio/          AudioManager, SoundData
-└── Online/         SupabaseSubsystem  ← new
+See [PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) for scope and decisions, [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for milestone order and acceptance gates, and [M1_REVIEW.md](M1_REVIEW.md) for the current human review packet and evidence limitations.
 
-scripts/
-├── rc_wait_ready.py      # wait for Remote Control
-├── run_e2e.py            # launch UE + run tests + teardown
-├── ue_launch.py          # launch UE with RC flags
-└── tests/
-    └── test_romanempire_e2e.py  # 4 E2E tests
+## Prerequisites
+
+- Unreal Engine 5.8 Launcher build (5.8.2 is the validated local installation).
+- VS Code with Microsoft's C/C++ Extension Pack, if VS Code is the chosen editor.
+- Visual Studio 2022 Build Tools 17.14 or newer (or a supported full Visual Studio installation), with the MSVC x64/x86 tools, .NET Framework SDK, and Windows SDK declared in `.vsconfig`. The compiler toolchain is required even when VS Code is the editor.
+- Git LFS.
+- Windows 11 or a supported Windows 10 development environment.
+
+After cloning:
+
+```powershell
+git lfs install
+git lfs pull
+.\Tools\validate_repository.ps1
+.\BuildProject.ps1 -Action Validate
 ```
 
-## Quick Start
+If Unreal is installed outside the Epic Launcher default location:
 
-### Open in UE5
-Double-click `RomanEmpireGame.uproject` → Accept recompile.
-
-### Run with Remote Control (for testing)
-```bash
-UnrealEditor "RomanEmpireGame.uproject" -ExecCmds="WebControl.StartServer"
+```powershell
+.\BuildProject.ps1 -Action Validate -EngineRoot 'D:\Epic Games\UE_5.8'
 ```
 
-### Run E2E tests
-```bash
-python scripts/rc_wait_ready.py --host 127.0.0.1 --port 30010
-python scripts/tests/test_romanempire_e2e.py
+The `ROMANEMPIREGAME_ENGINE_ROOT` environment variable is also supported.
+
+## Build commands
+
+```powershell
+# Generate VS Code project files (default)
+.\BuildProject.ps1 -Action Generate
+
+# Optional: generate Visual Studio project files instead
+.\BuildProject.ps1 -Action Generate -IDE VisualStudio
+
+# Development Editor and standalone Game targets
+.\BuildProject.ps1 -Action Editor
+.\BuildProject.ps1 -Action Game
+
+# Strict include audit: non-unity build with PCH disabled
+.\BuildProject.ps1 -Action IWYU
+
+# Native automation tests
+.\BuildProject.ps1 -Action Test
+
+# Cook or archive a Windows package under Artifacts/
+.\BuildProject.ps1 -Action Cook
+.\BuildProject.ps1 -Action Package -Configuration Development
 ```
 
-### Or run full E2E pipeline (launch + wait + test + teardown)
-```bash
-python scripts/run_e2e.py \
-  --ue-exe "C:\UE5\Engine\Binaries\Win64\UnrealEditor.exe" \
-  --uproject "RomanEmpireGame.uproject" \
-  --tests scripts/tests/
+Unreal Build Accelerator is disabled by default because Windows Smart App Control can reject locally built unsigned Editor DLLs emitted through UBA. This keeps the supported workflow compatible with the audited workstation without weakening Windows security. On a machine where its application-control policy accepts UBA output, opt in explicitly with `-UseBuildAcceleration`.
+
+`build.bat` remains as a compatibility shortcut for the Development Editor build and delegates to `BuildProject.ps1`.
+
+## Repository layout
+
+```text
+Config/                         Unreal project configuration
+Content/                        Tracked design inputs and future LFS assets
+Source/RomanEmpireGame/         Runtime C++ module
+  Public/Faction/               Exported resource/faction contract used by tests
+Source/RomanEmpireGameTests/    Editor-only native automation module
+scripts/                        Retirement record for the removed Remote Control harness
+Tools/                          Legacy orchestration/reporting tools
+.agents/ue-project-context.md   Audited project context for UE implementation skills
 ```
 
-## Supabase Online (optional)
-Edit `Config/DefaultGame.ini` → replace `URL` and `AnonKey`:
-```ini
-[Supabase]
-URL=https://YOUR_PROJECT.supabase.co
-AnonKey=YOUR_ANON_KEY_HERE
-```
+Remote Control and Automation Driver are disabled in normal project defaults. Epic's UE 5.8 Unreal MCP is configured only for Editor targets with the narrowed `EditorToolset` and `AutomationTestToolset`; the broad `AllToolsets` plugin is disabled. The server is loopback-only, started manually per session, and absent from Game and Shipping receipts.
 
-Create tables in [Supabase dashboard](https://app.supabase.com):
-```sql
-create table saves (
-  id uuid primary key default gen_random_uuid(),
-  player_id text not null,
-  save_data jsonb not null,
-  updated_at timestamptz default now()
-);
-create table leaderboard (
-  id uuid primary key default gen_random_uuid(),
-  player_id text not null,
-  player_name text,
-  turns_played int,
-  territories_conquered int,
-  faction text,
-  created_at timestamptz default now()
-);
-```
+## M1 implementation status
 
-## E2E Tests
-| Test | Validates |
-|------|-----------|
-| zone_transitions | Camera zooms Campaign → Battle → FPS |
-| building_menu | B key opens build menu |
-| turn_cycle | EndTurn increments GetCurrentTurn by 1 |
-| fps_mode | FPS zoom level activates first-person |
+- Visual Studio Build Tools 2022 17.14, MSVC 14.44, .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100 are installed and accepted by UE 5.8.2.
+- The supported build path leaves Windows Smart App Control enabled and uses direct non-UBA compilation by default; full Development and Shipping rebuilds, IWYU, tests, cook, package, and smoke launch pass on that path.
+- `/Game/Maps/L_Testbed` and `/Game/Maps/L_VerticalSlice` are created, assigned to the explicit framework classes, dynamically lit, validated, cooked, and covered by Git LFS rules.
+- Two native automation tests pass; the M1 PIE stability run completed for more than ten minutes without an error, ensure, fatal error, or crash.
+- The archived Development package reaches `/Game/Maps/L_VerticalSlice`; Development and Shipping receipts contain no MCP/toolset modules.
+- Human review accepted the M1 baseline. The authorized local commit and clean-clone validation are the remaining M1 closure steps; no remote push is implied.
 
-## GitHub
-https://github.com/ilandaniele/RomanEmpireGame
+Asset provenance and intake rules are in [ASSET_INVENTORY.md](ASSET_INVENTORY.md). Project licensing is defined by [LICENSE.txt](LICENSE.txt) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

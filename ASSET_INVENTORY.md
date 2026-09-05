@@ -1,0 +1,67 @@
+# Asset Inventory
+
+Inventory date: 2026-09-05
+Status: M0 legacy search complete; M1 bootstrap maps created and validated, pending review/commit
+
+## Search evidence
+
+The inventory covered:
+
+- The complete repository working tree, including ignored files.
+- All 39 commits reachable from local Git refs.
+- Accessible `Desktop`, `Documents`, `Downloads`, and `OneDrive` folders for alternate `.uproject` files or directories named for Roman Empire Game.
+- Epic Launcher manifests and standard `C:\Program Files\Epic Games` engine locations.
+
+Results at the original M0 inventory point:
+
+- No `.uasset`, `.umap`, `.fbx`, `.glb`, `.gltf`, `.blend`, `.spp`, image, or audio source file exists in the repository working tree.
+- No Unreal binary or source-media asset appeared anywhere in Git history.
+- No alternate Roman Empire Unreal project or backup was found in the searched user folders.
+- No Epic Launcher Unreal installation or manifest was found during the original M0 search. UE 5.8.2 was installed afterward and is now the validated engine.
+
+This establishes a clean-bootstrap baseline. It cannot prove that an inaccessible external drive, cloud account, or different computer contains old content. Such content is non-blocking and must be quarantined and reviewed through the intake process below if recovered later.
+
+## Tracked design and generation inputs
+
+| Path | Kind | Origin | License/status | Runtime requirement |
+|---|---|---|---|---|
+| `Content/Audio/AudioConfig.json` | Audio specification | Project-authored prototype | Proprietary, source | No; reference only until licensed audio is imported |
+| `Content/Blueprints/Buildings/BP_Barracks.design.json` | Blueprint design specification | Project-authored prototype | Proprietary, source | No; reference only |
+| `Content/Blueprints/UI/WBP_MainHUD.design.json` | UMG design specification | Project-authored prototype | Proprietary, source | No; reference only |
+| `Content/Blueprints/Units/BP_Legionary.design.json` | Blueprint design specification | Project-authored prototype | Proprietary, source | No; reference only |
+| `Content/Scripts/MasterSetup.py` | Editor generation script | Project-authored prototype | Proprietary, source; unvalidated | No; do not run until reviewed against UE 5.8 |
+| `Content/Scripts/CreateBlueprints.py` | Editor generation script | Project-authored prototype | Proprietary, source; unvalidated | No; do not run until reviewed against UE 5.8 |
+| `Content/Scripts/CreateMaterials.py` | Editor generation script | Project-authored prototype | Proprietary, source; unvalidated | No; do not run until reviewed against UE 5.8 |
+| `Content/Scripts/CreateAudioAssets.py` | Editor generation script | Project-authored prototype | Proprietary, source; unvalidated | No; do not run until reviewed against UE 5.8 |
+| `Content/Maps/L_Testbed.umap` | Unreal test map | UE 5.8 `Template_Default` derivative, saved through Unreal MCP | Epic engine-content terms plus project modifications; M1 validated | Yes; Editor startup, native content validation, and PIE stability |
+| `Content/Maps/L_VerticalSlice.umap` | Unreal gameplay map | UE 5.8 `Template_Default` derivative, saved through Unreal MCP | Epic engine-content terms plus project modifications; M1 validated | Yes; packaged-game default and smoke launch |
+
+Engine basic shapes and engine materials referenced by C++ are engine-provided prerequisites, not repository assets. Their object paths load in the native content test and their packaging behavior was verified with UE 5.8.2.
+
+## Required bootstrap assets
+
+M1 created these source assets through Unreal Editor; review and commit remain:
+
+- `/Game/Maps/L_Testbed.umap`.
+- `/Game/Maps/L_VerticalSlice.umap`.
+
+Dedicated Enhanced Input actions/mapping contexts and placeholder Blueprint/Data Asset/UMG assets were not required for the compiling/bootstrap gate. They remain planned for the relevant M2–M5 implementation milestones and must follow the same provenance, LFS, validation, cook, and package rules.
+
+No generated asset is accepted merely because a script or MCP call succeeds. It must load without warnings, validate, cook, package, and remain covered by Git LFS.
+
+## Asset intake record
+
+Every future production asset must record:
+
+| Field | Required evidence |
+|---|---|
+| Stable asset ID and repository path | Unreal object path plus source-art path, if retained |
+| Creator/source | Author, vendor, Fab/Marketplace listing, or generator and prompt/brief |
+| License | License name, commercial-use rights, redistribution limits, proof-of-purchase location |
+| Version | Vendor/package version and acquisition date |
+| Modifications | What changed and which source file can reproduce it |
+| Import settings | Scale, axes, LODs, collision, UV/lightmap, compression, skeleton, sample rate as applicable |
+| Validation | Editor load, reference scan, content validation, cook/package result, and performance budget |
+| Attribution | Exact notice required in `THIRD_PARTY_NOTICES.md`, or `None` with rationale |
+
+AI-generated concepts and placeholders remain non-production until provenance, commercial rights, visual consistency, import quality, and performance are explicitly accepted.

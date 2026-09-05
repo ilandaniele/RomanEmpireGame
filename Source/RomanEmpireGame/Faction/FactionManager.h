@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "FactionData.h"
+#include "Faction/FactionData.h"
 #include "FactionManager.generated.h"
 
 /**

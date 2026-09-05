@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "../Building/BuildingTypes.h"
+#include "Building/BuildingTypes.h"
 #include "BuildingMenuWidget.generated.h"
 
 class UVerticalBox;

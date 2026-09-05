@@ -1,7 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Legionary.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
+#include "CollisionQueryParams.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ALegionary::ALegionary()

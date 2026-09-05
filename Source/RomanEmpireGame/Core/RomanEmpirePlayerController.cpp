@@ -3,19 +3,24 @@
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireHUD.h"
-#include "../RomanEmpireGame.h"
-#include "../Units/UnitBase.h"
-#include "../Units/Legionary.h"
-#include "../Building/BuildingBase.h"
-#include "../Building/Barracks.h"
-#include "../Building/BuildingPlacementComponent.h"
-#include "../Camera/SeamlessZoomCamera.h"
+#include "RomanEmpireGame.h"
+#include "Units/UnitBase.h"
+#include "Units/Legionary.h"
+#include "Building/BuildingBase.h"
+#include "Building/Barracks.h"
+#include "Building/BuildingPlacementComponent.h"
+#include "Camera/SeamlessZoomCamera.h"
+#include "CollisionQueryParams.h"
+#include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 #include "InputTriggers.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/FloatingPawnMovement.h"
 
@@ -52,7 +57,6 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_BuildKey4 = nullptr;
 	IA_BuildKey5 = nullptr;
 	IA_BuildKey6 = nullptr;
-	CurrentBuildingCost = 0;
 	TargetZoomLevel = 0.5f;
 	CurrentZoomLevel = 0.5f;
 	SelectedBuilding = nullptr;
@@ -561,12 +565,10 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 	{
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
 		{
-			if (GameMode)
+			if (BuildingPlacementComponent->ConfirmPlacement())
 			{
-				GameMode->SubtractGold(CurrentBuildingCost);
+				CurrentSelectionMode = ERomanSelectionMode::None;
 			}
-			BuildingPlacementComponent->ConfirmPlacement();
-			CurrentSelectionMode = ERomanSelectionMode::None;
 		}
 		return;
 	}
@@ -755,7 +757,11 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 {
-	CurrentBuildingCost = 200;
+	if (BuildingPlacementComponent)
+	{
+		BuildingPlacementComponent->SetBuildingCost(200);
+		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Barracks);
+	}
 	StartBuildingPlacement(ABarracks::StaticClass());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Barracks (200 Gold)"));
 }
@@ -784,7 +790,6 @@ void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 {
-	CurrentBuildingCost = 120;
 	if (BuildingPlacementComponent)
 	{
 		BuildingPlacementComponent->SetBuildingCost(120);
@@ -796,7 +801,6 @@ void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 {
-	CurrentBuildingCost = 80;
 	if (BuildingPlacementComponent)
 	{
 		BuildingPlacementComponent->SetBuildingCost(80);
@@ -808,7 +812,6 @@ void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 {
-	CurrentBuildingCost = 300;
 	if (BuildingPlacementComponent)
 	{
 		BuildingPlacementComponent->SetBuildingCost(300);
@@ -897,7 +900,7 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 		if (AUnitBase* Unit = Cast<AUnitBase>(HitActor))
 		{
 			SelectedBuilding = nullptr;
-			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->HUDSelectedBuilding = nullptr;
+			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->SetSelectedBuilding(nullptr);
 			SelectUnit(Unit);
 		}
 		else if (ABuildingBase* Building = Cast<ABuildingBase>(HitActor))
@@ -907,7 +910,7 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 			SelectedBuilding = Building;
 			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
 			{
-				REHUD->HUDSelectedBuilding = Building;
+				REHUD->SetSelectedBuilding(Building);
 			}
 			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::White,
 				FString::Printf(TEXT("Selected building: %s"), *Building->GetName()));
@@ -930,7 +933,7 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 		else
 		{
 			SelectedBuilding = nullptr;
-			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->HUDSelectedBuilding = nullptr;
+			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->SetSelectedBuilding(nullptr);
 			ClearSelection();
 		}
 	}

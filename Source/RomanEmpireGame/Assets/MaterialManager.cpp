@@ -1,10 +1,12 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "MaterialManager.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
+#include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 

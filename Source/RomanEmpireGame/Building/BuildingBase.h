@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "BuildingTypes.h"
-#include "../Faction/FactionData.h"
+#include "Faction/FactionData.h"
 #include "BuildingBase.generated.h"
 
 class UBoxComponent;
+class UMaterialInterface;
+class USceneComponent;
 class UStaticMeshComponent;
 
 /**
@@ -81,10 +83,6 @@ public:
 	// Visual feedback for placement
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void SetPlacementMode(bool bPlacing, bool bValidPlacement);
-
-	// Called by BuildingPlacementComponent to configure type-specific visuals
-	UFUNCTION(BlueprintCallable, Category = "Building")
-	virtual void SetBuildingTypeData(EBuildingType InType) { BuildingData.BuildingType = InType; }
 
 protected:
 	// Components

@@ -4,9 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "../Faction/FactionData.h"
+#include "Faction/FactionData.h"
 #include "MaterialManager.generated.h"
 
+class UMaterialInterface;
 class UMaterialParameterCollection;
 class UMaterialInstanceDynamic;
 

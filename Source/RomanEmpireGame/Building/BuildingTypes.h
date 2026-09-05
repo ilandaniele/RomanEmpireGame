@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../Faction/FactionData.h"
+#include "Faction/FactionData.h"
 #include "BuildingTypes.generated.h"
+
+class UTexture2D;
 
 /**
  * Building category for UI organization

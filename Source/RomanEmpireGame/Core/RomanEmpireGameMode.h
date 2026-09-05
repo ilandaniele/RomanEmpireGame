@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Math/RandomStream.h"
 #include "RomanEmpireGameMode.generated.h"
 
 class AFactionManager;
@@ -67,7 +68,7 @@ public:
 
 	// Resource management
 	void SubtractGold(int32 Amount);
-	int32 GetPlayerGold() const { return PlayerGold; }
+	int32 GetPlayerGold() const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
@@ -75,8 +76,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
 	int32 CurrentTurn;
-
-	int32 PlayerGold;
 
 	// Manager references
 	UPROPERTY()
@@ -95,6 +94,9 @@ protected:
 	FOnGamePhaseChanged OnGamePhaseChanged;
 
 private:
+	static constexpr int32 PrototypeRandomSeed = 1337;
+	FRandomStream PrototypeRandomStream;
+
 	void InitializeManagers();
 	void SpawnInitialUnits();
 	void SpawnInitialBuildings();

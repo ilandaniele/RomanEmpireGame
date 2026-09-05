@@ -2,8 +2,10 @@
 
 #include "BuildingPlacementComponent.h"
 #include "BuildingBase.h"
-#include "../RomanEmpireGame.h"
-#include "../Core/RomanEmpireGameMode.h"
+#include "RomanEmpireGame.h"
+#include "Core/RomanEmpireGameMode.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
@@ -126,6 +128,13 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
+	ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+	if (!GameMode || GameMode->GetPlayerGold() < CurrentBuildingCost)
+	{
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: insufficient gold or missing game mode"));
+		return false;
+	}
+
 	// Destroy preview
 	DestroyPreviewBuilding();
 
@@ -143,9 +152,7 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	if (NewBuilding)
 	{
-		// Resource check and deduction
-		ARomanEmpireGameMode* GM = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
-		if (GM) GM->SubtractGold(CurrentBuildingCost);
+		GameMode->SubtractGold(CurrentBuildingCost);
 
 		// Set building type on spawned building
 		NewBuilding->SetBuildingTypeData(CurrentBuildingType);

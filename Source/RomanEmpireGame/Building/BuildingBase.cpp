@@ -1,10 +1,13 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingBase.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
 #include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 ABuildingBase::ABuildingBase()

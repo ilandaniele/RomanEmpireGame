@@ -1,7 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "FactionManager.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
 
 AFactionManager::AFactionManager()
 {

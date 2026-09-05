@@ -1,8 +1,10 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "SeamlessZoomCamera.h"
-#include "../RomanEmpireGame.h"
+#include "RomanEmpireGame.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SceneComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
 

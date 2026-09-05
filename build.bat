@@ -1,14 +1,8 @@
 @echo off
 setlocal
 
-set PROJECT_PATH=%~dp0RomanEmpireGame.uproject
-set UBT_PATH=C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll
-set DOTNET_PATH=C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\DotNet\8.0.412\win-x64\dotnet.exe
+rem Compatibility entry point. BuildProject.ps1 owns discovery and diagnostics.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0BuildProject.ps1" -Action Editor %*
+set EXIT_CODE=%ERRORLEVEL%
 
-echo Building RomanEmpireGameEditor...
-
-"%DOTNET_PATH%" "%UBT_PATH%" RomanEmpireGameEditor Win64 Development -Project="%PROJECT_PATH%" -progress
-
-echo EXIT_CODE=%ERRORLEVEL%
-
-endlocal
+endlocal & exit /b %EXIT_CODE%
