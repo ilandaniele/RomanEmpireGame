@@ -1,8 +1,9 @@
 # UE Project Context
 
 *Last updated: 2026-09-05*
-*Repository baseline: `89d8d66e5051d303dea9c965317cdb961d8a52f6`*
-*Status: M1 human-approved; dedicated commit and clean-clone/LFS reproduction authorized and pending*
+*Audit baseline: `89d8d66e5051d303dea9c965317cdb961d8a52f6`*
+*M1 baseline: `0b74ad1566306d7487629812de68bc6abd7f0594`*
+*Status: M1 complete and clean-clone proven; M2 canonical-state work starting*
 
 ## Engine & Project Overview
 
@@ -21,7 +22,7 @@
 
 - Max players is currently one.
 - Multiplayer, dedicated server, and client targets are not planned for the first playable slice.
-- The legacy asset inventory is complete. `L_Testbed.umap` and `L_VerticalSlice.umap` now provide the deterministic M1 bootstrap; they are validated, covered by Git LFS rules, and approved for the dedicated M1 commit.
+- The legacy asset inventory is complete. `L_Testbed.umap` and `L_VerticalSlice.umap` provide the committed deterministic M1 bootstrap; they are validated, materialize correctly through Git LFS, and reproduce their reviewed hashes from a clean clone.
 
 ## Module Structure
 
@@ -139,7 +140,7 @@
 
 **Current build entrypoint:** `BuildProject.ps1`, with UE 5.8 discovery, optional `-EngineRoot`, Visual Studio/Git LFS prerequisite checks, and UBT/UAT actions. UBA is disabled by default because the audited workstation's Smart App Control policy rejects its locally generated unsigned Editor DLL; `-UseBuildAcceleration` is an explicit opt-in for compatible machines. `build.bat` is a compatibility wrapper.
 **Current local editor/toolchain:** VS Code 1.136.1 with Microsoft's C/C++ Extension Pack, Visual Studio Build Tools 2022 17.14, MSVC 14.44, the .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100. VS Code remains the selected editor while Build Tools supplies the compiler and SDK.
-**Latest build evidence:** Repository validation and VS Code generation succeed. UE 5.8.2 builds Development Editor, Development Game, Shipping Game, and the strict non-unity/no-PCH Editor target. On 2026-09-05, full non-UBA Development and Shipping rebuilds passed, native automation reported 2 succeeded/0 failed, UAT propagated `-NoUBA`, cooked 516 packages with 0 errors/0 warnings, and archived `M1Review_NoUBA_20260905_1400`; its smoke launch reached `L_VerticalSlice` and exited cleanly with no failure signature.
+**Latest build evidence:** Repository validation and VS Code generation succeed. UE 5.8.2 builds Development Editor, Development Game, Shipping Game, and the strict non-unity/no-PCH Editor target. On 2026-09-05, approved M1 commit `0b74ad1566306d7487629812de68bc6abd7f0594` reproduced from a clean clone: LFS pull/fsck, validators, all four build gates, 2 succeeded/0 failed native tests, UAT cook/package of 516 packages, a packaged `L_VerticalSlice` smoke launch, player-receipt inspection, and shutdown hygiene all passed. The clean-clone cook had one transient optional host-resolution warning; UAT exited 0 and the original reviewed package retained 0 errors/0 warnings.
 **Custom engine fork:** None recorded.
 **Third-party C++ libraries:** None recorded beyond engine modules.
 **Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output.
@@ -185,13 +186,12 @@
 **Source control:** Git on `main`, with an `origin/main` upstream.
 **Branching/review policy:** Not established; M7 plans protected review and green gates before merge.
 **Asset lock policy:** Unreal binary assets and source-media formats are covered by `.gitattributes` Git LFS rules. Team checkout/locking conventions beyond LFS remain a future collaboration-policy decision.
-**Documentation:** `README.md`, `SETUP_GUIDE.md`, `IMPLEMENTATION_PLAN.md`, and `M1_REVIEW.md`; the plan is authoritative for future execution sequencing, while the review packet records the current gate evidence and limitations.
+**Documentation:** `README.md`, `SETUP_GUIDE.md`, `IMPLEMENTATION_PLAN.md`, and `M1_REVIEW.md`; the plan is authoritative for future execution sequencing, while the review packet records the completed M1 gate evidence and limitations.
 
 ## Known Baseline Blockers
 
-- The user approved the validated M1 working tree on 2026-09-05 and authorized its dedicated local commit and clean-clone reproduction; no push is authorized.
-- The final M1 reproducibility check must run from a clean post-commit clone with `git lfs pull` before M2 begins.
-- Campaign, economy, building, combat, UI, and test systems still have competing or incomplete state paths; the user authorized continued execution into M2 after M1 closes.
+- M1 is closed at approved commit `0b74ad1566306d7487629812de68bc6abd7f0594`; its clean-clone/LFS reproduction passed and no remote push was performed.
+- Campaign, economy, building, combat, UI, and test systems still have competing or incomplete state paths. M2 begins by establishing canonical resource state and typed transaction contracts.
 - Production gameplay, UI, audio, and art assets remain future milestone work and require provenance/licensing records.
 
 Update this context after M0 decisions, every engine/module/plugin migration, and any change to authoritative system ownership.

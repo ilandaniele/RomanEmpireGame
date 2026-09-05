@@ -2,13 +2,13 @@
 
 Roman Empire Game is an Unreal Engine 5.8 single-player Windows project combining a campaign layer, real-time tactical command, settlement development, and explicit first-person possession of a soldier.
 
-The M1 technical gate is complete on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The user approved M1 on 2026-09-05; its dedicated local commit and clean-clone/LFS reproduction are the remaining closure steps before M2 begins.
+M1 is complete and clean-clone proven on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The approved baseline is commit `0b74ad1566306d7487629812de68bc6abd7f0594`; M2 canonical-state work is now active.
 
 ## Product target
 
 The first playable slice is one complete Rome-versus-Carthage loop: build a barracks, recruit and command a small force, possess a legionary, capture an objective, resolve the territory result, save, exit, and restore.
 
-See [PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) for scope and decisions, [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for milestone order and acceptance gates, and [M1_REVIEW.md](M1_REVIEW.md) for the current human review packet and evidence limitations.
+See [PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) for scope and decisions, [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for milestone order and acceptance gates, and [M1_REVIEW.md](M1_REVIEW.md) for the completed M1 review and reproducibility evidence.
 
 ## Prerequisites
 
@@ -85,6 +85,6 @@ Remote Control and Automation Driver are disabled in normal project defaults. Ep
 - `/Game/Maps/L_Testbed` and `/Game/Maps/L_VerticalSlice` are created, assigned to the explicit framework classes, dynamically lit, validated, cooked, and covered by Git LFS rules.
 - Two native automation tests pass; the M1 PIE stability run completed for more than ten minutes without an error, ensure, fatal error, or crash.
 - The archived Development package reaches `/Game/Maps/L_VerticalSlice`; Development and Shipping receipts contain no MCP/toolset modules.
-- Human review accepted the M1 baseline. The authorized local commit and clean-clone validation are the remaining M1 closure steps; no remote push is implied.
+- Human review accepted the M1 baseline. Commit `0b74ad1566306d7487629812de68bc6abd7f0594` reproduced from a clean clone through LFS pull, validation, Editor/IWYU/Game builds, tests, packaging, packaged smoke, and player-receipt inspection. No remote push was performed.
 
 Asset provenance and intake rules are in [ASSET_INVENTORY.md](ASSET_INVENTORY.md). Project licensing is defined by [LICENSE.txt](LICENSE.txt) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

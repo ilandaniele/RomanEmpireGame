@@ -1,6 +1,6 @@
 # Roman Empire Game Implementation Plan
 
-Status: implementation active; M0 adopted and M1 recovery in progress
+Status: implementation active; M0 and M1 complete, M2 canonical-state work active
 Audit baseline: commit `89d8d66e5051d303dea9c965317cdb961d8a52f6`
 Plan date: 2026-09-03
 
@@ -196,7 +196,7 @@ Estimated effort: 0.5–2 focused days, excluding time needed to find external a
 
 Goal: make a clean checkout build, open, test, and package without private machine state.
 
-Progress as of 2026-09-05: the M1 technical gate is proven on the audited workstation. Source-asset/LFS and formatting policy, the UE 5.8 migration, portable build entrypoint, plugin quarantine, Editor-only native tests, compile/IWYU fixes, explicit framework defaults, deterministic bootstrap maps, and narrow Unreal MCP integration are implemented. VS Code generation, full non-UBA Development/Shipping rebuilds, strict IWYU, two native tests, ten-minute PIE stability, Development packaging, and packaged-scene smoke launch all succeed while Windows Smart App Control remains enabled. The user accepted the human review gate and authorized the dedicated local commit, clean-clone/LFS reproduction, and continuation of the implementation goal. M2 begins after the clean-clone proof closes M1; no push is authorized.
+Completed 2026-09-05: source-asset/LFS and formatting policy, the UE 5.8 migration, portable build entrypoint, plugin quarantine, Editor-only native tests, compile/IWYU fixes, explicit framework defaults, deterministic bootstrap maps, and narrow Unreal MCP integration are implemented. VS Code generation, full non-UBA Development/Shipping rebuilds, strict IWYU, two native tests, ten-minute PIE stability, Development packaging, and packaged-scene smoke launch all succeed while Windows Smart App Control remains enabled. The user accepted the human review gate, and approved commit `0b74ad1566306d7487629812de68bc6abd7f0594` reproduced from a clean `--no-local` clone through LFS pull, validation, all required builds, tests, package, smoke, receipt inspection, and clean shutdown. No push was performed. M2 is authorized and active.
 
 #### M1.1 Source-control policy
 
@@ -277,7 +277,9 @@ Implementation evidence recorded 2026-09-05:
 - `L_Testbed` ran in PIE for 10 minutes 9 seconds with no error, ensure, critical error, fatal error, or crash after PIE startup.
 - The final UAT BuildCookRun propagated `-NoUBA`, compiled every required action through the direct executor, cooked 516 packages with 0 errors/0 warnings, and produced `Artifacts/Packages/M1Review_NoUBA_20260905_1400`. Its unattended `-NullRHI` smoke launch loaded `/Game/Maps/L_VerticalSlice`, instantiated `ARomanEmpireGameMode`, initialized the HUD/controller, terrain, buildings, and both armies, produced no error/fatal/ensure/application-control signature, and exited cleanly.
 - Development and Shipping target receipts contain zero references to `ModelContextProtocol`, `ToolsetRegistry`, `EditorToolset`, `AutomationTestToolset`, or `AllToolsets`; no MCP listener remains after the intentional Editor session.
-- Human review accepted on 2026-09-05. The dedicated local commit and clean-clone `git lfs pull` reproduction are authorized and remain before final M1 closure. No push is authorized.
+- Human review accepted on 2026-09-05. The dedicated local commit is `0b74ad1566306d7487629812de68bc6abd7f0594`.
+- Clean-clone proof completed at `C:\Users\Ilan\AppData\Local\Temp\RomanEmpireGame-M1-0b74ad1-20260905\repo`: exact commit and clean status, LFS hashes reproduced, validators/VS Code generation passed, Editor/IWYU/Development/Shipping builds passed, 2/2 tests passed, 516 packages cooked, and the archived player loaded `L_VerticalSlice` before a graceful close with zero failure signatures. Both player receipts remained free of MCP/toolset modules. One transient optional host-resolution warning occurred during this clean-clone cook; UAT exited successfully and the original reviewed package retained its 0-error/0-warning evidence.
+- M1 is closed. The user authorized continuation into M2; no remote push was requested or performed.
 
 Estimated effort: 2–5 focused days after asset and engine decisions.
 
@@ -728,4 +730,4 @@ When implementation is authorized, execute only this batch first:
 5. Commit the deterministic test map and required placeholder assets.
 6. Prove clean Editor build, PIE launch, cook, package, and packaged smoke launch.
 
-The M1 human-review gate was accepted on 2026-09-05. Complete its authorized commit and clean-clone reproduction before beginning canonical-state refactoring; this keeps recovery failures separate from the larger gameplay redesign.
+The M1 human-review gate was accepted and its commit/clean-clone reproduction completed on 2026-09-05. Canonical-state refactoring may now proceed as the first M2 work package.
