@@ -76,27 +76,10 @@ void AFactionManager::InitializeDefaultFactions()
 
 void AFactionManager::InitializeDefaultDiplomacy()
 {
-	// Set initial diplomatic relations
-	// Rome vs Carthage - War (Punic Wars)
-	FDiplomaticRelation RomeCarthage;
-	RomeCarthage.OtherFaction = EFactionID::Carthage;
-	RomeCarthage.Status = EDiplomaticStatus::War;
-	RomeCarthage.RelationshipScore = -80;
-	DiplomacyMatrix.Add(RomeCarthage);
-
-	// Rome vs Gaul - Hostile
-	FDiplomaticRelation RomeGaul;
-	RomeGaul.OtherFaction = EFactionID::Gaul;
-	RomeGaul.Status = EDiplomaticStatus::Hostile;
-	RomeGaul.RelationshipScore = -40;
-	DiplomacyMatrix.Add(RomeGaul);
-
-	// Carthage vs Gaul - Neutral
-	FDiplomaticRelation CarthageGaul;
-	CarthageGaul.OtherFaction = EFactionID::Gaul;
-	CarthageGaul.Status = EDiplomaticStatus::Neutral;
-	CarthageGaul.RelationshipScore = 0;
-	DiplomacyMatrix.Add(CarthageGaul);
+	DiplomacyState.Reset();
+	DiplomacyState.TrySetStatus(EFactionID::Rome, EFactionID::Carthage, EDiplomaticStatus::War);
+	DiplomacyState.TrySetStatus(EFactionID::Rome, EFactionID::Gaul, EDiplomaticStatus::War);
+	// Carthage and Gaul remain in the implicit canonical Neutral state.
 }
 
 FFactionInfo AFactionManager::GetFactionInfo(EFactionID FactionID) const
@@ -157,39 +140,24 @@ FFactionResourceTransactionResult AFactionManager::TrySpendFactionResources(
 
 EDiplomaticStatus AFactionManager::GetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2) const
 {
-	if (Faction1 == Faction2)
-	{
-		return EDiplomaticStatus::Allied; // Same faction
-	}
-
-	for (const FDiplomaticRelation& Relation : DiplomacyMatrix)
-	{
-		if (Relation.OtherFaction == Faction2)
-		{
-			return Relation.Status;
-		}
-	}
-	return EDiplomaticStatus::Neutral;
+	return DiplomacyState.GetStatus(Faction1, Faction2);
 }
 
-void AFactionManager::SetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2, EDiplomaticStatus NewStatus)
+FDiplomaticChangeResult AFactionManager::SetDiplomaticStatus(
+	EFactionID Faction1,
+	EFactionID Faction2,
+	EDiplomaticStatus NewStatus)
 {
-	for (FDiplomaticRelation& Relation : DiplomacyMatrix)
+	FDiplomaticChangeResult Result = DiplomacyState.TrySetStatus(Faction1, Faction2, NewStatus);
+	if (Result.WasSuccessful())
 	{
-		if (Relation.OtherFaction == Faction2)
-		{
-			Relation.Status = NewStatus;
-			UE_LOG(LogRomanEmpire, Log, TEXT("Diplomatic status changed between factions"));
-			return;
-		}
+		UE_LOG(LogRomanEmpire, Log, TEXT("Diplomatic status changed between factions %d and %d to %d"),
+			static_cast<int32>(Result.Pair.FirstFaction),
+			static_cast<int32>(Result.Pair.SecondFaction),
+			static_cast<int32>(NewStatus));
+		OnDiplomaticStatusChanged.Broadcast(Result.Pair, NewStatus);
 	}
-
-	// Add new relation if not found
-	FDiplomaticRelation NewRelation;
-	NewRelation.OtherFaction = Faction2;
-	NewRelation.Status = NewStatus;
-	NewRelation.RelationshipScore = 0;
-	DiplomacyMatrix.Add(NewRelation);
+	return Result;
 }
 
 bool AFactionManager::AreAtWar(EFactionID Faction1, EFactionID Faction2) const
@@ -208,24 +176,6 @@ void AFactionManager::SetPlayerFaction(EFactionID NewFaction)
 	UE_LOG(LogRomanEmpire, Log, TEXT("Player faction set to: %d"), static_cast<int32>(NewFaction));
 }
 
-void AFactionManager::AssignTerritoryToFaction(FName TerritoryID, EFactionID FactionID)
-{
-	TerritoryOwnership.Add(TerritoryID, FactionID);
-}
-
-int32 AFactionManager::GetFactionTerritoryCount(EFactionID FactionID) const
-{
-	int32 Count = 0;
-	for (const auto& Pair : TerritoryOwnership)
-	{
-		if (Pair.Value == FactionID)
-		{
-			Count++;
-		}
-	}
-	return Count;
-}
-
 void AFactionManager::ProcessAITurns()
 {
 	for (const auto& Pair : FactionInfoMap)
@@ -239,16 +189,8 @@ void AFactionManager::ProcessAITurns()
 
 void AFactionManager::ProcessAIFactionTurn(EFactionID FactionID)
 {
-	// Basic AI: Generate income based on territory
-	int32 TerritoryCount = GetFactionTerritoryCount(FactionID);
-	
-	FFactionResourceDelta Income;
-	Income.Gold = 100 * TerritoryCount;
-	Income.Food = 50 * TerritoryCount;
-	
-	ApplyFactionResourceDelta(FactionID, Income);
-	
-	UE_LOG(LogRomanEmpire, Verbose, TEXT("AI faction %d processed turn, gained %d gold"), 
-		static_cast<int32>(FactionID), Income.Gold);
+	// Campaign production is processed exactly once by ACampaignManager before this stage.
+	UE_LOG(LogRomanEmpire, Verbose, TEXT("AI faction %d processed its action stage"),
+		static_cast<int32>(FactionID));
 }
 

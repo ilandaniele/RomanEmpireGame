@@ -336,6 +336,19 @@ Implementation evidence recorded 2026-09-05:
 - Define legal transitions and invariants for war, neutrality, alliance, and invalid/self relationships.
 - Add setters/factories that fully initialize territories before they become observable.
 
+Implementation evidence recorded 2026-09-05:
+
+- `FTerritoryDefinition` gives every region a validated stable `FName` ID, display text, terrain/resource definition, and explicit starting owner. Empty IDs/names, invalid enums, negative production, and duplicate IDs are rejected before registration.
+- `FTerritoryCampaignState`, owned by `AWorldMapManager`, contains the sole `TMap<FName, EFactionID>` runtime ownership store. Transfers return `FTerritoryOwnershipChangeResult` with previous/new owners and typed rejection reasons; successful changes update the matching actor presentation and broadcast the manager event.
+- `ATerritoryRegion` no longer has an `OwnerFaction` field or ownership setter. It retains only its stable definition/ID handle and reads the canonical manager state when presenting ownership, color, production, and UI-facing data.
+- Default territory creation now uses `SpawnActorDeferred`, assigns the complete validated definition and manager reference, registers canonical campaign state, and only then calls `FinishSpawningActor`. Existing authored actors must pass the same definition/duplicate-ID registration gate.
+- Campaign production and conquest/defeat checks read WorldMapManager ownership. The disconnected FactionManager territory map was removed, and the AI action stage no longer adds a second territory-income calculation after canonical production.
+- `FDiplomacyState` stores one relation per normalized unordered faction pair. Valid unstored pairs are neutral; `None`, out-of-range, and self pairs are invalid. Legal transitions are Neutral→War/Allied and War/Allied→Neutral, so direct War↔Allied jumps and repeated/invalid requests return typed failures without mutation.
+- Repository validation enforces the single ownership map, presentation-only territory actor, deferred initialization order, normalized diplomacy state, canonical campaign ownership reads, and required automation coverage.
+- The final automation report at `Artifacts/Automation/20260905_164215_075` contains 7 successes and 0 failures, including canonical ownership transfers/duplicate rejection and diplomacy symmetry/transition invariants. Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass.
+- Development BuildCookRun cooked 516 packages with 0 errors/0 warnings and archived successfully into `Artifacts/Packages/M2_3`. The signed Editor-hosted `-game` smoke loaded `L_VerticalSlice`, created and registered all 9 prototype territories, initialized the faction/world/campaign managers, and produced 0 failure signatures. Direct execution of newly unsigned player hashes remains subject to the M2.2 Smart App Control limitation.
+- M2.3 is complete; M2.4 is the active implementation package.
+
 #### M2.4 Data-driven definitions
 
 - Create Primary Data Assets for faction, unit, building, and territory definitions.

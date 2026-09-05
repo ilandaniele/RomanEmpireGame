@@ -23,19 +23,6 @@ enum class EFactionID : uint8
 };
 
 /**
- * Diplomatic relationship between factions
- */
-UENUM(BlueprintType)
-enum class EDiplomaticStatus : uint8
-{
-	War			UMETA(DisplayName = "At War"),
-	Hostile		UMETA(DisplayName = "Hostile"),
-	Neutral		UMETA(DisplayName = "Neutral"),
-	Friendly	UMETA(DisplayName = "Friendly"),
-	Allied		UMETA(DisplayName = "Allied")
-};
-
-/**
  * Resource types in the game
  */
 UENUM(BlueprintType)
@@ -213,30 +200,6 @@ struct ROMANEMPIREGAME_API FFactionInfo
 		, InfantryBonus(1.0f)
 		, CavalryBonus(1.0f)
 		, EconomyBonus(1.0f)
-	{}
-};
-
-/**
- * Diplomatic relationship data
- */
-USTRUCT(BlueprintType)
-struct ROMANEMPIREGAME_API FDiplomaticRelation
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Diplomacy")
-	EFactionID OtherFaction;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Diplomacy")
-	EDiplomaticStatus Status;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Diplomacy")
-	int32 RelationshipScore; // -100 to +100
-
-	FDiplomaticRelation()
-		: OtherFaction(EFactionID::None)
-		, Status(EDiplomaticStatus::Neutral)
-		, RelationshipScore(0)
 	{}
 };
 

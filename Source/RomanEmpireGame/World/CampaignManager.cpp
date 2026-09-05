@@ -285,7 +285,7 @@ bool ACampaignManager::CheckVictoryCondition(EFactionID FactionID, EVictoryCondi
 	{
 		case EVictoryCondition::Conquest:
 		{
-			int32 TerritoryCount = FactionManager->GetFactionTerritoryCount(FactionID);
+			const int32 TerritoryCount = WorldMapManager->GetFactionTerritoryCount(FactionID);
 			return TerritoryCount >= ConquestVictoryTerritories;
 		}
 
@@ -327,13 +327,13 @@ bool ACampaignManager::HasPlayerWon() const
 
 bool ACampaignManager::HasPlayerLost() const
 {
-	if (!FactionManager)
+	if (!FactionManager || !WorldMapManager)
 	{
 		return false;
 	}
 
-	EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
-	int32 TerritoryCount = FactionManager->GetFactionTerritoryCount(PlayerFaction);
+	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
+	const int32 TerritoryCount = WorldMapManager->GetFactionTerritoryCount(PlayerFaction);
 	
 	// Lost if no territories
 	return TerritoryCount == 0;

@@ -6,6 +6,27 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+	FTerritoryDefinition MakePrototypeTerritoryDefinition(
+		const TCHAR* ID,
+		const TCHAR* DisplayName,
+		EFactionID StartingOwner)
+	{
+		FTerritoryDefinition Definition;
+		Definition.TerritoryID = FName(ID);
+		Definition.DisplayName = FText::FromString(DisplayName);
+		Definition.Description = FText::FromString(
+			FString::Printf(TEXT("Prototype campaign territory: %s"), DisplayName));
+		Definition.StartingOwner = StartingOwner;
+		Definition.TerrainType = ETerrainType::Plains;
+		Definition.BonusResource = EResourceType::Gold;
+		Definition.ResourceProduction.Gold = 50;
+		Definition.ResourceProduction.Food = 30;
+		return Definition;
+	}
+}
+
 AWorldMapManager::AWorldMapManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -18,6 +39,9 @@ AWorldMapManager::AWorldMapManager()
 void AWorldMapManager::BeginPlay()
 {
 	Super::BeginPlay();
+	CampaignTerritoryState.Reset();
+	Territories.Reset();
+	TerritoryActorsByID.Reset();
 	
 	// Find existing territories or generate map
 	TArray<AActor*> FoundTerritories;
@@ -33,7 +57,7 @@ void AWorldMapManager::BeginPlay()
 		{
 			if (ATerritoryRegion* Territory = Cast<ATerritoryRegion>(Actor))
 			{
-				Territories.Add(Territory);
+				RegisterExistingTerritory(Territory);
 			}
 		}
 	}
@@ -43,6 +67,12 @@ void AWorldMapManager::BeginPlay()
 
 void AWorldMapManager::GenerateDefaultMap()
 {
+	if (Territories.Num() > 0 || CampaignTerritoryState.GetTerritoryCount() > 0)
+	{
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Default map generation skipped because territories already exist"));
+		return;
+	}
+
 	// Generate a small Mediterranean-style map
 	// Layout:
 	//   [Gaul]  [Alps]  [Greece]
@@ -50,109 +80,169 @@ void AWorldMapManager::GenerateDefaultMap()
 	//   [Carthage] [Sicily] [Egypt]
 
 	// Row 1 - Northern territories
-	CreateTerritory(TEXT("Gaul"), 
-		FText::FromString(TEXT("Gallia")), 
-		FVector(-TerritorySize, TerritorySize, 0), 
-		EFactionID::Gaul);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Gaul"), TEXT("Gallia"), EFactionID::Gaul),
+		FVector(-TerritorySize, TerritorySize, 0));
 
-	CreateTerritory(TEXT("Alps"), 
-		FText::FromString(TEXT("Alpine Passes")), 
-		FVector(0, TerritorySize, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Alps"), TEXT("Alpine Passes"), EFactionID::None),
+		FVector(0, TerritorySize, 0));
 
-	CreateTerritory(TEXT("Greece"), 
-		FText::FromString(TEXT("Graecia")), 
-		FVector(TerritorySize, TerritorySize, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Greece"), TEXT("Graecia"), EFactionID::None),
+		FVector(TerritorySize, TerritorySize, 0));
 
 	// Row 2 - Central territories
-	CreateTerritory(TEXT("Hispania"), 
-		FText::FromString(TEXT("Hispania")), 
-		FVector(-TerritorySize, 0, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Hispania"), TEXT("Hispania"), EFactionID::None),
+		FVector(-TerritorySize, 0, 0));
 
 	// Rome - center of the map
-	ATerritoryRegion* RomeTerritory = nullptr;
-	CreateTerritory(TEXT("Rome"), 
-		FText::FromString(TEXT("Italia")), 
-		FVector(0, 0, 0), 
-		EFactionID::Rome);
-	
-	// Find Rome and found its settlement
-	RomeTerritory = GetTerritoryByID(TEXT("Rome"));
+	ATerritoryRegion* RomeTerritory = CreateTerritory(
+		MakePrototypeTerritoryDefinition(TEXT("Rome"), TEXT("Italia"), EFactionID::Rome),
+		FVector(0, 0, 0));
+
 	if (RomeTerritory)
 	{
 		RomeTerritory->FoundSettlement(FText::FromString(TEXT("Roma")));
 	}
 
-	CreateTerritory(TEXT("Macedonia"), 
-		FText::FromString(TEXT("Macedonia")), 
-		FVector(TerritorySize, 0, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Macedonia"), TEXT("Macedonia"), EFactionID::None),
+		FVector(TerritorySize, 0, 0));
 
 	// Row 3 - Southern territories
-	ATerritoryRegion* CarthageTerritory = nullptr;
-	CreateTerritory(TEXT("Africa"), 
-		FText::FromString(TEXT("Africa")), 
-		FVector(-TerritorySize, -TerritorySize, 0), 
-		EFactionID::Carthage);
-	
-	CarthageTerritory = GetTerritoryByID(TEXT("Africa"));
+	ATerritoryRegion* CarthageTerritory = CreateTerritory(
+		MakePrototypeTerritoryDefinition(TEXT("Africa"), TEXT("Africa"), EFactionID::Carthage),
+		FVector(-TerritorySize, -TerritorySize, 0));
+
 	if (CarthageTerritory)
 	{
 		CarthageTerritory->FoundSettlement(FText::FromString(TEXT("Carthago")));
 	}
 
-	CreateTerritory(TEXT("Sicily"), 
-		FText::FromString(TEXT("Sicilia")), 
-		FVector(0, -TerritorySize, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Sicily"), TEXT("Sicilia"), EFactionID::None),
+		FVector(0, -TerritorySize, 0));
 
-	CreateTerritory(TEXT("Egypt"), 
-		FText::FromString(TEXT("Aegyptus")), 
-		FVector(TerritorySize, -TerritorySize, 0), 
-		EFactionID::None);
+	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Egypt"), TEXT("Aegyptus"), EFactionID::None),
+		FVector(TerritorySize, -TerritorySize, 0));
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Generated default Mediterranean map with %d territories"), Territories.Num());
 }
 
-void AWorldMapManager::CreateTerritory(FName ID, const FText& Name, const FVector& Location, EFactionID StartingOwner)
+ATerritoryRegion* AWorldMapManager::CreateTerritory(
+	const FTerritoryDefinition& Definition,
+	const FVector& Location)
 {
 	UWorld* World = GetWorld();
 	if (!World)
 	{
-		return;
+		return nullptr;
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-
-	ATerritoryRegion* NewTerritory = World->SpawnActor<ATerritoryRegion>(
+	const FTransform SpawnTransform(FRotator::ZeroRotator, Location);
+	ATerritoryRegion* NewTerritory = World->SpawnActorDeferred<ATerritoryRegion>(
 		ATerritoryRegion::StaticClass(),
-		Location,
-		FRotator::ZeroRotator,
-		SpawnParams
-	);
-
-	if (NewTerritory)
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!NewTerritory)
 	{
-		// Can't set directly as UPROPERTY is EditAnywhere, not code-settable
-		// In a real implementation, add setter functions
-		NewTerritory->SetOwnerFaction(StartingOwner);
-		Territories.Add(NewTerritory);
+		return nullptr;
 	}
+
+	if (!NewTerritory->InitializeTerritory(Definition, this))
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Territory %s rejected during actor initialization"),
+			*Definition.TerritoryID.ToString());
+		NewTerritory->Destroy();
+		return nullptr;
+	}
+
+	const FTerritoryRegistrationResult Registration =
+		CampaignTerritoryState.RegisterTerritory(Definition);
+	if (!Registration.WasSuccessful())
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Territory %s rejected by campaign state (%s)"),
+			*Definition.TerritoryID.ToString(),
+			RomanEmpireTerritories::GetRegistrationFailureName(Registration.Failure));
+		NewTerritory->Destroy();
+		return nullptr;
+	}
+
+	UGameplayStatics::FinishSpawningActor(NewTerritory, SpawnTransform);
+	Territories.Add(NewTerritory);
+	TerritoryActorsByID.Add(Definition.TerritoryID, NewTerritory);
+	return NewTerritory;
 }
 
 ATerritoryRegion* AWorldMapManager::GetTerritoryByID(FName TerritoryID) const
 {
-	for (ATerritoryRegion* Territory : Territories)
+	if (const TObjectPtr<ATerritoryRegion>* Territory = TerritoryActorsByID.Find(TerritoryID))
 	{
-		if (Territory && Territory->GetTerritoryID() == TerritoryID)
-		{
-			return Territory;
-		}
+		return Territory->Get();
 	}
 	return nullptr;
+}
+
+FTerritoryDefinition AWorldMapManager::GetTerritoryDefinition(FName TerritoryID) const
+{
+	FTerritoryDefinition Definition;
+	CampaignTerritoryState.TryGetDefinition(TerritoryID, Definition);
+	return Definition;
+}
+
+EFactionID AWorldMapManager::GetTerritoryOwner(FName TerritoryID) const
+{
+	EFactionID TerritoryOwner = EFactionID::None;
+	CampaignTerritoryState.TryGetOwner(TerritoryID, TerritoryOwner);
+	return TerritoryOwner;
+}
+
+FTerritoryOwnershipChangeResult AWorldMapManager::ChangeTerritoryOwner(
+	FName TerritoryID,
+	EFactionID NewOwner)
+{
+	FTerritoryOwnershipChangeResult Result =
+		CampaignTerritoryState.ChangeOwner(TerritoryID, NewOwner);
+	if (Result.WasSuccessful() && Result.bOwnershipChanged)
+	{
+		if (ATerritoryRegion* Territory = GetTerritoryByID(TerritoryID))
+		{
+			Territory->RefreshOwnershipPresentation(Result.PreviousOwner, Result.NewOwner);
+		}
+		OnTerritoryOwnerChanged.Broadcast(
+			TerritoryID, Result.PreviousOwner, Result.NewOwner);
+		UE_LOG(LogRomanEmpire, Log, TEXT("Territory %s changed owner from %d to %d"),
+			*TerritoryID.ToString(),
+			static_cast<int32>(Result.PreviousOwner),
+			static_cast<int32>(Result.NewOwner));
+	}
+	return Result;
+}
+
+int32 AWorldMapManager::GetFactionTerritoryCount(EFactionID FactionID) const
+{
+	return CampaignTerritoryState.GetFactionTerritoryCount(FactionID);
+}
+
+bool AWorldMapManager::RegisterExistingTerritory(ATerritoryRegion* Territory)
+{
+	if (!Territory)
+	{
+		return false;
+	}
+
+	const FTerritoryDefinition Definition = Territory->GetDefinition();
+	const FTerritoryRegistrationResult Registration =
+		CampaignTerritoryState.RegisterTerritory(Definition);
+	if (!Registration.WasSuccessful() || !Territory->InitializeTerritory(Definition, this))
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Existing territory %s rejected (%s)"),
+			*Definition.TerritoryID.ToString(),
+			RomanEmpireTerritories::GetRegistrationFailureName(Registration.Failure));
+		return false;
+	}
+
+	Territories.Add(Territory);
+	TerritoryActorsByID.Add(Definition.TerritoryID, Territory);
+	return true;
 }
 
 ATerritoryRegion* AWorldMapManager::GetTerritoryAtLocation(const FVector& Location) const

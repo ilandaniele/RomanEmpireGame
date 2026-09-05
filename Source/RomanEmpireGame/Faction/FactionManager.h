@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Faction/DiplomacyState.h"
 #include "GameFramework/Actor.h"
 #include "Faction/FactionData.h"
 #include "FactionManager.generated.h"
@@ -51,7 +52,10 @@ public:
 	EDiplomaticStatus GetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Faction|Diplomacy")
-	void SetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2, EDiplomaticStatus NewStatus);
+	FDiplomaticChangeResult SetDiplomaticStatus(
+		EFactionID Faction1,
+		EFactionID Faction2,
+		EDiplomaticStatus NewStatus);
 
 	UFUNCTION(BlueprintPure, Category = "Faction|Diplomacy")
 	bool AreAtWar(EFactionID Faction1, EFactionID Faction2) const;
@@ -59,19 +63,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Faction|Diplomacy")
 	bool AreAllied(EFactionID Faction1, EFactionID Faction2) const;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnDiplomaticStatusChanged,
+		FDiplomaticPair, Pair,
+		EDiplomaticStatus, NewStatus);
+
+	UPROPERTY(BlueprintAssignable, Category = "Faction|Diplomacy")
+	FOnDiplomaticStatusChanged OnDiplomaticStatusChanged;
+
 	// Player faction
 	UFUNCTION(BlueprintPure, Category = "Faction")
 	EFactionID GetPlayerFaction() const { return PlayerFaction; }
 
 	UFUNCTION(BlueprintCallable, Category = "Faction")
 	void SetPlayerFaction(EFactionID NewFaction);
-
-	// Territory
-	UFUNCTION(BlueprintCallable, Category = "Faction|Territory")
-	void AssignTerritoryToFaction(FName TerritoryID, EFactionID FactionID);
-
-	UFUNCTION(BlueprintPure, Category = "Faction|Territory")
-	int32 GetFactionTerritoryCount(EFactionID FactionID) const;
 
 	// AI turn processing
 	UFUNCTION(BlueprintCallable, Category = "Faction|AI")
@@ -85,13 +90,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction|State")
 	TMap<EFactionID, FFactionResourceAmounts> FactionResourcesMap;
 
-	// Diplomacy matrix
+	// Canonical normalized diplomacy state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction|Diplomacy")
-	TArray<FDiplomaticRelation> DiplomacyMatrix;
-
-	// Territory ownership
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction|Territory")
-	TMap<FName, EFactionID> TerritoryOwnership;
+	FDiplomacyState DiplomacyState;
 
 	// Player's faction
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction")

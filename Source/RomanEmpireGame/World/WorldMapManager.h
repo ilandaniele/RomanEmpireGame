@@ -2,9 +2,9 @@
 
 #pragma once
 
+#include "Campaign/TerritoryData.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Faction/FactionData.h"
 #include "WorldMapManager.generated.h"
 
 class ATerritoryRegion;
@@ -32,6 +32,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "World")
 	ATerritoryRegion* GetTerritoryAtLocation(const FVector& Location) const;
 
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	FTerritoryDefinition GetTerritoryDefinition(FName TerritoryID) const;
+
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	EFactionID GetTerritoryOwner(FName TerritoryID) const;
+
+	UFUNCTION(BlueprintCallable, Category = "World|Territory")
+	FTerritoryOwnershipChangeResult ChangeTerritoryOwner(
+		FName TerritoryID,
+		EFactionID NewOwner);
+
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	int32 GetFactionTerritoryCount(EFactionID FactionID) const;
+
 	// Map generation
 	UFUNCTION(BlueprintCallable, Category = "World")
 	void GenerateDefaultMap();
@@ -42,6 +56,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "World")
 	bool AreTerritoriesAdjacent(ATerritoryRegion* Territory1, ATerritoryRegion* Territory2) const;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+		FOnTerritoryOwnerChanged,
+		FName, TerritoryID,
+		EFactionID, PreviousOwner,
+		EFactionID, NewOwner);
+
+	UPROPERTY(BlueprintAssignable, Category = "World|Territory")
+	FOnTerritoryOwnerChanged OnTerritoryOwnerChanged;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World")
@@ -57,7 +80,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World|Size")
 	float TerritorySize;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World|Campaign State")
+	FTerritoryCampaignState CampaignTerritoryState;
+
 private:
-	void CreateTerritory(FName ID, const FText& Name, const FVector& Location, EFactionID StartingOwner);
+	UPROPERTY()
+	TMap<FName, TObjectPtr<ATerritoryRegion>> TerritoryActorsByID;
+
+	ATerritoryRegion* CreateTerritory(
+		const FTerritoryDefinition& Definition,
+		const FVector& Location);
+	bool RegisterExistingTerritory(ATerritoryRegion* Territory);
 };
 

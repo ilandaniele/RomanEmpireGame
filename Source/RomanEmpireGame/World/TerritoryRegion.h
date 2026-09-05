@@ -2,28 +2,16 @@
 
 #pragma once
 
+#include "Campaign/TerritoryData.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Faction/FactionData.h"
 #include "TerritoryRegion.generated.h"
 
 class ABuildingBase;
 class AUnitBase;
+class AWorldMapManager;
 class UBoxComponent;
 class UStaticMeshComponent;
-
-/**
- * Terrain type affecting movement and building
- */
-UENUM(BlueprintType)
-enum class ETerrainType : uint8
-{
-	Plains		UMETA(DisplayName = "Plains"),
-	Forest		UMETA(DisplayName = "Forest"),
-	Mountain	UMETA(DisplayName = "Mountain"),
-	Desert		UMETA(DisplayName = "Desert"),
-	Coast		UMETA(DisplayName = "Coast")
-};
 
 /**
  * A conquerable territory/region on the world map
@@ -39,29 +27,36 @@ public:
 
 	virtual void BeginPlay() override;
 
+	/** Called by the world-map factory before a deferred actor becomes observable. */
+	bool InitializeTerritory(
+		const FTerritoryDefinition& Definition,
+		AWorldMapManager* InWorldMapManager);
+
+	/** Presentation callback used only after the canonical campaign state changes. */
+	void RefreshOwnershipPresentation(EFactionID PreviousOwner, EFactionID NewOwner);
+
 	// Info
 	UFUNCTION(BlueprintPure, Category = "Territory")
-	FName GetTerritoryID() const { return TerritoryID; }
+	FName GetTerritoryID() const { return TerritoryDefinition.TerritoryID; }
 
 	UFUNCTION(BlueprintPure, Category = "Territory")
-	FText GetDisplayName() const { return DisplayName; }
+	FText GetDisplayName() const;
 
 	UFUNCTION(BlueprintPure, Category = "Territory")
-	ETerrainType GetTerrainType() const { return TerrainType; }
+	ETerrainType GetTerrainType() const;
+
+	FTerritoryDefinition GetDefinition() const;
 
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Territory")
-	EFactionID GetOwnerFaction() const { return OwnerFaction; }
-
-	UFUNCTION(BlueprintCallable, Category = "Territory")
-	void SetOwnerFaction(EFactionID NewOwner);
+	EFactionID GetOwnerFaction() const;
 
 	UFUNCTION(BlueprintPure, Category = "Territory")
 	bool IsContested() const;
 
 	// Resources
 	UFUNCTION(BlueprintPure, Category = "Territory|Resources")
-	FFactionResourceDelta GetResourceProduction() const { return ResourceProduction; }
+	FFactionResourceDelta GetResourceProduction() const;
 
 	// Settlement
 	UFUNCTION(BlueprintPure, Category = "Territory|Settlement")
@@ -78,7 +73,7 @@ public:
 
 	// Buildings in this territory
 	UFUNCTION(BlueprintPure, Category = "Territory|Buildings")
-	TArray<ABuildingBase*> GetBuildings() const { return Buildings; }
+	TArray<ABuildingBase*> GetBuildings() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Territory|Buildings")
 	void RegisterBuilding(ABuildingBase* Building);
@@ -92,30 +87,12 @@ public:
 	void UpdateTerritoryColor();
 
 protected:
-	// Identification
+	// Authored definition; runtime factories assign this before FinishSpawningActor.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory")
-	FName TerritoryID;
+	FTerritoryDefinition TerritoryDefinition;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory")
-	FText DisplayName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory")
-	FText Description;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory")
-	ETerrainType TerrainType;
-
-	// Ownership
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|State")
-	EFactionID OwnerFaction;
-
-	// Resources produced per turn
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Resources")
-	FFactionResourceDelta ResourceProduction;
-
-	// Bonus resources from terrain type
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Resources")
-	EResourceType BonusResource;
+	TObjectPtr<AWorldMapManager> WorldMapManager;
 
 	// Settlement
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
@@ -127,19 +104,22 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
 	int32 Population;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
+	FFactionResourceDelta SettlementProductionBonus;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
 	int32 MaxSettlementSlots; // How many buildings can be placed
 
 	// Buildings
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Buildings")
-	TArray<ABuildingBase*> Buildings;
+	TArray<TObjectPtr<ABuildingBase>> Buildings;
 
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UBoxComponent* TerritoryBounds;
+	TObjectPtr<UBoxComponent> TerritoryBounds;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* TerritoryMesh;
+	TObjectPtr<UStaticMeshComponent> TerritoryMesh;
 
 	// Events
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnTerritoryOwnerChanged, ATerritoryRegion*, Territory, EFactionID, NewOwner);
@@ -150,5 +130,8 @@ protected:
 
 	UPROPERTY(BlueprintAssignable, Category = "Territory|Events")
 	FOnSettlementFounded OnSettlementFounded;
+
+private:
+	bool bTerritoryInitialized = false;
 };
 

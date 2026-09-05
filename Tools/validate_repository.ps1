@@ -41,7 +41,9 @@ $requiredFiles = @(
     '.agents\ue-project-context.md',
     'Source\RomanEmpireGame\Public\Camera\ZoomConfiguration.h',
     'Source\RomanEmpireGame\Public\Campaign\CampaignTurn.h',
+    'Source\RomanEmpireGame\Public\Campaign\TerritoryData.h',
     'Source\RomanEmpireGame\Public\Core\GameplayMode.h',
+    'Source\RomanEmpireGame\Public\Faction\DiplomacyState.h',
     'Source\RomanEmpireGame\Public\Faction\FactionData.h',
     'Source\RomanEmpireGameTests\RomanEmpireGameTests.Build.cs',
     'Source\RomanEmpireGameTests\Private\CampaignStateRulesTests.cpp',
@@ -309,6 +311,44 @@ Assert-True -Condition ($zoomCameraSource -match 'GetDefaultZoomConfiguration\(\
     -Message 'SeamlessZoomCamera must classify zoom through the canonical configuration.'
 Assert-True -Condition ($runtimeHeaderText -notmatch '\bZOOM_(?:WORLD|TERRITORY|CITY|GROUND|FPS)') `
     -Message 'Legacy parallel zoom thresholds must not be reintroduced.'
+
+$factionManagerHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'Faction\FactionManager.h')
+Assert-True -Condition ($factionManagerHeader -match '\bFDiplomacyState\s+DiplomacyState\s*;') `
+    -Message 'FactionManager must own the normalized canonical diplomacy state.'
+Assert-True -Condition ($factionManagerHeader -notmatch '\bDiplomacyMatrix\b|\bTerritoryOwnership\b|\bAssignTerritoryToFaction\b|\bGetFactionTerritoryCount\b') `
+    -Message 'FactionManager may not reintroduce asymmetric diplomacy or a second territory-ownership store.'
+
+$diplomacyHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'Public\Faction\DiplomacyState.h')
+Assert-True -Condition ($diplomacyHeader -match 'TMap<int32,\s*FDiplomaticRelation>\s+RelationsByPair\s*;') `
+    -Message 'Diplomacy state must store each normalized unordered faction pair exactly once.'
+Assert-True -Condition ($diplomacyHeader -match '\bNormalizePair\s*\(') `
+    -Message 'Diplomacy state must expose one normalized faction-pair contract.'
+Assert-True -Condition ($runtimeHeaderText -notmatch 'EDiplomaticStatus::(?:Hostile|Friendly)') `
+    -Message 'Diplomacy must use only Invalid, War, Neutral, and Allied canonical statuses.'
+
+$territoryHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'World\TerritoryRegion.h')
+Assert-True -Condition ($territoryHeader -notmatch '\bEFactionID\s+OwnerFaction\s*;|\bSetOwnerFaction\s*\(') `
+    -Message 'Territory actors are presentation objects and may not own or directly set campaign ownership.'
+$territoryOwnershipStoreCount = [regex]::Matches(
+    $runtimeHeaderText,
+    'TMap<FName,\s*EFactionID>\s+TerritoryOwnership\s*;').Count
+Assert-True -Condition ($territoryOwnershipStoreCount -eq 1) `
+    -Message "Runtime headers must contain exactly one canonical territory-ownership store; found $territoryOwnershipStoreCount."
+
+$worldMapSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'World\WorldMapManager.cpp')
+Assert-True -Condition ($worldMapSource -match '(?s)SpawnActorDeferred<ATerritoryRegion>.*InitializeTerritory\s*\(.*FinishSpawningActor') `
+    -Message 'WorldMapManager must fully initialize territory actors through deferred spawning before they become observable.'
+Assert-True -Condition ($campaignSource -match 'WorldMapManager->GetFactionTerritoryCount\s*\(') `
+    -Message 'Campaign victory/defeat evaluation must read canonical territory ownership from WorldMapManager.'
+
+$campaignRulesTests = Read-Utf8 -Path (Join-Path $repositoryRoot 'Source\RomanEmpireGameTests\Private\CampaignStateRulesTests.cpp')
+foreach ($requiredTest in @(
+    'CanonicalTerritoryOwnership',
+    'DiplomacySymmetryAndTransitions'
+)) {
+    Assert-True -Condition ($campaignRulesTests -match [regex]::Escape($requiredTest)) `
+        -Message "Campaign state automation coverage is missing: $requiredTest"
+}
 
 $supabaseSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Online\SupabaseSubsystem.cpp')
 Assert-True -Condition ($supabaseSource -notmatch 'LogRomanEmpireGame') `
