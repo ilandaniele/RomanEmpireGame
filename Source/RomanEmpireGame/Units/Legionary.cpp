@@ -28,8 +28,8 @@ ALegionary::ALegionary()
 	UnitData.BaseStats.BlockStrength = 1.2f;
 
 	// Cost
-	UnitData.GoldCost = 150;
-	UnitData.FoodCost = 50;
+	UnitData.TrainingCost.Gold = 150;
+	UnitData.TrainingCost.Food = 50;
 	UnitData.TrainingTime = 15.0f;
 
 	// Combat

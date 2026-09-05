@@ -60,9 +60,6 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	TargetZoomLevel = 0.5f;
 	CurrentZoomLevel = 0.5f;
 	SelectedBuilding = nullptr;
-	bIsTrainingUnit = false;
-	TrainingStartTime = 0.0f;
-	TrainingDuration = 5.0f;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -759,7 +756,9 @@ void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(200);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 200;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Barracks);
 	}
 	StartBuildingPlacement(ABarracks::StaticClass());
@@ -770,7 +769,9 @@ void ARomanEmpirePlayerController::OnBuildingKey2Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(100);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 100;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Farm);
 	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
@@ -781,7 +782,9 @@ void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(150);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 150;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Mine);
 	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
@@ -792,7 +795,9 @@ void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(120);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 120;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Lumbercamp);
 	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
@@ -803,7 +808,9 @@ void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(80);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 80;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Wall);
 	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
@@ -814,7 +821,9 @@ void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 {
 	if (BuildingPlacementComponent)
 	{
-		BuildingPlacementComponent->SetBuildingCost(300);
+		FFactionResourceAmounts Cost;
+		Cost.Gold = 300;
+		BuildingPlacementComponent->SetBuildingCost(Cost);
 		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Temple);
 	}
 	StartBuildingPlacement(ABuildingBase::StaticClass());
@@ -987,48 +996,18 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 
 void ARomanEmpirePlayerController::OnTrainButtonClicked()
 {
-	if (!GameMode || !SelectedBuilding) return;
-	if (bIsTrainingUnit)
+	ABarracks* Barracks = Cast<ABarracks>(SelectedBuilding);
+	if (!Barracks)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Already training!"));
 		return;
 	}
-	// Cost: 150 Gold + 50 Food
-	const int32 GoldCost = 150;
-	const int32 FoodCost = 50;
-	if (GameMode->GetPlayerGold() < GoldCost)
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Not enough Gold! (Need 150)"));
-		return;
-	}
-	GameMode->SubtractGold(GoldCost);
-	// TODO: subtract food when SubtractFood exists
-	bIsTrainingUnit = true;
-	TrainingStartTime = GetWorld()->GetTimeSeconds();
-	TrainingDuration = 5.0f;
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Training Legionary... (5s)"));
-}
 
-void ARomanEmpirePlayerController::PlayerTick(float DeltaTime)
-{
-	Super::PlayerTick(DeltaTime);
-	// Training timer — spawn unit when done
-	if (bIsTrainingUnit && SelectedBuilding && IsValid(SelectedBuilding))
+	if (Barracks->TrainUnit(ALegionary::StaticClass()))
 	{
-		float Elapsed = GetWorld()->GetTimeSeconds() - TrainingStartTime;
-		if (Elapsed >= TrainingDuration)
-		{
-			bIsTrainingUnit = false;
-			FVector SpawnLoc = SelectedBuilding->GetActorLocation() + FVector(250.0f, 0.0f, 50.0f);
-			FActorSpawnParameters Params;
-			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			ALegionary* NewUnit = GetWorld()->SpawnActor<ALegionary>(ALegionary::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
-			if (NewUnit)
-			{
-				NewUnit->SetOwnerFaction(EFactionID::Rome);
-				NewUnit->ApplyFactionColor();
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green, TEXT("Legionary trained!"));
-			}
-		}
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Legionary training request accepted"));
+	}
+	else
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Legionary training request rejected"));
 	}
 }

@@ -50,8 +50,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
 	TSubclassOf<ABuildingBase> GetCurrentBuildingClass() const { return CurrentBuildingClass; }
 
+	UFUNCTION(BlueprintPure, Category = "Building|Placement")
+	EResourceTransactionFailure GetLastTransactionFailure() const { return LastTransactionFailure; }
+
 	// Set building cost and type for current placement
-	void SetBuildingCost(int32 Cost) { CurrentBuildingCost = Cost; }
+	void SetBuildingCost(const FFactionResourceAmounts& Cost) { CurrentBuildingCost = Cost; }
 	void SetBuildingTypeForPlacement(EBuildingType Type) { CurrentBuildingType = Type; }
 
 protected:
@@ -66,7 +69,7 @@ protected:
 	TSubclassOf<ABuildingBase> CurrentBuildingClass;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
-	ABuildingBase* PreviewBuilding;
+	TObjectPtr<ABuildingBase> PreviewBuilding;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
 	FVector CurrentPlacementLocation;
@@ -82,8 +85,9 @@ protected:
 	bool bSnapToGrid;
 
 	// Cost and type for current placement
-	int32 CurrentBuildingCost;
+	FFactionResourceAmounts CurrentBuildingCost;
 	EBuildingType CurrentBuildingType;
+	EResourceTransactionFailure LastTransactionFailure;
 
 	// Events
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingPlaced, ABuildingBase*, Building);

@@ -50,6 +50,118 @@ enum class EResourceType : uint8
 };
 
 /**
+ * Typed outcome for any resource transaction.
+ */
+UENUM(BlueprintType)
+enum class EResourceTransactionFailure : uint8
+{
+	None				UMETA(DisplayName = "None"),
+	InvalidFaction		UMETA(DisplayName = "Invalid Faction"),
+	InvalidCost			UMETA(DisplayName = "Invalid Cost"),
+	InsufficientGold	UMETA(DisplayName = "Insufficient Gold"),
+	InsufficientFood	UMETA(DisplayName = "Insufficient Food"),
+	InsufficientIron	UMETA(DisplayName = "Insufficient Iron"),
+	InsufficientWood	UMETA(DisplayName = "Insufficient Wood"),
+	InsufficientStone	UMETA(DisplayName = "Insufficient Stone"),
+	InsufficientPopulation UMETA(DisplayName = "Insufficient Population"),
+	ArithmeticOverflow	UMETA(DisplayName = "Arithmetic Overflow")
+};
+
+/**
+ * Non-negative resource amounts used for wallets, costs, and snapshots.
+ * Zero defaults prevent an empty cost or missing lookup from minting resources.
+ */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FFactionResourceAmounts
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Gold = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Food = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Iron = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Wood = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Stone = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Population = 0;
+
+	bool IsZero() const;
+	bool IsNonNegative() const;
+};
+
+/**
+ * Signed change to a resource wallet. Deltas are applied atomically.
+ */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FFactionResourceDelta
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Gold = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Food = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Iron = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Wood = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Stone = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	int32 Population = 0;
+
+	bool IsZero() const;
+};
+
+/**
+ * Immutable audit record returned by a resource transaction.
+ */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FFactionResourceTransactionResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resources")
+	EResourceTransactionFailure Failure = EResourceTransactionFailure::InvalidFaction;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resources")
+	FFactionResourceAmounts BalanceBefore;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resources")
+	FFactionResourceAmounts BalanceAfter;
+
+	bool WasSuccessful() const { return Failure == EResourceTransactionFailure::None; }
+};
+
+namespace RomanEmpireEconomy
+{
+	ROMANEMPIREGAME_API FFactionResourceTransactionResult TryApplyResourceDelta(
+		FFactionResourceAmounts& InOutBalance,
+		const FFactionResourceDelta& Delta);
+
+	ROMANEMPIREGAME_API FFactionResourceTransactionResult TrySpendResources(
+		FFactionResourceAmounts& InOutBalance,
+		const FFactionResourceAmounts& Cost);
+
+	ROMANEMPIREGAME_API FFactionResourceAmounts GetPrototypeStartingResources(EFactionID FactionID);
+	ROMANEMPIREGAME_API const TCHAR* GetTransactionFailureName(EResourceTransactionFailure Failure);
+}
+
+/**
  * Data structure holding faction information
  */
 USTRUCT(BlueprintType)
@@ -82,6 +194,10 @@ struct ROMANEMPIREGAME_API FFactionInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction|Bonuses")
 	float EconomyBonus;
 
+	// Explicit starting wallet. Gameplay state copies this value during initialization.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction|Resources")
+	FFactionResourceAmounts StartingResources;
+
 	// Unique units available to this faction
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction|Units")
 	TArray<FName> UniqueUnitTypes;
@@ -98,62 +214,6 @@ struct ROMANEMPIREGAME_API FFactionInfo
 		, CavalryBonus(1.0f)
 		, EconomyBonus(1.0f)
 	{}
-};
-
-/**
- * Resources owned by a faction
- */
-USTRUCT(BlueprintType)
-struct ROMANEMPIREGAME_API FFactionResources
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Gold;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Food;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Iron;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Wood;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Stone;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
-	int32 Population;
-
-	FFactionResources()
-		: Gold(1000)
-		, Food(500)
-		, Iron(200)
-		, Wood(300)
-		, Stone(200)
-		, Population(100)
-	{}
-
-	bool CanAfford(const FFactionResources& Cost) const
-	{
-		return Gold >= Cost.Gold &&
-			   Food >= Cost.Food &&
-			   Iron >= Cost.Iron &&
-			   Wood >= Cost.Wood &&
-			   Stone >= Cost.Stone &&
-			   Population >= Cost.Population;
-	}
-
-	void Deduct(const FFactionResources& Cost)
-	{
-		Gold -= Cost.Gold;
-		Food -= Cost.Food;
-		Iron -= Cost.Iron;
-		Wood -= Cost.Wood;
-		Stone -= Cost.Stone;
-		Population -= Cost.Population;
-	}
 };
 
 /**

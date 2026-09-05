@@ -23,7 +23,7 @@
 
 ARomanEmpireGameMode::ARomanEmpireGameMode()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	
 	CurrentPhase = EGamePhase::Tactical;  // Start in tactical, not strategic
 	CurrentTurn = 1;
@@ -59,21 +59,6 @@ void ARomanEmpireGameMode::BeginPlay()
 		CameraPawn->SetActorLocation(FVector(0.0f, 0.0f, 0.0f));
 		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to tactical zoom 0.55"));
 	}
-	
-	UpdateHUDResources();
-}
-
-void ARomanEmpireGameMode::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	static float ResourceUpdateTimer = 0.0f;
-	ResourceUpdateTimer += DeltaSeconds;
-	if (ResourceUpdateTimer >= 0.5f)
-	{
-		ResourceUpdateTimer = 0.0f;
-		UpdateHUDResources();
-	}
 }
 
 void ARomanEmpireGameMode::SetGamePhase(EGamePhase NewPhase)
@@ -108,7 +93,6 @@ void ARomanEmpireGameMode::EndTurn()
 	CurrentTurn++;
 	UE_LOG(LogRomanEmpire, Log, TEXT("Turn %d started"), CurrentTurn);
 	if (CampaignManager) CampaignManager->ProcessTurn();
-	UpdateHUDResources();
 
 	// Enemy AI: all non-Rome units advance toward Rome's territory (origin area)
 	TArray<AActor*> AllUnits;
@@ -573,67 +557,4 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Buildings spawned: barracks, temple, 8 houses, walls, watchtower, enemy HQ"));
-}
-
-void ARomanEmpireGameMode::UpdateHUDResources()
-{
-	if (!FactionManager) return;
-	
-	EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
-	FFactionResources Resources = FactionManager->GetFactionResources(PlayerFaction);
-	
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-	{
-		APlayerController* PC = It->Get();
-		if (PC)
-		{
-			ARomanEmpireHUD* HUD = Cast<ARomanEmpireHUD>(PC->GetHUD());
-			if (HUD)
-			{
-				HUD->UpdateResources(Resources.Gold, Resources.Food, Resources.Iron, Resources.Wood, Resources.Stone, Resources.Population);
-			}
-		}
-	}
-}
-
-void ARomanEmpireGameMode::SubtractGold(int32 Amount)
-{
-	if (!FactionManager || Amount <= 0)
-	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot spend gold: invalid manager or amount (%d)"), Amount);
-		return;
-	}
-
-	FFactionResources Cost;
-	Cost.Gold = Amount;
-	Cost.Food = 0;
-	Cost.Iron = 0;
-	Cost.Wood = 0;
-	Cost.Stone = 0;
-	Cost.Population = 0;
-
-	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
-	if (!FactionManager->DeductFactionResources(PlayerFaction, Cost))
-	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("Faction cannot afford %d gold"), Amount);
-		return;
-	}
-
-	UpdateHUDResources();
-	const int32 RemainingGold = GetPlayerGold();
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
-			FString::Printf(TEXT("-%d Gold (Remaining: %d)"), Amount, RemainingGold));
-	}
-}
-
-int32 ARomanEmpireGameMode::GetPlayerGold() const
-{
-	if (!FactionManager)
-	{
-		return 0;
-	}
-
-	return FactionManager->GetFactionResources(FactionManager->GetPlayerFaction()).Gold;
 }

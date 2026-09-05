@@ -61,7 +61,7 @@ public:
 
 	// Resources
 	UFUNCTION(BlueprintPure, Category = "Territory|Resources")
-	FFactionResources GetResourceProduction() const { return ResourceProduction; }
+	FFactionResourceDelta GetResourceProduction() const { return ResourceProduction; }
 
 	// Settlement
 	UFUNCTION(BlueprintPure, Category = "Territory|Settlement")
@@ -111,7 +111,7 @@ protected:
 
 	// Resources produced per turn
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Resources")
-	FFactionResources ResourceProduction;
+	FFactionResourceDelta ResourceProduction;
 
 	// Bonus resources from terrain type
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Resources")

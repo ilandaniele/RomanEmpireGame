@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Faction/FactionData.h"
 #include "RomanEmpireMainWidget.generated.h"
 
 class UCanvasPanel;
@@ -41,7 +42,7 @@ public:
 
 	// Resources
 	UFUNCTION(BlueprintCallable, Category = "UI")
-	void UpdateResourceDisplay(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population);
+	void UpdateResourceDisplay(const FFactionResourceAmounts& Resources);
 
 	// FPS mode
 	UFUNCTION(BlueprintCallable, Category = "UI")

@@ -295,6 +295,18 @@ Goal: eliminate competing models before rebuilding gameplay on top of them.
 - Route affordability and atomic deduction through one transaction API returning a typed failure reason.
 - Ensure building placement and training reserve/deduct resources exactly once.
 
+Implementation evidence recorded 2026-09-05:
+
+- `FFactionResourceAmounts` and `FFactionResourceDelta` now default every field to zero; explicit Rome, Carthage, and Gaul starting wallets are copied into the sole runtime wallet in `AFactionManager`.
+- `TrySpendFactionResources` combines affordability validation and all-resource deduction into one atomic request with typed failure reasons and before/after balances. Rejected costs and deltas leave the complete wallet unchanged; successful nonzero changes broadcast `OnFactionResourcesChanged`.
+- GameMode and Canvas HUD no longer own or synchronize resource copies. HUD presentation reads the canonical faction wallet, and the old `PlayerGold`, `SubtractGold`, `UpdateHUDResources`, and `Display*` paths are absent from runtime source.
+- Building confirmation and Barracks order acceptance each contain exactly one canonical spend call. Placement uses deferred spawning so a rejected transaction creates no live building; the controller delegates training state, timing, queueing, cost, and spawn responsibility to `ABarracks`.
+- Cancellation currently consumes the accepted training reservation; partial/full refunds remain an explicit later production-policy decision rather than an implicit second transaction.
+- Repository validation enforces the resource types, rejects the legacy resource/authority paths, and asserts one placement spend plus one training spend call.
+- UE 5.8.2 Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass. The exported automation report at `Artifacts/Automation/20260905_150636_277` contains 3 successes and 0 failures.
+- Development BuildCookRun cooked 516 packages into `Artifacts/Packages/M2_1`; the archived player loaded `L_VerticalSlice`, initialized the gameplay framework/managers/armies, closed through the viewport, left no game process, and produced 0 smoke failure signatures.
+- M2.1 is complete; M2.2 is the active implementation package.
+
 #### M2.2 Turn and phase model
 
 - Retain one canonical turn counter.

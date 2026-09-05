@@ -114,8 +114,8 @@ void ACampaignManager::ProcessResourceProduction()
 			continue;
 		}
 
-		FFactionResources Production = Territory->GetResourceProduction();
-		FactionManager->ModifyFactionResources(TerritoryOwner, Production);
+		const FFactionResourceDelta Production = Territory->GetResourceProduction();
+		FactionManager->ApplyFactionResourceDelta(TerritoryOwner, Production);
 	}
 }
 
@@ -178,7 +178,7 @@ bool ACampaignManager::CheckVictoryCondition(EFactionID FactionID, EVictoryCondi
 
 		case EVictoryCondition::Economic:
 		{
-			FFactionResources Resources = FactionManager->GetFactionResources(FactionID);
+			const FFactionResourceAmounts Resources = FactionManager->GetFactionResources(FactionID);
 			return Resources.Gold >= EconomicVictoryGold;
 		}
 

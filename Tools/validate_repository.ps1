@@ -173,8 +173,16 @@ foreach ($file in $testSource) {
 }
 
 $factionDataHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'Public\Faction\FactionData.h')
-Assert-True -Condition ($factionDataHeader -match 'struct\s+ROMANEMPIREGAME_API\s+FFactionResources') `
-    -Message 'FFactionResources must remain exported from the runtime module for native tests.'
+foreach ($resourceType in @(
+    'FFactionResourceAmounts',
+    'FFactionResourceDelta',
+    'FFactionResourceTransactionResult'
+)) {
+    Assert-True -Condition ($factionDataHeader -match "struct\s+ROMANEMPIREGAME_API\s+$resourceType") `
+        -Message "$resourceType must remain exported from the runtime module for native tests."
+}
+Assert-True -Condition ($factionDataHeader -notmatch 'struct\s+ROMANEMPIREGAME_API\s+FFactionResources\b') `
+    -Message 'The overloaded FFactionResources type must not be reintroduced.'
 
 $runtimeSource = Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File -Include '*.h', '*.cpp', '*.Build.cs'
 foreach ($file in $runtimeSource) {
@@ -226,6 +234,8 @@ Assert-True -Condition ($hudSource -match 'void\s+ARomanEmpireHUD::ShowFPSOverla
 $gameModeSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireGameMode.cpp')
 Assert-True -Condition ($gameModeSource -notmatch 'HUD->DisplayGold') `
     -Message 'GameMode may not mutate protected HUD resource presentation state directly.'
+Assert-True -Condition ($gameModeSource -notmatch '\b(?:GetPlayerGold|SubtractGold|UpdateHUDResources)\b') `
+    -Message 'GameMode may not reintroduce a parallel player-resource authority.'
 foreach ($assignment in @(
     'DefaultPawnClass\s*=\s*ASeamlessZoomCamera::StaticClass\(\)',
     'PlayerControllerClass\s*=\s*ARomanEmpirePlayerController::StaticClass\(\)',
@@ -239,8 +249,20 @@ foreach ($assignment in @(
 $controllerSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpirePlayerController.cpp')
 Assert-True -Condition ($controllerSource -notmatch 'REHUD->HUDSelectedBuilding') `
     -Message 'PlayerController must use the HUD public building-selection API.'
+Assert-True -Condition ($controllerSource -notmatch '\b(?:TrainingProgress|TrainingTimeRemaining|UnitBeingTrained)\b') `
+    -Message 'PlayerController may not own duplicate unit-training state.'
 Assert-True -Condition ($controllerSource -match 'if\s*\(\s*BuildingPlacementComponent->ConfirmPlacement\(\)\s*\)\s*\{\s*CurrentSelectionMode\s*=\s*ERomanSelectionMode::None') `
     -Message 'Building placement mode must clear only after ConfirmPlacement succeeds.'
+
+$placementSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\BuildingPlacementComponent.cpp')
+$placementSpendCount = [regex]::Matches($placementSource, '\bTrySpendFactionResources\s*\(').Count
+Assert-True -Condition ($placementSpendCount -eq 1) `
+    -Message "Building placement must perform exactly one canonical spend call; found $placementSpendCount."
+
+$barracksSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\Barracks.cpp')
+$trainingSpendCount = [regex]::Matches($barracksSource, '\bTrySpendFactionResources\s*\(').Count
+Assert-True -Condition ($trainingSpendCount -eq 1) `
+    -Message "Barracks training acceptance must perform exactly one canonical spend call; found $trainingSpendCount."
 
 $supabaseSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Online\SupabaseSubsystem.cpp')
 Assert-True -Condition ($supabaseSource -notmatch 'LogRomanEmpireGame') `

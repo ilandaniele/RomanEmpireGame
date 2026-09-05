@@ -82,31 +82,31 @@ void URomanEmpireMainWidget::UpdateUnitPanel(const TArray<AUnitBase*>& SelectedU
 	}
 }
 
-void URomanEmpireMainWidget::UpdateResourceDisplay(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population)
+void URomanEmpireMainWidget::UpdateResourceDisplay(const FFactionResourceAmounts& Resources)
 {
 	if (GoldText)
 	{
-		GoldText->SetText(FText::AsNumber(Gold));
+		GoldText->SetText(FText::AsNumber(Resources.Gold));
 	}
 	if (FoodText)
 	{
-		FoodText->SetText(FText::AsNumber(Food));
+		FoodText->SetText(FText::AsNumber(Resources.Food));
 	}
 	if (IronText)
 	{
-		IronText->SetText(FText::AsNumber(Iron));
+		IronText->SetText(FText::AsNumber(Resources.Iron));
 	}
 	if (WoodText)
 	{
-		WoodText->SetText(FText::AsNumber(Wood));
+		WoodText->SetText(FText::AsNumber(Resources.Wood));
 	}
 	if (StoneText)
 	{
-		StoneText->SetText(FText::AsNumber(Stone));
+		StoneText->SetText(FText::AsNumber(Resources.Stone));
 	}
 	if (PopulationText)
 	{
-		PopulationText->SetText(FText::AsNumber(Population));
+		PopulationText->SetText(FText::AsNumber(Resources.Population));
 	}
 }
 

@@ -91,7 +91,7 @@ struct FBuildingData
 
 	// Costs
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Cost")
-	FFactionResources Cost;
+	FFactionResourceAmounts Cost;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Cost")
 	float ConstructionTime; // In seconds

@@ -92,13 +92,6 @@ public:
 	// Selected building (for info panel / training)
 	class ABuildingBase* SelectedBuilding;
 
-	// Barracks training state
-	bool bIsTrainingUnit;
-	float TrainingStartTime;
-	float TrainingDuration;
-
-	virtual void PlayerTick(float DeltaTime) override;
-
 	// Building select / training
 	void OnTrainButtonClicked();
 

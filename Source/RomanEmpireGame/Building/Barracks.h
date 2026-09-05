@@ -19,13 +19,16 @@ public:
 
 	// Unit training
 	UFUNCTION(BlueprintCallable, Category = "Barracks")
-	void TrainUnit(TSubclassOf<class AUnitBase> UnitClass);
+	bool TrainUnit(TSubclassOf<class AUnitBase> UnitClass);
 
 	UFUNCTION(BlueprintPure, Category = "Barracks")
 	float GetTrainingProgress() const { return TrainingProgress; }
 
 	UFUNCTION(BlueprintPure, Category = "Barracks")
 	bool IsTraining() const { return bIsTraining; }
+
+	UFUNCTION(BlueprintPure, Category = "Barracks")
+	float GetTrainingTimeRemaining() const { return bIsTraining ? FMath::Max(0.0f, TrainingTime * (1.0f - TrainingProgress)) : 0.0f; }
 
 	UFUNCTION(BlueprintCallable, Category = "Barracks")
 	void CancelTraining();

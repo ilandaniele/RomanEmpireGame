@@ -31,6 +31,7 @@ void AFactionManager::InitializeDefaultFactions()
 	Rome.InfantryBonus = 1.2f;
 	Rome.CavalryBonus = 1.0f;
 	Rome.EconomyBonus = 1.1f;
+	Rome.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Rome);
 	Rome.UniqueUnitTypes.Add(TEXT("Legionary"));
 	Rome.UniqueUnitTypes.Add(TEXT("Praetorian"));
 	Rome.UniqueBuildingTypes.Add(TEXT("Colosseum"));
@@ -45,6 +46,7 @@ void AFactionManager::InitializeDefaultFactions()
 	Carthage.InfantryBonus = 0.9f;
 	Carthage.CavalryBonus = 1.1f;
 	Carthage.EconomyBonus = 1.3f;
+	Carthage.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Carthage);
 	Carthage.UniqueUnitTypes.Add(TEXT("WarElephant"));
 	Carthage.UniqueUnitTypes.Add(TEXT("SacredBand"));
 	Carthage.UniqueBuildingTypes.Add(TEXT("TradePort"));
@@ -59,6 +61,7 @@ void AFactionManager::InitializeDefaultFactions()
 	Gaul.InfantryBonus = 1.1f;
 	Gaul.CavalryBonus = 1.2f;
 	Gaul.EconomyBonus = 0.9f;
+	Gaul.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Gaul);
 	Gaul.UniqueUnitTypes.Add(TEXT("NakedFanatic"));
 	Gaul.UniqueUnitTypes.Add(TEXT("NobleCavalry"));
 	Gaul.UniqueBuildingTypes.Add(TEXT("SacredGrove"));
@@ -67,18 +70,7 @@ void AFactionManager::InitializeDefaultFactions()
 	// Initialize resources for each faction
 	for (const auto& Pair : FactionInfoMap)
 	{
-		FFactionResources StartingResources;
-		StartingResources.Gold = 1000;
-		StartingResources.Food = 500;
-		StartingResources.Iron = 200;
-		StartingResources.Wood = 300;
-		StartingResources.Stone = 200;
-		StartingResources.Population = 100;
-		
-		// Apply economy bonus
-		StartingResources.Gold = FMath::RoundToInt(StartingResources.Gold * Pair.Value.EconomyBonus);
-		
-		FactionResourcesMap.Add(Pair.Key, StartingResources);
+		FactionResourcesMap.Add(Pair.Key, Pair.Value.StartingResources);
 	}
 }
 
@@ -116,48 +108,51 @@ FFactionInfo AFactionManager::GetFactionInfo(EFactionID FactionID) const
 	return FFactionInfo();
 }
 
-FFactionResources AFactionManager::GetFactionResources(EFactionID FactionID) const
+FFactionResourceAmounts AFactionManager::GetFactionResources(EFactionID FactionID) const
 {
-	if (const FFactionResources* Resources = FactionResourcesMap.Find(FactionID))
+	if (const FFactionResourceAmounts* Resources = FactionResourcesMap.Find(FactionID))
 	{
 		return *Resources;
 	}
-	return FFactionResources();
+	return FFactionResourceAmounts();
 }
 
-void AFactionManager::ModifyFactionResources(EFactionID FactionID, const FFactionResources& Delta)
+FFactionResourceTransactionResult AFactionManager::ApplyFactionResourceDelta(
+	EFactionID FactionID,
+	const FFactionResourceDelta& Delta)
 {
-	if (FFactionResources* Resources = FactionResourcesMap.Find(FactionID))
+	if (FFactionResourceAmounts* Resources = FactionResourcesMap.Find(FactionID))
 	{
-		Resources->Gold += Delta.Gold;
-		Resources->Food += Delta.Food;
-		Resources->Iron += Delta.Iron;
-		Resources->Wood += Delta.Wood;
-		Resources->Stone += Delta.Stone;
-		Resources->Population += Delta.Population;
-	}
-}
-
-bool AFactionManager::CanFactionAfford(EFactionID FactionID, const FFactionResources& Cost) const
-{
-	if (const FFactionResources* Resources = FactionResourcesMap.Find(FactionID))
-	{
-		return Resources->CanAfford(Cost);
-	}
-	return false;
-}
-
-bool AFactionManager::DeductFactionResources(EFactionID FactionID, const FFactionResources& Cost)
-{
-	if (FFactionResources* Resources = FactionResourcesMap.Find(FactionID))
-	{
-		if (Resources->CanAfford(Cost))
+		FFactionResourceTransactionResult Result = RomanEmpireEconomy::TryApplyResourceDelta(*Resources, Delta);
+		if (Result.WasSuccessful() && !Delta.IsZero())
 		{
-			Resources->Deduct(Cost);
-			return true;
+			OnFactionResourcesChanged.Broadcast(FactionID, *Resources);
 		}
+		return Result;
 	}
-	return false;
+
+	FFactionResourceTransactionResult Result;
+	Result.Failure = EResourceTransactionFailure::InvalidFaction;
+	return Result;
+}
+
+FFactionResourceTransactionResult AFactionManager::TrySpendFactionResources(
+	EFactionID FactionID,
+	const FFactionResourceAmounts& Cost)
+{
+	if (FFactionResourceAmounts* Resources = FactionResourcesMap.Find(FactionID))
+	{
+		FFactionResourceTransactionResult Result = RomanEmpireEconomy::TrySpendResources(*Resources, Cost);
+		if (Result.WasSuccessful() && !Cost.IsZero())
+		{
+			OnFactionResourcesChanged.Broadcast(FactionID, *Resources);
+		}
+		return Result;
+	}
+
+	FFactionResourceTransactionResult Result;
+	Result.Failure = EResourceTransactionFailure::InvalidFaction;
+	return Result;
 }
 
 EDiplomaticStatus AFactionManager::GetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2) const
@@ -247,11 +242,11 @@ void AFactionManager::ProcessAIFactionTurn(EFactionID FactionID)
 	// Basic AI: Generate income based on territory
 	int32 TerritoryCount = GetFactionTerritoryCount(FactionID);
 	
-	FFactionResources Income;
+	FFactionResourceDelta Income;
 	Income.Gold = 100 * TerritoryCount;
 	Income.Food = 50 * TerritoryCount;
 	
-	ModifyFactionResources(FactionID, Income);
+	ApplyFactionResourceDelta(FactionID, Income);
 	
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("AI faction %d processed turn, gained %d gold"), 
 		static_cast<int32>(FactionID), Income.Gold);

@@ -36,7 +36,6 @@ public:
 	ARomanEmpireGameMode();
 
 	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaSeconds) override;
 
 	// Phase management
 	UFUNCTION(BlueprintCallable, Category = "Game Phase")
@@ -66,10 +65,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentTurn() const { return CurrentTurn; }
 
-	// Resource management
-	void SubtractGold(int32 Amount);
-	int32 GetPlayerGold() const;
-
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
 	EGamePhase CurrentPhase;
@@ -79,13 +74,13 @@ protected:
 
 	// Manager references
 	UPROPERTY()
-	AFactionManager* FactionManager;
+	TObjectPtr<AFactionManager> FactionManager;
 
 	UPROPERTY()
-	AWorldMapManager* WorldMapManager;
+	TObjectPtr<AWorldMapManager> WorldMapManager;
 
 	UPROPERTY()
-	ACampaignManager* CampaignManager;
+	TObjectPtr<ACampaignManager> CampaignManager;
 
 	// Phase change delegate
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGamePhaseChanged, EGamePhase, OldPhase, EGamePhase, NewPhase);
@@ -101,7 +96,6 @@ private:
 	void SpawnInitialUnits();
 	void SpawnInitialBuildings();
 	void SpawnWorldTerrain();
-	void UpdateHUDResources();
 	EGamePhase DeterminePhaseFromZoom(float ZoomLevel) const;
 };
 

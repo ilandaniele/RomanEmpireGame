@@ -4,6 +4,7 @@
 #include "BuildingBase.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
+#include "Faction/FactionManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -19,8 +20,9 @@ UBuildingPlacementComponent::UBuildingPlacementComponent()
 	CurrentRotation = 0.0f;
 	GridSize = 100.0f;   // 1 meter grid
 	bSnapToGrid = true;
-	CurrentBuildingCost = 0;
+	CurrentBuildingCost = FFactionResourceAmounts();
 	CurrentBuildingType = EBuildingType::None;
+	LastTransactionFailure = EResourceTransactionFailure::None;
 }
 
 void UBuildingPlacementComponent::BeginPlay()
@@ -57,6 +59,7 @@ void UBuildingPlacementComponent::StartPlacement(TSubclassOf<ABuildingBase> Buil
 	CurrentBuildingClass = BuildingClass;
 	CurrentRotation = 0.0f;
 	bIsPlacing = true;
+	LastTransactionFailure = EResourceTransactionFailure::None;
 
 	CreatePreviewBuilding();
 
@@ -129,58 +132,63 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 	}
 
 	ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
-	if (!GameMode || GameMode->GetPlayerGold() < CurrentBuildingCost)
+	AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	if (!FactionManager)
 	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: insufficient gold or missing game mode"));
+		LastTransactionFailure = EResourceTransactionFailure::InvalidFaction;
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: missing faction resource authority"));
 		return false;
 	}
 
-	// Destroy preview
-	DestroyPreviewBuilding();
-
-	// Spawn actual building
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	FRotator Rotation(0.0f, CurrentRotation, 0.0f);
-	ABuildingBase* NewBuilding = World->SpawnActor<ABuildingBase>(
-		CurrentBuildingClass, 
-		CurrentPlacementLocation, 
-		Rotation, 
-		SpawnParams
-	);
-
-	if (NewBuilding)
+	const FRotator Rotation(0.0f, CurrentRotation, 0.0f);
+	const FTransform PlacementTransform(Rotation, CurrentPlacementLocation);
+	ABuildingBase* NewBuilding = World->SpawnActorDeferred<ABuildingBase>(
+		CurrentBuildingClass,
+		PlacementTransform,
+		nullptr,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!NewBuilding)
 	{
-		GameMode->SubtractGold(CurrentBuildingCost);
-
-		// Set building type on spawned building
-		NewBuilding->SetBuildingTypeData(CurrentBuildingType);
-
-		// Set owner faction
-		NewBuilding->SetOwnerFaction(EFactionID::Rome);
-		
-		// Start construction
-		NewBuilding->StartConstruction();
-		
-		OnBuildingPlaced.Broadcast(NewBuilding);
-		
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
-				FString::Printf(TEXT("Building placed: %s"), *NewBuilding->GetName()));
-		}
-		
-		UE_LOG(LogRomanEmpire, Log, TEXT("Building placed and construction started: %s"), 
-			*NewBuilding->GetName());
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot confirm placement: deferred building spawn failed"));
+		return false;
 	}
+
+	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
+	const FFactionResourceTransactionResult SpendResult =
+		FactionManager->TrySpendFactionResources(PlayerFaction, CurrentBuildingCost);
+	LastTransactionFailure = SpendResult.Failure;
+	if (!SpendResult.WasSuccessful())
+	{
+		NewBuilding->Destroy();
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: resource transaction failed (%s)"),
+			RomanEmpireEconomy::GetTransactionFailureName(SpendResult.Failure));
+		return false;
+	}
+
+	NewBuilding->SetBuildingTypeData(CurrentBuildingType);
+	NewBuilding->SetOwnerFaction(PlayerFaction);
+	UGameplayStatics::FinishSpawningActor(NewBuilding, PlacementTransform);
+	NewBuilding->StartConstruction();
+
+	DestroyPreviewBuilding();
+	OnBuildingPlaced.Broadcast(NewBuilding);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
+			FString::Printf(TEXT("Building placed: %s"), *NewBuilding->GetName()));
+	}
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("Building placed and construction started: %s"),
+		*NewBuilding->GetName());
 
 	// Reset state
 	bIsPlacing = false;
 	bCanPlace = false;
 	CurrentBuildingClass = nullptr;
 
-	return NewBuilding != nullptr;
+	return true;
 }
 
 void UBuildingPlacementComponent::CancelPlacement()

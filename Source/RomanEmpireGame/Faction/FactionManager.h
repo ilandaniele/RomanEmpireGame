@@ -26,16 +26,25 @@ public:
 	FFactionInfo GetFactionInfo(EFactionID FactionID) const;
 
 	UFUNCTION(BlueprintPure, Category = "Faction")
-	FFactionResources GetFactionResources(EFactionID FactionID) const;
+	FFactionResourceAmounts GetFactionResources(EFactionID FactionID) const;
 
-	UFUNCTION(BlueprintCallable, Category = "Faction")
-	void ModifyFactionResources(EFactionID FactionID, const FFactionResources& Delta);
+	UFUNCTION(BlueprintCallable, Category = "Faction|Resources")
+	FFactionResourceTransactionResult ApplyFactionResourceDelta(
+		EFactionID FactionID,
+		const FFactionResourceDelta& Delta);
 
-	UFUNCTION(BlueprintPure, Category = "Faction")
-	bool CanFactionAfford(EFactionID FactionID, const FFactionResources& Cost) const;
+	UFUNCTION(BlueprintCallable, Category = "Faction|Resources")
+	FFactionResourceTransactionResult TrySpendFactionResources(
+		EFactionID FactionID,
+		const FFactionResourceAmounts& Cost);
 
-	UFUNCTION(BlueprintCallable, Category = "Faction")
-	bool DeductFactionResources(EFactionID FactionID, const FFactionResources& Cost);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnFactionResourcesChanged,
+		EFactionID, FactionID,
+		FFactionResourceAmounts, NewBalance);
+
+	UPROPERTY(BlueprintAssignable, Category = "Faction|Resources")
+	FOnFactionResourcesChanged OnFactionResourcesChanged;
 
 	// Diplomacy
 	UFUNCTION(BlueprintPure, Category = "Faction|Diplomacy")
@@ -74,7 +83,7 @@ protected:
 	TMap<EFactionID, FFactionInfo> FactionInfoMap;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction|State")
-	TMap<EFactionID, FFactionResources> FactionResourcesMap;
+	TMap<EFactionID, FFactionResourceAmounts> FactionResourcesMap;
 
 	// Diplomacy matrix
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Faction|Diplomacy")

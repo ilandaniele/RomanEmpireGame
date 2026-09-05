@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Faction/FactionData.h"
 #include "UnitTypes.generated.h"
 
 class UTexture2D;
@@ -165,12 +166,9 @@ struct FUnitData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
 	FUnitStats BaseStats;
 
-	// Cost to train
+	// Cost reserved atomically when the unit enters a training queue
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Cost")
-	int32 GoldCost;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Cost")
-	int32 FoodCost;
+	FFactionResourceAmounts TrainingCost;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Cost")
 	float TrainingTime;
@@ -196,8 +194,6 @@ struct FUnitData
 		: UnitType(EUnitType::None)
 		, Category(EUnitCategory::Infantry)
 		, Icon(nullptr)
-		, GoldCost(100)
-		, FoodCost(50)
 		, TrainingTime(10.0f)
 		, AttackRange(150.0f)
 		, bCanUseRanged(false)

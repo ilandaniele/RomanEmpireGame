@@ -5,8 +5,8 @@
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
+#include "Faction/FactionManager.h"
 #include "RomanEmpireGameMode.h"
-#include "RomanEmpirePlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
@@ -18,13 +18,6 @@ ARomanEmpireHUD::ARomanEmpireHUD()
 	bBuildingMenuVisible = false;
 	bFPSMode = false;
 	CurrentZoomLevel = 0.3f;
-
-	DisplayGold = 0;
-	DisplayFood = 0;
-	DisplayIron = 0;
-	DisplayWood = 0;
-	DisplayStone = 0;
-	DisplayPopulation = 0;
 
 	CachedGameMode = nullptr;
 	HUDSelectedBuilding = nullptr;
@@ -93,6 +86,14 @@ void ARomanEmpireHUD::DrawResourceBar()
 {
 	const float BarHeight = 32.0f;
 	const float ScreenWidth = Canvas->SizeX;
+	FFactionResourceAmounts Resources;
+	if (CachedGameMode)
+	{
+		if (const AFactionManager* FactionManager = CachedGameMode->GetFactionManager())
+		{
+			Resources = FactionManager->GetFactionResources(FactionManager->GetPlayerFaction());
+		}
+	}
 	
 	// Background bar
 	FLinearColor BarBG(0.05f, 0.05f, 0.1f, 0.85f);
@@ -107,27 +108,27 @@ void ARomanEmpireHUD::DrawResourceBar()
 	float Spacing = 140.0f;
 
 	// Gold
-	DrawText(FString::Printf(TEXT("Gold: %d"), DisplayGold), FLinearColor(1.0f, 0.84f, 0.0f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Gold: %d"), Resources.Gold), FLinearColor(1.0f, 0.84f, 0.0f), X, Y, Font);
 	X += Spacing;
 
 	// Food
-	DrawText(FString::Printf(TEXT("Food: %d"), DisplayFood), FLinearColor(0.4f, 0.8f, 0.2f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Food: %d"), Resources.Food), FLinearColor(0.4f, 0.8f, 0.2f), X, Y, Font);
 	X += Spacing;
 
 	// Iron
-	DrawText(FString::Printf(TEXT("Iron: %d"), DisplayIron), FLinearColor(0.7f, 0.7f, 0.75f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Iron: %d"), Resources.Iron), FLinearColor(0.7f, 0.7f, 0.75f), X, Y, Font);
 	X += Spacing;
 
 	// Wood
-	DrawText(FString::Printf(TEXT("Wood: %d"), DisplayWood), FLinearColor(0.6f, 0.4f, 0.2f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Wood: %d"), Resources.Wood), FLinearColor(0.6f, 0.4f, 0.2f), X, Y, Font);
 	X += Spacing;
 
 	// Stone
-	DrawText(FString::Printf(TEXT("Stone: %d"), DisplayStone), FLinearColor(0.6f, 0.6f, 0.6f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Stone: %d"), Resources.Stone), FLinearColor(0.6f, 0.6f, 0.6f), X, Y, Font);
 	X += Spacing;
 
 	// Population
-	DrawText(FString::Printf(TEXT("Pop: %d"), DisplayPopulation), FLinearColor(0.9f, 0.9f, 0.9f), X, Y, Font);
+	DrawText(FString::Printf(TEXT("Pop: %d"), Resources.Population), FLinearColor(0.9f, 0.9f, 0.9f), X, Y, Font);
 }
 
 void ARomanEmpireHUD::DrawPhaseIndicator()
@@ -304,16 +305,6 @@ void ARomanEmpireHUD::ShowFPSOverlay(bool bShow)
 	bFPSMode = bShow;
 }
 
-void ARomanEmpireHUD::UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population)
-{
-	DisplayGold = Gold;
-	DisplayFood = Food;
-	DisplayIron = Iron;
-	DisplayWood = Wood;
-	DisplayStone = Stone;
-	DisplayPopulation = Population;
-}
-
 void ARomanEmpireHUD::OnZoomLevelChanged(float ZoomLevel)
 {
 	CurrentZoomLevel = ZoomLevel;
@@ -400,17 +391,16 @@ void ARomanEmpireHUD::DrawBuildingPanel()
 		TrainButtonMax = FVector2D(BtnX + BtnW, BtnY + BtnH);
 
 		// Training progress bar
-		ARomanEmpirePlayerController* PC = Cast<ARomanEmpirePlayerController>(GetOwningPlayerController());
-		if (PC && PC->bIsTrainingUnit)
+		const ABarracks* Barracks = Cast<ABarracks>(HUDSelectedBuilding);
+		if (Barracks && Barracks->IsTraining())
 		{
-			float Elapsed = GetWorld()->GetTimeSeconds() - PC->TrainingStartTime;
-			float Pct = FMath::Clamp(Elapsed / PC->TrainingDuration, 0.0f, 1.0f);
+			const float Pct = FMath::Clamp(Barracks->GetTrainingProgress(), 0.0f, 1.0f);
 			const float ProgX = PanelX + 10.0f;
 			const float ProgY = PanelY + 58.0f;
 			const float ProgW = PanelW - 130.0f;
 			DrawRect(FLinearColor(0.2f, 0.2f, 0.2f, 0.8f), ProgX, ProgY, ProgW, 14.0f);
 			DrawRect(FLinearColor(0.2f, 0.8f, 0.2f, 0.9f), ProgX, ProgY, ProgW * Pct, 14.0f);
-			float Remaining = FMath::Max(0.0f, PC->TrainingDuration - Elapsed);
+			const float Remaining = Barracks->GetTrainingTimeRemaining();
 			DrawText(FString::Printf(TEXT("Training: %.1fs"), Remaining),
 				FLinearColor(0.8f, 1.0f, 0.8f), ProgX, ProgY + 18.0f, Font);
 		}

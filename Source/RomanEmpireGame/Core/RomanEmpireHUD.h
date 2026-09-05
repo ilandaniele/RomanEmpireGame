@@ -44,9 +44,6 @@ public:
 	void ShowFPSOverlay(bool bShow);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
-	void UpdateResources(int32 Gold, int32 Food, int32 Iron, int32 Wood, int32 Stone, int32 Population);
-
-	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void OnZoomLevelChanged(float ZoomLevel);
 
 	// Building selection (called by player controller on click)
@@ -72,32 +69,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|State")
 	float CurrentZoomLevel;
 
-	// Displayed resource values (updated via UpdateResources)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayGold;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayFood;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayIron;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayWood;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayStone;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Resources")
-	int32 DisplayPopulation;
-
 	// Currently selected units
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Selection")
 	TArray<AUnitBase*> CurrentSelectedUnits;
 
 	// Currently selected building
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Selection")
-	ABuildingBase* HUDSelectedBuilding;
+	TObjectPtr<ABuildingBase> HUDSelectedBuilding;
 
 	// Victory state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HUD|Victory")
@@ -111,7 +89,7 @@ protected:
 
 	// Cached references
 	UPROPERTY()
-	ARomanEmpireGameMode* CachedGameMode;
+	TObjectPtr<ARomanEmpireGameMode> CachedGameMode;
 
 private:
 	float LastVictoryCheckTime;
