@@ -42,11 +42,16 @@ $requiredFiles = @(
     'Source\RomanEmpireGame\Public\Camera\ZoomConfiguration.h',
     'Source\RomanEmpireGame\Public\Campaign\CampaignTurn.h',
     'Source\RomanEmpireGame\Public\Campaign\TerritoryData.h',
+    'Source\RomanEmpireGame\Public\Building\BuildingTypes.h',
+    'Source\RomanEmpireGame\Public\Content\RomanContentDefinitions.h',
+    'Source\RomanEmpireGame\Public\Content\RomanContentRegistry.h',
     'Source\RomanEmpireGame\Public\Core\GameplayMode.h',
     'Source\RomanEmpireGame\Public\Faction\DiplomacyState.h',
     'Source\RomanEmpireGame\Public\Faction\FactionData.h',
+    'Source\RomanEmpireGame\Public\Units\UnitTypes.h',
     'Source\RomanEmpireGameTests\RomanEmpireGameTests.Build.cs',
     'Source\RomanEmpireGameTests\Private\CampaignStateRulesTests.cpp',
+    'Source\RomanEmpireGameTests\Private\ContentDefinitionValidationTests.cpp',
     'Source\RomanEmpireGameTests\Private\ContentPathValidationTests.cpp',
     'Source\RomanEmpireGameTests\Private\FactionResourceRulesTests.cpp'
 )
@@ -110,6 +115,11 @@ Assert-True -Condition ($defaultGame -match '(?m)^bEnabled=False\s*$') `
     -Message 'Supabase must remain explicitly disabled for the offline slice.'
 Assert-True -Condition ($defaultGame -notmatch 'YOUR_PROJECT|YOUR_ANON|YOUR_KEY') `
     -Message 'Placeholder online credentials must not masquerade as configured values.'
+foreach ($assetType in @('RomanFaction', 'RomanUnit', 'RomanBuilding', 'RomanTerritory')) {
+    $assetTypePattern = 'PrimaryAssetType="' + [regex]::Escape($assetType) + '"'
+    Assert-True -Condition ($defaultGame -match $assetTypePattern) `
+        -Message "DefaultGame.ini must scan the $assetType Primary Data Asset category."
+}
 
 $gitIgnore = Read-Utf8 -Path (Join-Path $repositoryRoot '.gitignore')
 Assert-True -Condition ($gitIgnore -notmatch '(?m)^\s*\*\.uasset\s*$') `
@@ -235,9 +245,11 @@ foreach ($accessor in @('GetCurrentHealth', 'GetMaxHealth', 'GetCurrentMorale'))
 }
 
 $buildingHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\BuildingBase.h')
-$buildingSetterCount = [regex]::Matches($buildingHeader, '\bSetBuildingTypeData\s*\(').Count
-Assert-True -Condition ($buildingSetterCount -eq 1) `
-    -Message "BuildingBase.h must declare SetBuildingTypeData exactly once; found $buildingSetterCount."
+$buildingInitializerCount = [regex]::Matches($buildingHeader, '\bInitializeBuilding\s*\(').Count
+Assert-True -Condition ($buildingInitializerCount -eq 1) `
+    -Message "BuildingBase.h must declare InitializeBuilding exactly once; found $buildingInitializerCount."
+Assert-True -Condition ($buildingHeader -notmatch '\bSetBuildingTypeData\s*\(') `
+    -Message 'Building types must be initialized from stable content IDs, not mutable enum-only setters.'
 
 $hudSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireHUD.cpp')
 Assert-True -Condition ($hudSource -notmatch '\bCurrentZoomLevel\b') `
@@ -267,6 +279,16 @@ Assert-True -Condition ($controllerSource -notmatch '\b(?:CurrentZoomLevel|Targe
     -Message 'PlayerController may not own duplicate zoom or gameplay-mode state.'
 Assert-True -Condition ($controllerSource -match 'if\s*\(\s*BuildingPlacementComponent->ConfirmPlacement\(\)\s*\)\s*\{\s*CurrentSelectionMode\s*=\s*ERomanSelectionMode::None') `
     -Message 'Building placement mode must clear only after ConfirmPlacement succeeds.'
+Assert-True -Condition ($controllerSource -notmatch 'Cost\.Gold\s*=|TEXT\("Building:\s*(?:Barracks|Farm|Mine|Lumber Camp|Wall|Temple)') `
+    -Message 'PlayerController may not duplicate building costs or presentation strings from Primary Data Assets.'
+Assert-True -Condition ($controllerSource -match 'FindBuildingByQuickSlot\s*\(') `
+    -Message 'PlayerController building hotkeys must resolve stable definitions through the content registry.'
+
+$hudSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireHUD.cpp')
+Assert-True -Condition ($hudSource -match 'GetAllBuildings\s*\(') `
+    -Message 'HUD building presentation must enumerate the canonical content registry.'
+Assert-True -Condition ($hudSource -notmatch 'TEXT\("(?:Barracks|Farm|Mine|Lumber Camp|Wall|Temple)\s*\(') `
+    -Message 'HUD may not duplicate building menu names or costs from Primary Data Assets.'
 
 $placementSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\BuildingPlacementComponent.cpp')
 $placementSpendCount = [regex]::Matches($placementSource, '\bTrySpendFactionResources\s*\(').Count
@@ -338,6 +360,10 @@ Assert-True -Condition ($territoryOwnershipStoreCount -eq 1) `
 $worldMapSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'World\WorldMapManager.cpp')
 Assert-True -Condition ($worldMapSource -match '(?s)SpawnActorDeferred<ATerritoryRegion>.*InitializeTerritory\s*\(.*FinishSpawningActor') `
     -Message 'WorldMapManager must fully initialize territory actors through deferred spawning before they become observable.'
+Assert-True -Condition ($worldMapSource -notmatch '\bMakePrototypeTerritoryDefinition\b') `
+    -Message 'WorldMapManager may not rebuild Primary Data Asset territory definitions in C++.'
+Assert-True -Condition ($worldMapSource -match 'GetAllTerritories\s*\(') `
+    -Message 'WorldMapManager must generate the prototype campaign from authored territory assets.'
 Assert-True -Condition ($campaignSource -match 'WorldMapManager->GetFactionTerritoryCount\s*\(') `
     -Message 'Campaign victory/defeat evaluation must read canonical territory ownership from WorldMapManager.'
 
@@ -348,6 +374,58 @@ foreach ($requiredTest in @(
 )) {
     Assert-True -Condition ($campaignRulesTests -match [regex]::Escape($requiredTest)) `
         -Message "Campaign state automation coverage is missing: $requiredTest"
+}
+
+$contentDefinitionTests = Read-Utf8 -Path (Join-Path $repositoryRoot 'Source\RomanEmpireGameTests\Private\ContentDefinitionValidationTests.cpp')
+foreach ($requiredTest in @(
+    'ValidationFailures',
+    'PrimaryAssetDiscovery',
+    'DuplicateStableID',
+    'InvalidFactionReference',
+    'MissingAssetType'
+)) {
+    Assert-True -Condition ($contentDefinitionTests -match [regex]::Escape($requiredTest)) `
+        -Message "Content-definition automation coverage is missing: $requiredTest"
+}
+
+foreach ($removedDefinitionFactory in @(
+    'GetPrototypeStartingResources',
+    'MakePrototypeTerritoryDefinition',
+    'SetBuildingTypeData'
+)) {
+    $definitionFactoryMatches = @(
+        $runtimeSource.FullName |
+            ForEach-Object { Read-Utf8 -Path $_ } |
+            Where-Object { $_ -match "\b$removedDefinitionFactory\b" }
+    )
+    Assert-True -Condition ($definitionFactoryMatches.Count -eq 0) `
+        -Message "Legacy hard-coded definition factory remains in runtime source: $removedDefinitionFactory"
+}
+
+$requiredDefinitionAssets = @(
+    'Content\Data\Factions\PDA_Faction_Rome.uasset',
+    'Content\Data\Factions\PDA_Faction_Carthage.uasset',
+    'Content\Data\Factions\PDA_Faction_Gaul.uasset',
+    'Content\Data\Units\PDA_Unit_Legionary.uasset',
+    'Content\Data\Buildings\PDA_Building_Barracks.uasset',
+    'Content\Data\Buildings\PDA_Building_Farm.uasset',
+    'Content\Data\Buildings\PDA_Building_Mine.uasset',
+    'Content\Data\Buildings\PDA_Building_Lumbercamp.uasset',
+    'Content\Data\Buildings\PDA_Building_Wall.uasset',
+    'Content\Data\Buildings\PDA_Building_Temple.uasset',
+    'Content\Data\Territories\PDA_Territory_Gaul.uasset',
+    'Content\Data\Territories\PDA_Territory_Alps.uasset',
+    'Content\Data\Territories\PDA_Territory_Greece.uasset',
+    'Content\Data\Territories\PDA_Territory_Hispania.uasset',
+    'Content\Data\Territories\PDA_Territory_Rome.uasset',
+    'Content\Data\Territories\PDA_Territory_Macedonia.uasset',
+    'Content\Data\Territories\PDA_Territory_Africa.uasset',
+    'Content\Data\Territories\PDA_Territory_Sicily.uasset',
+    'Content\Data\Territories\PDA_Territory_Egypt.uasset'
+)
+foreach ($relativePath in $requiredDefinitionAssets) {
+    Assert-True -Condition (Test-Path -LiteralPath (Join-Path $repositoryRoot $relativePath) -PathType Leaf) `
+        -Message "Required M2.4 Primary Data Asset is missing: $relativePath"
 }
 
 $supabaseSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Online\SupabaseSubsystem.cpp')

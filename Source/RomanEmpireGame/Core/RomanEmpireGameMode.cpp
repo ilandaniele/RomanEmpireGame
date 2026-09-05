@@ -2,13 +2,13 @@
 
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireGame.h"
+#include "Content/RomanContentRegistry.h"
 #include "Faction/FactionManager.h"
 #include "World/WorldMapManager.h"
 #include "World/CampaignManager.h"
 #include "Camera/SeamlessZoomCamera.h"
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireHUD.h"
-#include "Units/Legionary.h"
 #include "Units/UnitBase.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
@@ -343,15 +343,10 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 		{
 			FVector SpawnLoc = RomanBase + FVector(Col * 200.0f - 400.0f, Row * 200.0f - 200.0f, 0.0f);
 			
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-			
-			ALegionary* Unit = World->SpawnActor<ALegionary>(ALegionary::StaticClass(), SpawnLoc, FRotator::ZeroRotator, SpawnParams);
-			if (Unit)
-			{
-				Unit->SetOwnerFaction(EFactionID::Rome);
-				Unit->SetCurrentHealth(Unit->GetUnitData().BaseStats.MaxHealth);
-			}
+			SpawnUnitFromDefinition(
+				TEXT("Legionary"),
+				EFactionID::Rome,
+				FTransform(FRotator::ZeroRotator, SpawnLoc));
 		}
 	}
 	
@@ -365,17 +360,49 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 			0.0f
 		);
 		
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-		
-		ALegionary* Unit = World->SpawnActor<ALegionary>(ALegionary::StaticClass(), SpawnLoc, FRotator(0, 180, 0), SpawnParams);
+		SpawnUnitFromDefinition(
+			TEXT("Legionary"),
+			EFactionID::Carthage,
+			FTransform(FRotator(0.0f, 180.0f, 0.0f), SpawnLoc));
+	}
+
+	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 15 Roman + 10 Carthaginian units"));
+}
+
+AUnitBase* ARomanEmpireGameMode::SpawnUnitFromDefinition(
+	FName UnitID,
+	EFactionID OwnerFaction,
+	const FTransform& SpawnTransform)
+{
+	UWorld* World = GetWorld();
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanUnitDefinition* Asset = Registry ? Registry->FindUnit(UnitID) : nullptr;
+	UClass* UnitClass = Asset ? Asset->UnitClass.Get() : nullptr;
+	if (!World || !UnitClass)
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot spawn unit definition %s"), *UnitID.ToString());
+		return nullptr;
+	}
+
+	AUnitBase* Unit = World->SpawnActorDeferred<AUnitBase>(
+		UnitClass,
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	if (!Unit || !Unit->InitializeUnit(UnitID, OwnerFaction))
+	{
 		if (Unit)
 		{
-			Unit->SetOwnerFaction(EFactionID::Carthage);
+			Unit->Destroy();
 		}
+		UE_LOG(LogRomanEmpire, Error, TEXT("Unit definition %s rejected during initialization"),
+			*UnitID.ToString());
+		return nullptr;
 	}
-	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 15 Roman + 10 Carthaginian units"));
+
+	UGameplayStatics::FinishSpawningActor(Unit, SpawnTransform);
+	return Unit;
 }
 
 void ARomanEmpireGameMode::SpawnInitialBuildings()

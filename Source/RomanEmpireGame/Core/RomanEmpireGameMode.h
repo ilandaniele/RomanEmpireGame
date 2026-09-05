@@ -6,6 +6,7 @@
 #include "Camera/ZoomConfiguration.h"
 #include "Campaign/CampaignTurn.h"
 #include "Core/GameplayMode.h"
+#include "Faction/FactionData.h"
 #include "GameFramework/GameModeBase.h"
 #include "Math/RandomStream.h"
 #include "RomanEmpireGameMode.generated.h"
@@ -13,6 +14,7 @@
 class AFactionManager;
 class AWorldMapManager;
 class ACampaignManager;
+class AUnitBase;
 
 /**
  * Main game mode for Roman Empire Game
@@ -84,6 +86,10 @@ private:
 	FRandomStream PrototypeRandomStream;
 
 	void InitializeManagers();
+	AUnitBase* SpawnUnitFromDefinition(
+		FName UnitID,
+		EFactionID OwnerFaction,
+		const FTransform& SpawnTransform);
 	void SpawnInitialUnits();
 	void SpawnInitialBuildings();
 	void SpawnWorldTerrain();

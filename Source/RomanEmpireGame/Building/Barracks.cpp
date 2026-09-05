@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Barracks.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
 #include "Faction/FactionManager.h"
@@ -11,30 +12,13 @@
 ABarracks::ABarracks()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
-	// Setup barracks data
-	BuildingData.BuildingType = EBuildingType::Barracks;
-	BuildingData.Category = EBuildingCategory::Military;
-	BuildingData.DisplayName = FText::FromString(TEXT("Barracks"));
-	BuildingData.Description = FText::FromString(TEXT("Trains infantry units for your armies."));
-	BuildingData.MaxHealth = 1500;
-	BuildingData.Armor = 5;
-	BuildingData.FootprintSize = FVector2D(4.0f, 4.0f);
-	BuildingData.ConstructionTime = 30.0f;
-	
-	BuildingData.Cost.Gold = 400;
-	BuildingData.Cost.Wood = 200;
-	BuildingData.Cost.Stone = 100;
-
-	BuildingData.TrainableUnits.Add(TEXT("Legionary"));
-	BuildingData.TrainableUnits.Add(TEXT("Velites"));
-	BuildingData.TrainableUnits.Add(TEXT("Triarii"));
+	BuildingDefinitionID = TEXT("Barracks");
 
 	// Initialize training
 	bIsTraining = false;
 	TrainingProgress = 0.0f;
-	TrainingTime = 10.0f;
-	CurrentlyTraining = nullptr;
+	TrainingTime = 0.0f;
+	CurrentlyTrainingID = NAME_None;
 	SpawnOffset = FVector(300.0f, 0.0f, 0.0f);
 	MaxQueueSize = 5;
 }
@@ -56,16 +40,17 @@ void ABarracks::Tick(float DeltaSeconds)
 		SpawnTrainedUnit();
 		TrainingProgress = 0.0f;
 		bIsTraining = false;
-		CurrentlyTraining = nullptr;
+		CurrentlyTrainingID = NAME_None;
 
 		// Start next in queue
 		StartNextInQueue();
 	}
 }
 
-bool ABarracks::TrainUnit(TSubclassOf<AUnitBase> UnitClass)
+bool ABarracks::TrainUnit(FName UnitID)
 {
-	if (!UnitClass || !IsComplete())
+	if (!RomanEmpireContent::IsStableID(UnitID) || !IsComplete() ||
+		!BuildingData.TrainableUnits.Contains(UnitID))
 	{
 		return false;
 	}
@@ -76,20 +61,24 @@ bool ABarracks::TrainUnit(TSubclassOf<AUnitBase> UnitClass)
 		return false;
 	}
 
-	const AUnitBase* UnitDefaults = UnitClass->GetDefaultObject<AUnitBase>();
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(UnitID) : nullptr;
 	const ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
 	AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	if (!UnitDefaults || !FactionManager || OwnerFaction == EFactionID::None)
+	const URomanFactionDefinition* FactionAsset = Registry ? Registry->FindFaction(OwnerFaction) : nullptr;
+	if (!Registry || !Registry->IsReady() || !UnitAsset || UnitAsset->UnitClass.IsNull() ||
+		!FactionManager || !FactionAsset ||
+		!UnitAsset->AvailableToFactions.Contains(FactionAsset->Definition.FactionID))
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot train unit: missing definition or faction resource authority"));
 		return false;
 	}
 
-	const FUnitData UnitDefinition = UnitDefaults->GetUnitData();
+	const FUnitData& UnitDefinition = UnitAsset->Definition;
 	if (UnitDefinition.TrainingTime <= 0.0f)
 	{
 		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot train unit: %s has a non-positive training time"),
-			*UnitClass->GetName());
+			*UnitID.ToString());
 		return false;
 	}
 
@@ -105,19 +94,19 @@ bool ABarracks::TrainUnit(TSubclassOf<AUnitBase> UnitClass)
 	if (!bIsTraining)
 	{
 		// Start training immediately
-		CurrentlyTraining = UnitClass;
+		CurrentlyTrainingID = UnitID;
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
 		TrainingTime = UnitDefinition.TrainingTime;
 		
-		UE_LOG(LogRomanEmpire, Log, TEXT("Started training: %s"), *UnitClass->GetName());
+		UE_LOG(LogRomanEmpire, Log, TEXT("Started training: %s"), *UnitID.ToString());
 	}
 	else
 	{
 		// Add to queue
-		TrainingQueue.Add(UnitClass);
+		TrainingQueue.Add(UnitID);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Added to queue: %s (Queue size: %d)"), 
-			*UnitClass->GetName(), TrainingQueue.Num());
+			*UnitID.ToString(), TrainingQueue.Num());
 	}
 
 	return true;
@@ -129,7 +118,7 @@ void ABarracks::CancelTraining()
 	{
 		bIsTraining = false;
 		TrainingProgress = 0.0f;
-		CurrentlyTraining = nullptr;
+		CurrentlyTrainingID = NAME_None;
 		
 		// Accepted orders consume their full reservation. A cancellation-refund policy is deferred.
 		
@@ -140,23 +129,39 @@ void ABarracks::CancelTraining()
 void ABarracks::SpawnTrainedUnit()
 {
 	UWorld* World = GetWorld();
-	if (!World || !CurrentlyTraining)
+	if (!World || CurrentlyTrainingID.IsNone())
 	{
 		return;
 	}
 
-	FVector SpawnLocation = GetActorLocation() + GetActorRotation().RotateVector(SpawnOffset);
-	FRotator SpawnRotation = GetActorRotation();
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-	AUnitBase* NewUnit = World->SpawnActor<AUnitBase>(CurrentlyTraining, SpawnLocation, SpawnRotation, SpawnParams);
-	
-	if (NewUnit)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(CurrentlyTrainingID) : nullptr;
+	UClass* UnitClass = UnitAsset ? UnitAsset->UnitClass.Get() : nullptr;
+	if (!UnitClass)
 	{
-		NewUnit->SetOwnerFaction(OwnerFaction);
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot spawn trained unit %s: factory class is unavailable"),
+			*CurrentlyTrainingID.ToString());
+		return;
+	}
+
+	const FVector SpawnLocation = GetActorLocation() + GetActorRotation().RotateVector(SpawnOffset);
+	const FRotator SpawnRotation = GetActorRotation();
+	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+	AUnitBase* NewUnit = World->SpawnActorDeferred<AUnitBase>(
+		UnitClass,
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	
+	if (NewUnit && NewUnit->InitializeUnit(CurrentlyTrainingID, OwnerFaction))
+	{
+		UGameplayStatics::FinishSpawningActor(NewUnit, SpawnTransform);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
+	}
+	else if (NewUnit)
+	{
+		NewUnit->Destroy();
 	}
 }
 
@@ -164,14 +169,15 @@ void ABarracks::StartNextInQueue()
 {
 	if (TrainingQueue.Num() > 0)
 	{
-		CurrentlyTraining = TrainingQueue[0];
+		CurrentlyTrainingID = TrainingQueue[0];
 		TrainingQueue.RemoveAt(0);
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
 
-		if (const AUnitBase* UnitDefaults = CurrentlyTraining->GetDefaultObject<AUnitBase>())
+		const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+		if (const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(CurrentlyTrainingID) : nullptr)
 		{
-			TrainingTime = UnitDefaults->GetUnitData().TrainingTime;
+			TrainingTime = UnitAsset->Definition.TrainingTime;
 		}
 	}
 }

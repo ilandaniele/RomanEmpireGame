@@ -90,10 +90,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Materials|Parameters")
 	UMaterialParameterCollection* GlobalParameterCollection;
 
-	// Faction colors
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Materials|Factions")
-	TMap<EFactionID, FLinearColor> FactionColors;
-
 	// Ghost materials
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Materials|Ghost")
 	UMaterialInterface* GhostValidBaseMaterial;
@@ -102,7 +98,6 @@ protected:
 	UMaterialInterface* GhostInvalidBaseMaterial;
 
 private:
-	void InitializeDefaultColors();
 	void InitializeDefaultMaterials();
 };
 

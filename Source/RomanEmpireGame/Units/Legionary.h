@@ -41,19 +41,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Legionary")
 	bool bInTestudo;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Legionary")
-	int32 MaxPila; // Javelins
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Legionary")
 	int32 PilaCount;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Legionary")
 	TSubclassOf<AActor> PilumProjectile;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Legionary")
-	float PilumDamage;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Legionary")
-	float PilumRange;
 };
 

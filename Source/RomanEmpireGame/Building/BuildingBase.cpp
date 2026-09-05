@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingBase.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
@@ -46,7 +47,7 @@ ABuildingBase::ABuildingBase()
 	CurrentState = EBuildingState::Placing;
 	OwnerFaction = EFactionID::None;
 	ConstructionProgress = 0.0f;
-	CurrentHealth = 1000;
+	CurrentHealth = 0;
 	bIsSelected = false;
 
 	// Default materials will be set in Blueprint
@@ -59,77 +60,58 @@ ABuildingBase::ABuildingBase()
 void ABuildingBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	CurrentHealth = BuildingData.MaxHealth;
 
-	// Differentiate building shapes by type
-	if (BuildingMesh)
+	if (!bBuildingInitialized && !InitializeBuilding(BuildingDefinitionID, OwnerFaction))
 	{
-		switch (BuildingData.BuildingType)
-		{
-		case EBuildingType::Barracks:
-			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 2.5f, 3.0f));
-			BuildingMesh->SetMaterial(0, nullptr); // Default grey
-			break;
-		case EBuildingType::Farm:
-			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 0.5f)); // Flat
-			break;
-		case EBuildingType::Mine:
-			BuildingMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.5f)); // Tall narrow
-			break;
-		case EBuildingType::Lumbercamp:
-			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 1.5f, 2.0f)); // Rectangular
-			break;
-		case EBuildingType::Wall:
-			BuildingMesh->SetRelativeScale3D(FVector(0.5f, 5.0f, 3.0f)); // Wall shape
-			break;
-		case EBuildingType::Temple:
-			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 4.0f)); // Grand
-			break;
-		default:
-			BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
-			break;
-		}
+		UE_LOG(LogRomanEmpire, Error, TEXT("Building %s has no valid content definition"), *GetName());
+		SetActorTickEnabled(false);
+		return;
 	}
+
+	CurrentHealth = BuildingData.MaxHealth;
+	ApplyDefinitionPresentation();
 	UpdateVisuals();
 }
 
-void ABuildingBase::SetBuildingTypeData(EBuildingType NewType)
+bool ABuildingBase::InitializeBuilding(FName DefinitionID, EFactionID NewOwner)
 {
-	BuildingData.BuildingType = NewType;
-
-	// Re-apply shape and color by type
-	if (BuildingMesh)
+	if (bBuildingInitialized || !RomanEmpireContent::IsStableID(DefinitionID))
 	{
-		UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
-		UMaterialInstanceDynamic* MID = Base ? UMaterialInstanceDynamic::Create(Base, this) : nullptr;
+		return false;
+	}
 
-		switch (NewType)
-		{
-		case EBuildingType::Farm:
-			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 0.4f));
-			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.8f, 0.2f)); BuildingMesh->SetMaterial(0, MID); }
-			break;
-		case EBuildingType::Mine:
-			BuildingMesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 2.5f));
-			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.5f, 0.5f)); BuildingMesh->SetMaterial(0, MID); }
-			break;
-		case EBuildingType::Lumbercamp:
-			BuildingMesh->SetRelativeScale3D(FVector(2.5f, 1.5f, 2.0f));
-			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.4f, 0.2f, 0.05f)); BuildingMesh->SetMaterial(0, MID); }
-			break;
-		case EBuildingType::Wall:
-			BuildingMesh->SetRelativeScale3D(FVector(0.4f, 5.0f, 3.0f));
-			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.8f, 0.8f, 0.8f)); BuildingMesh->SetMaterial(0, MID); }
-			break;
-		case EBuildingType::Temple:
-			BuildingMesh->SetRelativeScale3D(FVector(3.0f, 3.0f, 4.5f));
-			if (MID) { MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.9f, 0.8f, 0.1f)); BuildingMesh->SetMaterial(0, MID); }
-			break;
-		default:
-			BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
-			break;
-		}
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuilding(DefinitionID) : nullptr;
+	const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(NewOwner) : nullptr;
+	if (!Registry || !Registry->IsReady() || !Asset ||
+		(NewOwner != EFactionID::None &&
+			(!Faction || !Asset->AvailableToFactions.Contains(Faction->Definition.FactionID))))
+	{
+		return false;
+	}
+
+	BuildingDefinitionID = DefinitionID;
+	BuildingData = Asset->Definition;
+	OwnerFaction = NewOwner;
+	bBuildingInitialized = true;
+	ApplyDefinitionPresentation();
+	return true;
+}
+
+void ABuildingBase::ApplyDefinitionPresentation()
+{
+	if (!BuildingMesh || !bBuildingInitialized)
+	{
+		return;
+	}
+
+	BuildingMesh->SetRelativeScale3D(BuildingData.PrototypeScale);
+	UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+	UMaterialInstanceDynamic* MID = Base ? UMaterialInstanceDynamic::Create(Base, this) : nullptr;
+	if (MID)
+	{
+		MID->SetVectorParameterValue(TEXT("Color"), BuildingData.PrototypeColor);
+		BuildingMesh->SetMaterial(0, MID);
 	}
 }
 

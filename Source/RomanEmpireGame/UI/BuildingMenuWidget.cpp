@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingMenuWidget.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Components/VerticalBox.h"
 #include "Components/Button.h"
@@ -35,66 +36,32 @@ void UBuildingMenuWidget::NativeConstruct()
 
 void UBuildingMenuWidget::PopulateBuildingList()
 {
-	// Create building entries - in a real implementation, this would
-	// iterate over a data table of building definitions
-
-	// Military
-	FBuildingData BarracksData;
-	BarracksData.BuildingType = EBuildingType::Barracks;
-	BarracksData.Category = EBuildingCategory::Military;
-	BarracksData.DisplayName = FText::FromString(TEXT("Barracks"));
-	BarracksData.Cost.Gold = 400;
-	BarracksData.Cost.Wood = 200;
-	if (MilitaryBuildingsBox)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (!Registry || !Registry->IsReady())
 	{
-		CreateBuildingButton(EBuildingType::Barracks, BarracksData, MilitaryBuildingsBox);
+		return;
 	}
 
-	FBuildingData ArcheryData;
-	ArcheryData.BuildingType = EBuildingType::ArcheryRange;
-	ArcheryData.Category = EBuildingCategory::Military;
-	ArcheryData.DisplayName = FText::FromString(TEXT("Archery Range"));
-	ArcheryData.Cost.Gold = 350;
-	ArcheryData.Cost.Wood = 250;
-	if (MilitaryBuildingsBox)
+	for (const URomanBuildingDefinition* Asset : Registry->GetAllBuildings())
 	{
-		CreateBuildingButton(EBuildingType::ArcheryRange, ArcheryData, MilitaryBuildingsBox);
-	}
+		if (!Asset)
+		{
+			continue;
+		}
 
-	// Economic
-	FBuildingData FarmData;
-	FarmData.BuildingType = EBuildingType::Farm;
-	FarmData.Category = EBuildingCategory::Economic;
-	FarmData.DisplayName = FText::FromString(TEXT("Farm"));
-	FarmData.Cost.Gold = 100;
-	FarmData.Cost.Wood = 50;
-	if (EconomicBuildingsBox)
-	{
-		CreateBuildingButton(EBuildingType::Farm, FarmData, EconomicBuildingsBox);
-	}
-
-	// Civil
-	FBuildingData ForumData;
-	ForumData.BuildingType = EBuildingType::Forum;
-	ForumData.Category = EBuildingCategory::Civil;
-	ForumData.DisplayName = FText::FromString(TEXT("Forum"));
-	ForumData.Cost.Gold = 500;
-	ForumData.Cost.Stone = 300;
-	if (CivilBuildingsBox)
-	{
-		CreateBuildingButton(EBuildingType::Forum, ForumData, CivilBuildingsBox);
-	}
-
-	// Defense
-	FBuildingData WallData;
-	WallData.BuildingType = EBuildingType::Wall;
-	WallData.Category = EBuildingCategory::Defense;
-	WallData.DisplayName = FText::FromString(TEXT("Wall"));
-	WallData.Cost.Gold = 50;
-	WallData.Cost.Stone = 100;
-	if (DefenseBuildingsBox)
-	{
-		CreateBuildingButton(EBuildingType::Wall, WallData, DefenseBuildingsBox);
+		UVerticalBox* Container = nullptr;
+		switch (Asset->Definition.Category)
+		{
+		case EBuildingCategory::Military: Container = MilitaryBuildingsBox; break;
+		case EBuildingCategory::Economic: Container = EconomicBuildingsBox; break;
+		case EBuildingCategory::Civil: Container = CivilBuildingsBox; break;
+		case EBuildingCategory::Defense: Container = DefenseBuildingsBox; break;
+		default: break;
+		}
+		if (Container)
+		{
+			CreateBuildingButton(Asset->Definition.BuildingID, Asset->Definition, Container);
+		}
 	}
 
 	// Set initial visibility
@@ -141,7 +108,7 @@ void UBuildingMenuWidget::SetCategoryVisibility(EBuildingCategory Category)
 	}
 }
 
-void UBuildingMenuWidget::CreateBuildingButton(EBuildingType BuildingType, const FBuildingData& Data, UVerticalBox* Container)
+void UBuildingMenuWidget::CreateBuildingButton(FName BuildingID, const FBuildingData& Data, UVerticalBox* Container)
 {
 	// In a full implementation, this would instantiate the button template
 	// and set up click handlers to broadcast OnBuildingSelected
@@ -150,7 +117,7 @@ void UBuildingMenuWidget::CreateBuildingButton(EBuildingType BuildingType, const
 	// - Icon image
 	// - Name text
 	// - Cost display
-	// - Click handler calling OnBuildingSelected.Broadcast(BuildingType)
+	// - Click handler calling OnBuildingSelected.Broadcast(BuildingID)
 }
 
 void UBuildingMenuWidget::OnMilitaryTabClicked()

@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "BuildingTypes.h"
+#include "Building/BuildingTypes.h"
 #include "Faction/FactionData.h"
 #include "BuildingBase.generated.h"
 
@@ -38,9 +38,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Building")
 	EBuildingState GetBuildingState() const { return CurrentState; }
 
-	// Set building type after spawn (for generic ABuildingBase placed by keys 2-6)
-	UFUNCTION(BlueprintCallable, Category = "Building")
-	void SetBuildingTypeData(EBuildingType NewType);
+	UFUNCTION(BlueprintPure, Category = "Building")
+	FName GetBuildingDefinitionID() const { return BuildingDefinitionID; }
+
+	/** Fully applies immutable content and ownership before a deferred spawn becomes observable. */
+	bool InitializeBuilding(FName DefinitionID, EFactionID NewOwner);
 
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Building")
@@ -85,6 +87,10 @@ public:
 	void SetPlacementMode(bool bPlacing, bool bValidPlacement);
 
 protected:
+	/** Stable ID only; authored values live in URomanBuildingDefinition assets. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building")
+	FName BuildingDefinitionID = NAME_None;
+
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USceneComponent* RootScene;
@@ -99,7 +105,7 @@ protected:
 	UStaticMeshComponent* ConstructionScaffolding;
 
 	// Building data
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building")
 	FBuildingData BuildingData;
 
 	// State
@@ -151,6 +157,8 @@ protected:
 	virtual void OnDestroyed();
 
 private:
+	bool bBuildingInitialized = false;
+	void ApplyDefinitionPresentation();
 	void UpdateVisuals();
 };
 

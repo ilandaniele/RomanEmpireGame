@@ -99,7 +99,7 @@ protected:
 	EFactionID PlayerFaction;
 
 private:
-	void InitializeDefaultFactions();
+	bool InitializeFactionsFromContent();
 	void InitializeDefaultDiplomacy();
 	void ProcessAIFactionTurn(EFactionID FactionID);
 };

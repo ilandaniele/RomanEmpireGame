@@ -144,7 +144,7 @@ namespace RomanEmpireEconomy
 		FFactionResourceAmounts& InOutBalance,
 		const FFactionResourceAmounts& Cost);
 
-	ROMANEMPIREGAME_API FFactionResourceAmounts GetPrototypeStartingResources(EFactionID FactionID);
+	ROMANEMPIREGAME_API FString DescribeResourceCost(const FFactionResourceAmounts& Cost);
 	ROMANEMPIREGAME_API const TCHAR* GetTransactionFailureName(EResourceTransactionFailure Failure);
 }
 
@@ -156,8 +156,13 @@ struct ROMANEMPIREGAME_API FFactionInfo
 {
 	GENERATED_BODY()
 
+	/** Stable content identity used by registries, factories, and future save records. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction")
-	EFactionID FactionID;
+	FName FactionID = NAME_None;
+
+	/** Runtime state identity retained for the fixed prototype faction set. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction")
+	EFactionID RuntimeFaction = EFactionID::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction")
 	FText DisplayName;
@@ -169,7 +174,7 @@ struct ROMANEMPIREGAME_API FFactionInfo
 	FLinearColor FactionColor;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction")
-	UTexture2D* FactionBanner;
+	TSoftObjectPtr<UTexture2D> FactionBanner;
 
 	// Starting bonuses
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction|Bonuses")
@@ -194,9 +199,7 @@ struct ROMANEMPIREGAME_API FFactionInfo
 	TArray<FName> UniqueBuildingTypes;
 
 	FFactionInfo()
-		: FactionID(EFactionID::None)
-		, FactionColor(FLinearColor::White)
-		, FactionBanner(nullptr)
+		: FactionColor(FLinearColor::White)
 		, InfantryBonus(1.0f)
 		, CavalryBonus(1.0f)
 		, EconomyBonus(1.0f)

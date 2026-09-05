@@ -74,11 +74,15 @@ struct FBuildingData
 {
 	GENERATED_BODY()
 
+	/** Stable content identity used by runtime factories and future save records. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
-	EBuildingType BuildingType;
+	FName BuildingID = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
-	EBuildingCategory Category;
+	EBuildingType BuildingType = EBuildingType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+	EBuildingCategory Category = EBuildingCategory::Civil;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
 	FText DisplayName;
@@ -87,32 +91,39 @@ struct FBuildingData
 	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
-	UTexture2D* Icon;
+	TSoftObjectPtr<UTexture2D> Icon;
 
 	// Costs
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Cost")
 	FFactionResourceAmounts Cost;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Cost")
-	float ConstructionTime; // In seconds
+	float ConstructionTime = 0.0f; // In seconds
 
 	// Stats
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Stats")
-	int32 MaxHealth;
+	int32 MaxHealth = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Stats")
-	int32 Armor;
+	int32 Armor = 0;
 
 	// Size for placement
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Size")
-	FVector2D FootprintSize; // Width x Depth in grid units
+	FVector2D FootprintSize = FVector2D::ZeroVector; // Width x Depth in grid units
+
+	/** Temporary primitive presentation, authored in data until production art replaces it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Prototype Visuals")
+	FVector PrototypeScale = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Prototype Visuals")
+	FLinearColor PrototypeColor = FLinearColor::White;
 
 	// Production (for economic buildings)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Production")
-	EResourceType ProducedResource;
+	EResourceType ProducedResource = EResourceType::Gold;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Production")
-	int32 ProductionRate; // Per turn
+	int32 ProductionRate = 0; // Per turn
 
 	// Units that can be trained (for military buildings)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Units")
@@ -122,16 +133,5 @@ struct FBuildingData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Requirements")
 	TArray<EBuildingType> RequiredBuildings;
 
-	FBuildingData()
-		: BuildingType(EBuildingType::None)
-		, Category(EBuildingCategory::Civil)
-		, Icon(nullptr)
-		, ConstructionTime(30.0f)
-		, MaxHealth(1000)
-		, Armor(5)
-		, FootprintSize(3.0f, 3.0f)
-		, ProducedResource(EResourceType::Gold)
-		, ProductionRate(0)
-	{}
 };
 

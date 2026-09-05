@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "MaterialManager.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -23,34 +24,9 @@ void AMaterialManager::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	InitializeDefaultColors();
 	InitializeDefaultMaterials();
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Material Manager initialized"));
-}
-
-void AMaterialManager::InitializeDefaultColors()
-{
-	// Roman Red
-	FactionColors.Add(EFactionID::Rome, FLinearColor(0.8f, 0.15f, 0.15f, 1.0f));
-	
-	// Carthaginian Purple
-	FactionColors.Add(EFactionID::Carthage, FLinearColor(0.5f, 0.1f, 0.5f, 1.0f));
-	
-	// Gallic Green
-	FactionColors.Add(EFactionID::Gaul, FLinearColor(0.15f, 0.6f, 0.15f, 1.0f));
-	
-	// Greek Blue
-	FactionColors.Add(EFactionID::Greece, FLinearColor(0.2f, 0.4f, 0.8f, 1.0f));
-	
-	// Egyptian Gold
-	FactionColors.Add(EFactionID::Egypt, FLinearColor(0.9f, 0.75f, 0.2f, 1.0f));
-	
-	// Briton Blue
-	FactionColors.Add(EFactionID::Britannia, FLinearColor(0.3f, 0.5f, 0.7f, 1.0f));
-	
-	// Neutral Gray
-	FactionColors.Add(EFactionID::None, FLinearColor(0.5f, 0.5f, 0.5f, 1.0f));
 }
 
 void AMaterialManager::InitializeDefaultMaterials()
@@ -94,11 +70,9 @@ UMaterialInterface* AMaterialManager::GetMaterial(EMaterialType MaterialType) co
 
 FLinearColor AMaterialManager::GetFactionColor(EFactionID Faction) const
 {
-	if (const FLinearColor* Color = FactionColors.Find(Faction))
-	{
-		return *Color;
-	}
-	return FLinearColor::Gray;
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanFactionDefinition* Definition = Registry ? Registry->FindFaction(Faction) : nullptr;
+	return Definition ? Definition->Definition.FactionColor : FLinearColor::Gray;
 }
 
 void AMaterialManager::SetGlobalFactionColor(EFactionID Faction)

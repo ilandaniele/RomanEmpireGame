@@ -8,52 +8,18 @@
 
 ALegionary::ALegionary()
 {
-	// Setup Legionary stats
-	UnitData.UnitType = EUnitType::Legionary;
-	UnitData.Category = EUnitCategory::Infantry;
-	UnitData.DisplayName = FText::FromString(TEXT("Legionary"));
-	UnitData.Description = FText::FromString(TEXT("The disciplined backbone of the Roman army. Armed with gladius, pilum, and scutum."));
-
-	// Stats
-	UnitData.BaseStats.MaxHealth = 120;
-	UnitData.BaseStats.MeleeAttack = 12;
-	UnitData.BaseStats.RangedAttack = 8;
-	UnitData.BaseStats.MeleeDefense = 10;
-	UnitData.BaseStats.RangedDefense = 8;
-	UnitData.BaseStats.Armor = 5;
-	UnitData.BaseStats.Speed = 280.0f;
-	UnitData.BaseStats.Morale = 60;
-	UnitData.BaseStats.Stamina = 100.0f;
-	UnitData.BaseStats.AttackSpeed = 1.0f;
-	UnitData.BaseStats.BlockStrength = 1.2f;
-
-	// Cost
-	UnitData.TrainingCost.Gold = 150;
-	UnitData.TrainingCost.Food = 50;
-	UnitData.TrainingTime = 15.0f;
-
-	// Combat
-	UnitData.AttackRange = 150.0f;
-	UnitData.bCanUseRanged = true; // Can throw pilum
-	UnitData.bHasShield = true;
-
-	// Equipment
-	UnitData.PrimaryWeapon = TEXT("Gladius");
-	UnitData.SecondaryWeapon = TEXT("Pilum");
+	UnitDefinitionID = TEXT("Legionary");
 
 	// Legionary specific
 	bInTestudo = false;
-	MaxPila = 2;
-	PilaCount = MaxPila;
+	PilaCount = 0;
 	PilumProjectile = nullptr;
-	PilumDamage = 25.0f;
-	PilumRange = 2000.0f;
 }
 
 void ALegionary::BeginPlay()
 {
 	Super::BeginPlay();
-	PilaCount = MaxPila;
+	PilaCount = UnitData.StartingRangedAmmo;
 }
 
 void ALegionary::ActivateTestudo()
@@ -69,12 +35,12 @@ void ALegionary::ActivateTestudo()
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
-		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed * 0.3f;
+		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed * UnitData.DefensiveFormationSpeedMultiplier;
 	}
 
 	// Boost defense (temporary stat modification)
-	UnitData.BaseStats.RangedDefense += 20;
-	UnitData.BaseStats.MeleeDefense += 10;
+	UnitData.BaseStats.RangedDefense += UnitData.DefensiveFormationRangedDefenseBonus;
+	UnitData.BaseStats.MeleeDefense += UnitData.DefensiveFormationMeleeDefenseBonus;
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("%s activated Testudo formation"), *GetName());
 }
@@ -95,8 +61,8 @@ void ALegionary::DeactivateTestudo()
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed;
 	}
 
-	UnitData.BaseStats.RangedDefense -= 20;
-	UnitData.BaseStats.MeleeDefense -= 10;
+	UnitData.BaseStats.RangedDefense -= UnitData.DefensiveFormationRangedDefenseBonus;
+	UnitData.BaseStats.MeleeDefense -= UnitData.DefensiveFormationMeleeDefenseBonus;
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("%s deactivated Testudo formation"), *GetName());
 }
@@ -129,7 +95,7 @@ void ALegionary::ThrowPilum()
 	else
 	{
 		// Fallback: Instant hit trace
-		FVector End = SpawnLocation + GetActorForwardVector() * PilumRange;
+		FVector End = SpawnLocation + GetActorForwardVector() * UnitData.SpecialRangedRange;
 		
 		FHitResult HitResult;
 		FCollisionQueryParams Params;
@@ -141,9 +107,9 @@ void ALegionary::ThrowPilum()
 			{
 				if (HitUnit->GetOwnerFaction() != OwnerFaction)
 				{
-					HitUnit->TakeCombatDamage(PilumDamage, this, true);
+					HitUnit->TakeCombatDamage(UnitData.SpecialRangedDamage, this, true);
 					UE_LOG(LogRomanEmpire, Log, TEXT("%s hit %s with pilum for %f damage"), 
-						*GetName(), *HitUnit->GetName(), PilumDamage);
+						*GetName(), *HitUnit->GetName(), UnitData.SpecialRangedDamage);
 				}
 			}
 		}

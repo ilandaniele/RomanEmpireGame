@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "BuildingTypes.h"
+#include "Building/BuildingTypes.h"
 #include "BuildingPlacementComponent.generated.h"
 
 class ABuildingBase;
@@ -26,7 +26,7 @@ public:
 
 	// Placement control
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
-	void StartPlacement(TSubclassOf<ABuildingBase> BuildingClass);
+	void StartPlacement(FName BuildingID);
 
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void UpdatePreview(const FVector& WorldLocation);
@@ -48,14 +48,10 @@ public:
 	bool CanPlace() const { return bCanPlace; }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
-	TSubclassOf<ABuildingBase> GetCurrentBuildingClass() const { return CurrentBuildingClass; }
+	FName GetCurrentBuildingID() const { return CurrentBuildingID; }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
 	EResourceTransactionFailure GetLastTransactionFailure() const { return LastTransactionFailure; }
-
-	// Set building cost and type for current placement
-	void SetBuildingCost(const FFactionResourceAmounts& Cost) { CurrentBuildingCost = Cost; }
-	void SetBuildingTypeForPlacement(EBuildingType Type) { CurrentBuildingType = Type; }
 
 protected:
 	// Currently placing
@@ -67,6 +63,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
 	TSubclassOf<ABuildingBase> CurrentBuildingClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
+	FName CurrentBuildingID = NAME_None;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building|Placement")
 	TObjectPtr<ABuildingBase> PreviewBuilding;
@@ -84,9 +83,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Placement")
 	bool bSnapToGrid;
 
-	// Cost and type for current placement
-	FFactionResourceAmounts CurrentBuildingCost;
-	EBuildingType CurrentBuildingType;
 	EResourceTransactionFailure LastTransactionFailure;
 
 	// Events

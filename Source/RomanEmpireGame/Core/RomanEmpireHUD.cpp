@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireHUD.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
@@ -254,12 +255,27 @@ void ARomanEmpireHUD::DrawBuildingMenu()
 	float ItemSpacing = 25.0f;
 
 	// Building list (placeholder — could be made clickable with hit testing)
-	DrawText(TEXT("[1] Barracks (200 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
-	DrawText(TEXT("[2] Farm (100 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
-	DrawText(TEXT("[3] Mine (150 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
-	DrawText(TEXT("[4] Lumber Mill (120 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
-	DrawText(TEXT("[5] Wall (80 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
-	DrawText(TEXT("[6] Temple (300 Gold)"), FLinearColor::White, X + 15.0f, ItemY, Font); ItemY += ItemSpacing;
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (Registry && Registry->IsReady())
+	{
+		for (const URomanBuildingDefinition* Asset : Registry->GetAllBuildings())
+		{
+			if (!Asset || Asset->QuickSlot <= 0)
+			{
+				continue;
+			}
+			DrawText(
+				FString::Printf(TEXT("[%d] %s (%s)"),
+					Asset->QuickSlot,
+					*Asset->Definition.DisplayName.ToString(),
+					*RomanEmpireEconomy::DescribeResourceCost(Asset->Definition.Cost)),
+				FLinearColor::White,
+				X + 15.0f,
+				ItemY,
+				Font);
+			ItemY += ItemSpacing;
+		}
+	}
 
 	ItemY += 15.0f;
 	DrawText(TEXT("Press B to close"), FLinearColor(0.6f, 0.6f, 0.6f), X + 15.0f, ItemY, Font);
@@ -369,13 +385,29 @@ void ARomanEmpireHUD::DrawBuildingPanel()
 	DrawRect(FLinearColor(0.6f, 0.5f, 0.1f, 0.8f), PanelX, PanelY, PanelW, 2.0f); // Top border
 
 	// Building name
-	FString Title = HUDSelectedBuilding->GetClass()->GetName().Replace(TEXT("A"), TEXT(""));
+	const FBuildingData BuildingDefinition = HUDSelectedBuilding->GetBuildingData();
+	const FString Title = BuildingDefinition.DisplayName.ToString();
 	DrawText(Title.ToUpper(), FLinearColor(1.0f, 0.9f, 0.3f), PanelX + 10.0f, PanelY + 8.0f, Font);
 
 	// Check if it's a Barracks
 	if (Cast<ABarracks>(HUDSelectedBuilding))
 	{
-		DrawText(TEXT("[ Legionary - 150g 50f ]"), FLinearColor(0.9f, 0.9f, 0.9f), PanelX + 10.0f, PanelY + 28.0f, Font);
+		const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+		const FName UnitID = BuildingDefinition.TrainableUnits.IsEmpty()
+			? NAME_None
+			: BuildingDefinition.TrainableUnits[0];
+		const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(UnitID) : nullptr;
+		if (UnitAsset)
+		{
+			DrawText(
+				FString::Printf(TEXT("[ %s - %s ]"),
+					*UnitAsset->Definition.DisplayName.ToString(),
+					*RomanEmpireEconomy::DescribeResourceCost(UnitAsset->Definition.TrainingCost)),
+				FLinearColor(0.9f, 0.9f, 0.9f),
+				PanelX + 10.0f,
+				PanelY + 28.0f,
+				Font);
+		}
 
 		// TRAIN button
 		const float BtnX = PanelX + PanelW - 100.0f;
@@ -410,7 +442,14 @@ void ARomanEmpireHUD::DrawBuildingPanel()
 	else
 	{
 		// Generic building info
-		DrawText(TEXT("Owner: Rome"), FLinearColor(0.8f, 0.3f, 0.2f), PanelX + 10.0f, PanelY + 28.0f, Font);
+		const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+		const URomanFactionDefinition* Faction = Registry
+			? Registry->FindFaction(HUDSelectedBuilding->GetOwnerFaction())
+			: nullptr;
+		const FString OwnerName = Faction ? Faction->Definition.DisplayName.ToString() : TEXT("Unowned");
+		DrawText(FString::Printf(TEXT("Owner: %s"), *OwnerName),
+			Faction ? Faction->Definition.FactionColor : FLinearColor::Gray,
+			PanelX + 10.0f, PanelY + 28.0f, Font);
 		DrawText(TEXT("Status: Operational"), FLinearColor(0.3f, 0.9f, 0.4f), PanelX + 10.0f, PanelY + 48.0f, Font);
 		TrainButtonMin = TrainButtonMax = FVector2D::ZeroVector;
 	}

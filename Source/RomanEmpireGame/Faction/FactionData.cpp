@@ -89,29 +89,16 @@ FFactionResourceTransactionResult RomanEmpireEconomy::TrySpendResources(
 	return TryApplyResourceDelta(InOutBalance, SpendDelta);
 }
 
-FFactionResourceAmounts RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID FactionID)
+FString RomanEmpireEconomy::DescribeResourceCost(const FFactionResourceAmounts& Cost)
 {
-	FFactionResourceAmounts Resources;
-	Resources.Food = 500;
-	Resources.Iron = 200;
-	Resources.Wood = 300;
-	Resources.Stone = 200;
-	Resources.Population = 100;
-
-	switch (FactionID)
-	{
-	case EFactionID::Rome:
-		Resources.Gold = 1100;
-		return Resources;
-	case EFactionID::Carthage:
-		Resources.Gold = 1300;
-		return Resources;
-	case EFactionID::Gaul:
-		Resources.Gold = 900;
-		return Resources;
-	default:
-		return FFactionResourceAmounts();
-	}
+	TArray<FString> Parts;
+	if (Cost.Gold > 0) Parts.Add(FString::Printf(TEXT("%d Gold"), Cost.Gold));
+	if (Cost.Food > 0) Parts.Add(FString::Printf(TEXT("%d Food"), Cost.Food));
+	if (Cost.Iron > 0) Parts.Add(FString::Printf(TEXT("%d Iron"), Cost.Iron));
+	if (Cost.Wood > 0) Parts.Add(FString::Printf(TEXT("%d Wood"), Cost.Wood));
+	if (Cost.Stone > 0) Parts.Add(FString::Printf(TEXT("%d Stone"), Cost.Stone));
+	if (Cost.Population > 0) Parts.Add(FString::Printf(TEXT("%d Population"), Cost.Population));
+	return Parts.IsEmpty() ? TEXT("Free") : FString::Join(Parts, TEXT(", "));
 }
 
 const TCHAR* RomanEmpireEconomy::GetTransactionFailureName(EResourceTransactionFailure Failure)

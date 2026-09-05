@@ -2,6 +2,7 @@
 
 #include "BuildingPlacementComponent.h"
 #include "BuildingBase.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
 #include "Faction/FactionManager.h"
@@ -20,8 +21,6 @@ UBuildingPlacementComponent::UBuildingPlacementComponent()
 	CurrentRotation = 0.0f;
 	GridSize = 100.0f;   // 1 meter grid
 	bSnapToGrid = true;
-	CurrentBuildingCost = FFactionResourceAmounts();
-	CurrentBuildingType = EBuildingType::None;
 	LastTransactionFailure = EResourceTransactionFailure::None;
 }
 
@@ -42,11 +41,15 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	}
 }
 
-void UBuildingPlacementComponent::StartPlacement(TSubclassOf<ABuildingBase> BuildingClass)
+void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 {
-	if (!BuildingClass)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuilding(BuildingID) : nullptr;
+	UClass* BuildingClass = Asset ? Asset->BuildingClass.Get() : nullptr;
+	if (!Registry || !Registry->IsReady() || !Asset || !BuildingClass)
 	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot start placement: null building class"));
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot start placement: unknown building ID %s"),
+			*BuildingID.ToString());
 		return;
 	}
 
@@ -57,28 +60,23 @@ void UBuildingPlacementComponent::StartPlacement(TSubclassOf<ABuildingBase> Buil
 	}
 
 	CurrentBuildingClass = BuildingClass;
+	CurrentBuildingID = BuildingID;
 	CurrentRotation = 0.0f;
 	bIsPlacing = true;
 	LastTransactionFailure = EResourceTransactionFailure::None;
 
 	CreatePreviewBuilding();
 
-	// Apply building type shape/color to preview immediately
-	if (PreviewBuilding)
-	{
-		PreviewBuilding->SetBuildingTypeData(CurrentBuildingType);
-	}
-
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 3.0f,
 			PreviewBuilding ? FColor::Green : FColor::Red,
 			FString::Printf(TEXT("BuildPlace: %s preview=%s"),
-				*BuildingClass->GetName(),
+				*BuildingID.ToString(),
 				PreviewBuilding ? TEXT("OK") : TEXT("FAILED")));
 	}
 
-	UE_LOG(LogRomanEmpire, Log, TEXT("Started placing building: %s"), *BuildingClass->GetName());
+	UE_LOG(LogRomanEmpire, Log, TEXT("Started placing building: %s"), *BuildingID.ToString());
 }
 
 void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
@@ -119,7 +117,7 @@ void UBuildingPlacementComponent::RotatePreview(float Degrees)
 
 bool UBuildingPlacementComponent::ConfirmPlacement()
 {
-	if (!bIsPlacing || !bCanPlace || !CurrentBuildingClass)
+	if (!bIsPlacing || !bCanPlace || !CurrentBuildingClass || CurrentBuildingID.IsNone())
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: invalid state"));
 		return false;
@@ -133,7 +131,9 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
 	AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	if (!FactionManager)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuilding(CurrentBuildingID) : nullptr;
+	if (!FactionManager || !Asset)
 	{
 		LastTransactionFailure = EResourceTransactionFailure::InvalidFaction;
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: missing faction resource authority"));
@@ -156,7 +156,7 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
 	const FFactionResourceTransactionResult SpendResult =
-		FactionManager->TrySpendFactionResources(PlayerFaction, CurrentBuildingCost);
+		FactionManager->TrySpendFactionResources(PlayerFaction, Asset->Definition.Cost);
 	LastTransactionFailure = SpendResult.Failure;
 	if (!SpendResult.WasSuccessful())
 	{
@@ -166,8 +166,20 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
-	NewBuilding->SetBuildingTypeData(CurrentBuildingType);
-	NewBuilding->SetOwnerFaction(PlayerFaction);
+	if (!NewBuilding->InitializeBuilding(CurrentBuildingID, PlayerFaction))
+	{
+		FFactionResourceDelta Refund;
+		Refund.Gold = Asset->Definition.Cost.Gold;
+		Refund.Food = Asset->Definition.Cost.Food;
+		Refund.Iron = Asset->Definition.Cost.Iron;
+		Refund.Wood = Asset->Definition.Cost.Wood;
+		Refund.Stone = Asset->Definition.Cost.Stone;
+		Refund.Population = Asset->Definition.Cost.Population;
+		FactionManager->ApplyFactionResourceDelta(PlayerFaction, Refund);
+		NewBuilding->Destroy();
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot confirm placement: building definition initialization failed"));
+		return false;
+	}
 	UGameplayStatics::FinishSpawningActor(NewBuilding, PlacementTransform);
 	NewBuilding->StartConstruction();
 
@@ -187,6 +199,7 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 	bIsPlacing = false;
 	bCanPlace = false;
 	CurrentBuildingClass = nullptr;
+	CurrentBuildingID = NAME_None;
 
 	return true;
 }
@@ -203,6 +216,7 @@ void UBuildingPlacementComponent::CancelPlacement()
 	bIsPlacing = false;
 	bCanPlace = false;
 	CurrentBuildingClass = nullptr;
+	CurrentBuildingID = NAME_None;
 	CurrentRotation = 0.0f;
 
 	OnPlacementCancelled.Broadcast();
@@ -218,18 +232,26 @@ void UBuildingPlacementComponent::CreatePreviewBuilding()
 		return;
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	PreviewBuilding = World->SpawnActor<ABuildingBase>(
-		CurrentBuildingClass, 
-		FVector::ZeroVector, 
-		FRotator::ZeroRotator, 
-		SpawnParams
-	);
+	const FTransform PreviewTransform(FRotator::ZeroRotator, FVector::ZeroVector);
+	PreviewBuilding = World->SpawnActorDeferred<ABuildingBase>(
+		CurrentBuildingClass,
+		PreviewTransform,
+		nullptr,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
 	if (PreviewBuilding)
 	{
+		const ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+		const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+		const EFactionID PreviewFaction = FactionManager ? FactionManager->GetPlayerFaction() : EFactionID::None;
+		if (!PreviewBuilding->InitializeBuilding(CurrentBuildingID, PreviewFaction))
+		{
+			PreviewBuilding->Destroy();
+			PreviewBuilding = nullptr;
+			return;
+		}
+		UGameplayStatics::FinishSpawningActor(PreviewBuilding, PreviewTransform);
 		PreviewBuilding->SetPlacementMode(true, false);
 	}
 }

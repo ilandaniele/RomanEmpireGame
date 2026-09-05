@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "UnitTypes.h"
+#include "Units/UnitTypes.h"
 #include "Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
@@ -37,6 +37,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Unit")
 	EUnitType GetUnitType() const { return UnitData.UnitType; }
+
+	UFUNCTION(BlueprintPure, Category = "Unit")
+	FName GetUnitDefinitionID() const { return UnitDefinitionID; }
+
+	/** Fully applies immutable content and ownership before a deferred spawn becomes observable. */
+	bool InitializeUnit(FName DefinitionID, EFactionID NewOwner);
 
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -115,7 +121,10 @@ public:
 
 	// Stamina (FPS mode)
 	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
-	float GetStaminaPercent() const { return CurrentStamina / UnitData.BaseStats.Stamina; }
+	float GetStaminaPercent() const
+	{
+		return UnitData.BaseStats.Stamina > 0.0f ? CurrentStamina / UnitData.BaseStats.Stamina : 0.0f;
+	}
 
 	// State
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -125,8 +134,12 @@ public:
 	void SetPossessedByPlayer(bool bPossessed);
 
 protected:
-	// Unit data
+	/** Stable ID only; authored values live in URomanUnitDefinition assets. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit")
+	FName UnitDefinitionID = NAME_None;
+
+	// Unit data
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit")
 	FUnitData UnitData;
 
 	// State
@@ -249,5 +262,8 @@ protected:
 	virtual void UpdateStamina(float DeltaSeconds);
 	virtual void OnDeath();
 	float CalculateDamageReduction(float RawDamage, bool bIsRanged) const;
+
+private:
+	bool bUnitInitialized = false;
 };
 

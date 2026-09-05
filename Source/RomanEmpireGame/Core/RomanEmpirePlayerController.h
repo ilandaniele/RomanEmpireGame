@@ -61,7 +61,7 @@ public:
 
 	// Building
 	UFUNCTION(BlueprintCallable, Category = "Building")
-	void StartBuildingPlacement(TSubclassOf<ABuildingBase> BuildingClass);
+	void StartBuildingPlacement(FName BuildingID);
 
 	UFUNCTION(BlueprintCallable, Category = "Building")
 	void CancelBuildingPlacement();
@@ -199,6 +199,7 @@ private:
 	TObjectPtr<ARomanEmpireGameMode> GameMode;
 
 	void CreateInputActionsAndMappings();
+	void StartBuildingPlacementByQuickSlot(int32 QuickSlot);
 	void PerformBoxSelect();
 	AActor* GetActorUnderCursor() const;
 };

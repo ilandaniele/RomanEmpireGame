@@ -87,57 +87,42 @@ struct FUnitStats
 
 	// Base stats
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 MaxHealth;
+	int32 MaxHealth = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 MeleeAttack;
+	int32 MeleeAttack = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 RangedAttack;
+	int32 RangedAttack = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 MeleeDefense;
+	int32 MeleeDefense = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 RangedDefense;
+	int32 RangedDefense = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 Armor;
+	int32 Armor = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	float Speed;
+	float Speed = 0.0f;
 
 	// Morale
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	int32 Morale;
+	int32 Morale = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	float Stamina;
+	float Stamina = 0.0f;
 
 	// FPS mode stats
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats|FPS")
-	float AttackSpeed;
+	float AttackSpeed = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats|FPS")
-	float BlockStrength;
+	float BlockStrength = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats|FPS")
-	float DodgeSpeed;
-
-	FUnitStats()
-		: MaxHealth(100)
-		, MeleeAttack(10)
-		, RangedAttack(0)
-		, MeleeDefense(8)
-		, RangedDefense(5)
-		, Armor(3)
-		, Speed(300.0f)
-		, Morale(50)
-		, Stamina(100.0f)
-		, AttackSpeed(1.0f)
-		, BlockStrength(1.0f)
-		, DodgeSpeed(1.0f)
-	{}
+	float DodgeSpeed = 0.0f;
 };
 
 /**
@@ -148,11 +133,15 @@ struct FUnitData
 {
 	GENERATED_BODY()
 
+	/** Stable content identity used by runtime factories and future save records. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
-	EUnitType UnitType;
+	FName UnitID = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
-	EUnitCategory Category;
+	EUnitType UnitType = EUnitType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
+	EUnitCategory Category = EUnitCategory::Infantry;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
 	FText DisplayName;
@@ -161,7 +150,7 @@ struct FUnitData
 	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
-	UTexture2D* Icon;
+	TSoftObjectPtr<UTexture2D> Icon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
 	FUnitStats BaseStats;
@@ -171,14 +160,32 @@ struct FUnitData
 	FFactionResourceAmounts TrainingCost;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Cost")
-	float TrainingTime;
+	float TrainingTime = 0.0f;
 
 	// Combat range
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
-	float AttackRange;
+	float AttackRange = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
-	bool bCanUseRanged;
+	bool bCanUseRanged = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
+	int32 StartingRangedAmmo = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
+	float SpecialRangedDamage = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
+	float SpecialRangedRange = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Formation")
+	float DefensiveFormationSpeedMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Formation")
+	int32 DefensiveFormationMeleeDefenseBonus = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Formation")
+	int32 DefensiveFormationRangedDefenseBonus = 0;
 
 	// Equipment for FPS mode
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
@@ -188,16 +195,6 @@ struct FUnitData
 	FName SecondaryWeapon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
-	bool bHasShield;
-
-	FUnitData()
-		: UnitType(EUnitType::None)
-		, Category(EUnitCategory::Infantry)
-		, Icon(nullptr)
-		, TrainingTime(10.0f)
-		, AttackRange(150.0f)
-		, bCanUseRanged(false)
-		, bHasShield(true)
-	{}
+	bool bHasShield = false;
 };
 

@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "FactionManager.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 
 AFactionManager::AFactionManager()
@@ -14,64 +15,38 @@ void AFactionManager::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	InitializeDefaultFactions();
+	if (!InitializeFactionsFromContent())
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Faction Manager could not initialize because content definitions are invalid"));
+		return;
+	}
 	InitializeDefaultDiplomacy();
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Faction Manager initialized with %d factions"), FactionInfoMap.Num());
 }
 
-void AFactionManager::InitializeDefaultFactions()
+bool AFactionManager::InitializeFactionsFromContent()
 {
-	// Rome
-	FFactionInfo Rome;
-	Rome.FactionID = EFactionID::Rome;
-	Rome.DisplayName = FText::FromString(TEXT("Roman Republic"));
-	Rome.Description = FText::FromString(TEXT("The mighty Roman Republic, known for disciplined legions."));
-	Rome.FactionColor = FLinearColor(0.8f, 0.1f, 0.1f, 1.0f); // Red
-	Rome.InfantryBonus = 1.2f;
-	Rome.CavalryBonus = 1.0f;
-	Rome.EconomyBonus = 1.1f;
-	Rome.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Rome);
-	Rome.UniqueUnitTypes.Add(TEXT("Legionary"));
-	Rome.UniqueUnitTypes.Add(TEXT("Praetorian"));
-	Rome.UniqueBuildingTypes.Add(TEXT("Colosseum"));
-	FactionInfoMap.Add(EFactionID::Rome, Rome);
-
-	// Carthage
-	FFactionInfo Carthage;
-	Carthage.FactionID = EFactionID::Carthage;
-	Carthage.DisplayName = FText::FromString(TEXT("Carthage"));
-	Carthage.Description = FText::FromString(TEXT("The great trading empire of the Mediterranean."));
-	Carthage.FactionColor = FLinearColor(0.5f, 0.0f, 0.5f, 1.0f); // Purple
-	Carthage.InfantryBonus = 0.9f;
-	Carthage.CavalryBonus = 1.1f;
-	Carthage.EconomyBonus = 1.3f;
-	Carthage.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Carthage);
-	Carthage.UniqueUnitTypes.Add(TEXT("WarElephant"));
-	Carthage.UniqueUnitTypes.Add(TEXT("SacredBand"));
-	Carthage.UniqueBuildingTypes.Add(TEXT("TradePort"));
-	FactionInfoMap.Add(EFactionID::Carthage, Carthage);
-
-	// Gaul
-	FFactionInfo Gaul;
-	Gaul.FactionID = EFactionID::Gaul;
-	Gaul.DisplayName = FText::FromString(TEXT("Gallic Tribes"));
-	Gaul.Description = FText::FromString(TEXT("Fierce Celtic warriors from the northern forests."));
-	Gaul.FactionColor = FLinearColor(0.1f, 0.6f, 0.1f, 1.0f); // Green
-	Gaul.InfantryBonus = 1.1f;
-	Gaul.CavalryBonus = 1.2f;
-	Gaul.EconomyBonus = 0.9f;
-	Gaul.StartingResources = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Gaul);
-	Gaul.UniqueUnitTypes.Add(TEXT("NakedFanatic"));
-	Gaul.UniqueUnitTypes.Add(TEXT("NobleCavalry"));
-	Gaul.UniqueBuildingTypes.Add(TEXT("SacredGrove"));
-	FactionInfoMap.Add(EFactionID::Gaul, Gaul);
-
-	// Initialize resources for each faction
-	for (const auto& Pair : FactionInfoMap)
+	FactionInfoMap.Reset();
+	FactionResourcesMap.Reset();
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (!Registry || !Registry->IsReady())
 	{
-		FactionResourcesMap.Add(Pair.Key, Pair.Value.StartingResources);
+		return false;
 	}
+
+	for (const URomanFactionDefinition* Asset : Registry->GetAllFactions())
+	{
+		if (!Asset)
+		{
+			continue;
+		}
+		const FFactionInfo& Definition = Asset->Definition;
+		FactionInfoMap.Add(Definition.RuntimeFaction, Definition);
+		FactionResourcesMap.Add(Definition.RuntimeFaction, Definition.StartingResources);
+	}
+
+	return FactionInfoMap.Num() > 0;
 }
 
 void AFactionManager::InitializeDefaultDiplomacy()

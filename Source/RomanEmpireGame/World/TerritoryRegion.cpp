@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "TerritoryRegion.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Building/BuildingBase.h"
 #include "Units/UnitBase.h"
@@ -202,22 +203,10 @@ void ATerritoryRegion::UpdateTerritoryColor()
 	// TODO: Apply faction color to territory mesh material
 	// Will need dynamic material instances
 
-	FLinearColor Color;
-	switch (GetOwnerFaction())
-	{
-		case EFactionID::Rome:
-			Color = FLinearColor(0.8f, 0.1f, 0.1f, 0.3f); // Red
-			break;
-		case EFactionID::Carthage:
-			Color = FLinearColor(0.5f, 0.0f, 0.5f, 0.3f); // Purple
-			break;
-		case EFactionID::Gaul:
-			Color = FLinearColor(0.1f, 0.6f, 0.1f, 0.3f); // Green
-			break;
-		default:
-			Color = FLinearColor(0.5f, 0.5f, 0.5f, 0.3f); // Gray for neutral
-			break;
-	}
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(GetOwnerFaction()) : nullptr;
+	FLinearColor Color = Faction ? Faction->Definition.FactionColor : FLinearColor::Gray;
+	Color.A = 0.3f;
 
 	// Apply color through dynamic material
 	// TerritoryMesh->SetVectorParameterValueOnMaterials(TEXT("FactionColor"), Color);

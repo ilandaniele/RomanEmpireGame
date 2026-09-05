@@ -19,7 +19,7 @@ public:
 
 	// Unit training
 	UFUNCTION(BlueprintCallable, Category = "Barracks")
-	bool TrainUnit(TSubclassOf<class AUnitBase> UnitClass);
+	bool TrainUnit(FName UnitID);
 
 	UFUNCTION(BlueprintPure, Category = "Barracks")
 	float GetTrainingProgress() const { return TrainingProgress; }
@@ -46,7 +46,7 @@ protected:
 	float TrainingTime;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Barracks")
-	TSubclassOf<AUnitBase> CurrentlyTraining;
+	FName CurrentlyTrainingID = NAME_None;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Barracks")
 	FVector SpawnOffset;
@@ -55,7 +55,7 @@ protected:
 	int32 MaxQueueSize;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Barracks")
-	TArray<TSubclassOf<AUnitBase>> TrainingQueue;
+	TArray<FName> TrainingQueue;
 
 private:
 	void SpawnTrainedUnit();

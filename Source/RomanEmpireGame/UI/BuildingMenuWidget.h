@@ -13,7 +13,7 @@ class UImage;
 class UTextBlock;
 class ABuildingBase;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingSelected, EBuildingType, BuildingType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingSelected, FName, BuildingID);
 
 /**
  * Building selection menu (Age of Empires style)
@@ -74,10 +74,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Menu")
 	TSubclassOf<UUserWidget> BuildingButtonTemplate;
 
-	// Building class references
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Menu")
-	TMap<EBuildingType, TSubclassOf<ABuildingBase>> BuildingClasses;
-
 	// Current filter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building Menu")
 	EBuildingCategory CurrentCategory;
@@ -95,7 +91,7 @@ protected:
 	void OnDefenseTabClicked();
 
 private:
-	void CreateBuildingButton(EBuildingType BuildingType, const FBuildingData& Data, UVerticalBox* Container);
+	void CreateBuildingButton(FName BuildingID, const FBuildingData& Data, UVerticalBox* Container);
 	void SetCategoryVisibility(EBuildingCategory Category);
 };
 

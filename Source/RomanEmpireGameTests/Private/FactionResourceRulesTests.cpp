@@ -8,7 +8,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFactionResourceDefaultsTest,
-	"RomanEmpireGame.Rules.Resources.ZeroDefaultsAndStartingDefinitions",
+	"RomanEmpireGame.Rules.Resources.ZeroDefaults",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
 
 bool FFactionResourceDefaultsTest::RunTest(const FString& Parameters)
@@ -17,18 +17,6 @@ bool FFactionResourceDefaultsTest::RunTest(const FString& Parameters)
 	const FFactionResourceDelta EmptyDelta;
 	TestTrue(TEXT("Resource amounts default to zero"), EmptyAmounts.IsZero());
 	TestTrue(TEXT("Resource deltas default to zero"), EmptyDelta.IsZero());
-
-	const FFactionResourceAmounts Rome = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Rome);
-	const FFactionResourceAmounts Carthage = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Carthage);
-	const FFactionResourceAmounts Gaul = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::Gaul);
-	const FFactionResourceAmounts Invalid = RomanEmpireEconomy::GetPrototypeStartingResources(EFactionID::None);
-
-	TestEqual(TEXT("Rome has an explicit starting gold amount"), Rome.Gold, 1100);
-	TestEqual(TEXT("Carthage has an explicit starting gold amount"), Carthage.Gold, 1300);
-	TestEqual(TEXT("Gaul has an explicit starting gold amount"), Gaul.Gold, 900);
-	TestEqual(TEXT("Starting food is explicitly defined"), Rome.Food, 500);
-	TestEqual(TEXT("Starting population is explicitly defined"), Rome.Population, 100);
-	TestTrue(TEXT("An invalid faction does not receive implicit resources"), Invalid.IsZero());
 
 	return true;
 }

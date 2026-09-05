@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "UnitBase.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
@@ -260,7 +261,7 @@ AUnitBase::AUnitBase()
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
-		Movement->MaxWalkSpeed = 300.0f;
+		Movement->MaxWalkSpeed = 0.0f;
 		Movement->bOrientRotationToMovement = true;
 		Movement->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	}
@@ -272,9 +273,9 @@ AUnitBase::AUnitBase()
 
 	// Initialize state
 	OwnerFaction = EFactionID::None;
-	CurrentHealth = 100;
-	CurrentStamina = 100.0f;
-	CurrentMorale = 50;
+	CurrentHealth = 0;
+	CurrentStamina = 0.0f;
+	CurrentMorale = 0;
 	bIsSelected = false;
 	bIsPossessedByPlayer = false;
 	bIsBlocking = false;
@@ -282,7 +283,7 @@ AUnitBase::AUnitBase()
 	CurrentStance = EUnitStance::Defensive;
 	bHasMoveCommand = false;
 	AttackTarget = nullptr;
-	AttackCooldown = 1.0f;
+	AttackCooldown = 0.0f;
 	AttackCooldownRemaining = 0.0f;
 	WalkAnimTime = 0.0f;
 	SelectionRingMesh = nullptr;
@@ -304,6 +305,13 @@ AUnitBase::AUnitBase()
 void AUnitBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!bUnitInitialized && !InitializeUnit(UnitDefinitionID, OwnerFaction))
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Unit %s has no valid content definition"), *GetName());
+		SetActorTickEnabled(false);
+		return;
+	}
 	
 	// Initialize from unit data
 	CurrentHealth = UnitData.BaseStats.MaxHealth;
@@ -319,7 +327,7 @@ void AUnitBase::BeginPlay()
 	
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit spawned: %s"), *UnitData.DisplayName.ToString());
 	ApplyFactionColor();  // Apply faction color on spawn
-	AttackCooldown = 0.0f;
+	AttackCooldown = 1.0f / UnitData.BaseStats.AttackSpeed;
 	AttackCooldownRemaining = 0.0f;
 
 	// Enable unit-to-unit avoidance so they don't overlap
@@ -328,6 +336,29 @@ void AUnitBase::BeginPlay()
 		GetCharacterMovement()->bUseRVOAvoidance = true;
 		GetCharacterMovement()->AvoidanceWeight = 0.5f;
 	}
+}
+
+bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
+{
+	if (bUnitInitialized || !RomanEmpireContent::IsStableID(DefinitionID))
+	{
+		return false;
+	}
+
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanUnitDefinition* Asset = Registry ? Registry->FindUnit(DefinitionID) : nullptr;
+	const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(NewOwner) : nullptr;
+	if (!Registry || !Registry->IsReady() || !Asset || !Faction ||
+		!Asset->AvailableToFactions.Contains(Faction->Definition.FactionID))
+	{
+		return false;
+	}
+
+	UnitDefinitionID = DefinitionID;
+	UnitData = Asset->Definition;
+	OwnerFaction = NewOwner;
+	bUnitInitialized = true;
+	return true;
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
@@ -356,16 +387,16 @@ void AUnitBase::Tick(float DeltaSeconds)
 			if (Target && Target->IsAlive())
 			{
 				float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
-				if (Dist2D <= 500.0f)
+				if (Dist2D <= UnitData.AttackRange)
 				{
 					// In range: STOP moving, countdown, FIRE
 					bHasMoveCommand = false;
 					AttackCooldownRemaining -= DeltaSeconds;
 					if (AttackCooldownRemaining <= 0.0f)
 					{
-						float Dmg = FMath::Max(20.0f, (float)UnitData.BaseStats.MeleeAttack);
+						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
 						Target->CurrentHealth = FMath::Max(0, Target->CurrentHealth - (int32)Dmg);
-						AttackCooldownRemaining = 1.0f;
+						AttackCooldownRemaining = AttackCooldown;
 
 						// Arm swing
 						if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
@@ -497,14 +528,11 @@ void AUnitBase::ApplyFactionColor()
 {
 	if (!VisualMesh) return;
 
-	FLinearColor FactionColor;
-	switch (OwnerFaction)
-	{
-		case EFactionID::Rome:     FactionColor = FLinearColor(0.8f, 0.15f, 0.1f); break;  // Red
-		case EFactionID::Carthage: FactionColor = FLinearColor(0.5f, 0.1f, 0.6f); break;   // Purple
-		case EFactionID::Gaul:     FactionColor = FLinearColor(0.2f, 0.5f, 0.15f); break;  // Green
-		default:                   FactionColor = FLinearColor(0.5f, 0.5f, 0.5f); break;   // Gray
-	}
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(OwnerFaction) : nullptr;
+	const FLinearColor FactionColor = Faction
+		? Faction->Definition.FactionColor
+		: FLinearColor(0.5f, 0.5f, 0.5f);
 
 	UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
 	if (BaseMat)
@@ -844,7 +872,7 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	{
 		float Distance = FVector::Dist2D(GetActorLocation(), AttackTarget->GetActorLocation());
 		
-		if (Distance <= 500.0f)  // Hardcoded attack range (2D)
+		if (Distance <= UnitData.AttackRange)
 		{
 			// In attack range - stop and deal damage directly
 			bHasMoveCommand = false;
@@ -854,9 +882,9 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
 				if (Target && Target->IsAlive())
 				{
-					float Dmg = FMath::Max(15.0f, (float)UnitData.BaseStats.MeleeAttack);
+					const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
 					Target->TakeCombatDamage(Dmg, this, false);
-					AttackCooldownRemaining = 1.2f;
+					AttackCooldownRemaining = AttackCooldown;
 
 					// Attack arm swing
 					if (RightArmMesh)

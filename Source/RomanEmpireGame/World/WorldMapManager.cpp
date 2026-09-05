@@ -1,31 +1,11 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "WorldMapManager.h"
+#include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "World/TerritoryRegion.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-
-namespace
-{
-	FTerritoryDefinition MakePrototypeTerritoryDefinition(
-		const TCHAR* ID,
-		const TCHAR* DisplayName,
-		EFactionID StartingOwner)
-	{
-		FTerritoryDefinition Definition;
-		Definition.TerritoryID = FName(ID);
-		Definition.DisplayName = FText::FromString(DisplayName);
-		Definition.Description = FText::FromString(
-			FString::Printf(TEXT("Prototype campaign territory: %s"), DisplayName));
-		Definition.StartingOwner = StartingOwner;
-		Definition.TerrainType = ETerrainType::Plains;
-		Definition.BonusResource = EResourceType::Gold;
-		Definition.ResourceProduction.Gold = 50;
-		Definition.ResourceProduction.Food = 30;
-		return Definition;
-	}
-}
 
 AWorldMapManager::AWorldMapManager()
 {
@@ -73,54 +53,26 @@ void AWorldMapManager::GenerateDefaultMap()
 		return;
 	}
 
-	// Generate a small Mediterranean-style map
-	// Layout:
-	//   [Gaul]  [Alps]  [Greece]
-	//   [Hispania] [Rome] [Macedonia]  
-	//   [Carthage] [Sicily] [Egypt]
-
-	// Row 1 - Northern territories
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Gaul"), TEXT("Gallia"), EFactionID::Gaul),
-		FVector(-TerritorySize, TerritorySize, 0));
-
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Alps"), TEXT("Alpine Passes"), EFactionID::None),
-		FVector(0, TerritorySize, 0));
-
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Greece"), TEXT("Graecia"), EFactionID::None),
-		FVector(TerritorySize, TerritorySize, 0));
-
-	// Row 2 - Central territories
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Hispania"), TEXT("Hispania"), EFactionID::None),
-		FVector(-TerritorySize, 0, 0));
-
-	// Rome - center of the map
-	ATerritoryRegion* RomeTerritory = CreateTerritory(
-		MakePrototypeTerritoryDefinition(TEXT("Rome"), TEXT("Italia"), EFactionID::Rome),
-		FVector(0, 0, 0));
-
-	if (RomeTerritory)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (!Registry || !Registry->IsReady())
 	{
-		RomeTerritory->FoundSettlement(FText::FromString(TEXT("Roma")));
+		UE_LOG(LogRomanEmpire, Error, TEXT("Default map generation requires a valid content registry"));
+		return;
 	}
 
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Macedonia"), TEXT("Macedonia"), EFactionID::None),
-		FVector(TerritorySize, 0, 0));
-
-	// Row 3 - Southern territories
-	ATerritoryRegion* CarthageTerritory = CreateTerritory(
-		MakePrototypeTerritoryDefinition(TEXT("Africa"), TEXT("Africa"), EFactionID::Carthage),
-		FVector(-TerritorySize, -TerritorySize, 0));
-
-	if (CarthageTerritory)
+	for (const URomanTerritoryDefinition* Asset : Registry->GetAllTerritories())
 	{
-		CarthageTerritory->FoundSettlement(FText::FromString(TEXT("Carthago")));
+		if (!Asset)
+		{
+			continue;
+		}
+
+		ATerritoryRegion* Territory = CreateTerritory(Asset->Definition, Asset->MapLocation);
+		if (Territory && !Asset->StartingSettlementName.IsEmpty())
+		{
+			Territory->FoundSettlement(Asset->StartingSettlementName);
+		}
 	}
-
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Sicily"), TEXT("Sicilia"), EFactionID::None),
-		FVector(0, -TerritorySize, 0));
-
-	CreateTerritory(MakePrototypeTerritoryDefinition(TEXT("Egypt"), TEXT("Aegyptus"), EFactionID::None),
-		FVector(TerritorySize, -TerritorySize, 0));
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Generated default Mediterranean map with %d territories"), Territories.Num());
 }

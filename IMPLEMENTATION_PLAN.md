@@ -347,7 +347,7 @@ Implementation evidence recorded 2026-09-05:
 - Repository validation enforces the single ownership map, presentation-only territory actor, deferred initialization order, normalized diplomacy state, canonical campaign ownership reads, and required automation coverage.
 - The final automation report at `Artifacts/Automation/20260905_164215_075` contains 7 successes and 0 failures, including canonical ownership transfers/duplicate rejection and diplomacy symmetry/transition invariants. Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass.
 - Development BuildCookRun cooked 516 packages with 0 errors/0 warnings and archived successfully into `Artifacts/Packages/M2_3`. The signed Editor-hosted `-game` smoke loaded `L_VerticalSlice`, created and registered all 9 prototype territories, initialized the faction/world/campaign managers, and produced 0 failure signatures. Direct execution of newly unsigned player hashes remains subject to the M2.2 Smart App Control limitation.
-- M2.3 is complete; M2.4 is the active implementation package.
+- M2.3 is complete and its evidence remains the baseline for M2.4.
 
 #### M2.4 Data-driven definitions
 
@@ -355,6 +355,18 @@ Implementation evidence recorded 2026-09-05:
 - Remove repeated costs, durations, colors, display strings, and combat values from controller/HUD code.
 - Use stable IDs in save files and runtime factories.
 - Add content validation for duplicate IDs, missing assets, invalid costs, and invalid faction references.
+
+Implementation evidence recorded 2026-09-05:
+
+- Applying `ue-data-assets-tables` and the gated `unreal-mcp` workflow, the Editor created and saved 19 project-authored Primary Data Assets: 3 factions, 1 unit, 6 buildings, and 9 territories. The four asset classes, Asset Manager scan rules, and exact provenance are recorded in `ASSET_INVENTORY.md`.
+- `URomanContentRegistrySubsystem` discovers the four Primary Asset types at GameInstance startup, validates the complete cross-asset graph, preloads only the configured factory classes, and exposes stable-ID and quick-slot lookups. Missing categories/assets/classes, duplicate stable/runtime IDs or quick slots, invalid values, unknown factions, and unknown trainable units fail closed with typed issues.
+- Faction wallets, map territory placement/settlements, unit stats/combat/formation behavior, building costs/durations/visuals/production, menu strings, and faction colors now originate in the assets. PlayerController, Canvas HUD, UMG menu scaffolding, factions, world map, unit/building initialization, placement, and barracks training consume the same registry definitions instead of rebuilding them.
+- Unit and building factories use deferred spawning plus stable `FName` definition IDs before actors become observable; the barracks queue also stores stable unit IDs. No local save serializer exists before M5.4, so that future versioned save contract will persist these same IDs rather than object pointers or enum-only identities.
+- Unit/building data contracts moved under the runtime module's public boundary after the Editor test module exposed their former private-header dependency. Repository validation now enforces the four scan categories, all 19 assets, stable-ID registry use, removed legacy definition factories, and the two new automation scenarios.
+- `Artifacts/Automation/20260905_190532_896` contains 9 successes and 0 failures. It proves live Primary Asset discovery/counts and canonical authored values, plus transient rejection of duplicate IDs, missing asset categories, negative costs, and invalid faction references.
+- Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game builds pass. Development BuildCookRun cooked 535 packages with 0 errors/0 warnings and archived to `Artifacts/Packages/M2_4`; Development and Shipping receipts contain zero MCP/toolset references.
+- `Artifacts/M2_4-EditorGame-Smoke.log` shows the registry initialized with exactly 3 factions, 1 unit, 6 buildings, and 9 territories before `L_VerticalSlice` brought up the three managers, both settlements, all territories, and both armies. The smoke exited normally with 0 project error/fatal/assert/ensure signatures; direct newly unsigned player execution remains subject to the documented Smart App Control limitation.
+- M2.4 is complete; M2.5 is the active implementation package.
 
 #### M2.5 UI and event consolidation
 

@@ -4,8 +4,8 @@
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireHUD.h"
 #include "RomanEmpireGame.h"
+#include "Content/RomanContentRegistry.h"
 #include "Units/UnitBase.h"
-#include "Units/Legionary.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
 #include "Building/BuildingPlacementComponent.h"
@@ -430,13 +430,13 @@ void ARomanEmpirePlayerController::ClearSelection()
 	SelectedUnits.Empty();
 }
 
-void ARomanEmpirePlayerController::StartBuildingPlacement(TSubclassOf<ABuildingBase> BuildingClass)
+void ARomanEmpirePlayerController::StartBuildingPlacement(FName BuildingID)
 {
-	if (BuildingPlacementComponent && BuildingClass)
+	if (BuildingPlacementComponent && RomanEmpireContent::IsStableID(BuildingID))
 	{
 		CurrentSelectionMode = ERomanSelectionMode::BuildingPlacement;
-		BuildingPlacementComponent->StartPlacement(BuildingClass);
-		UE_LOG(LogRomanEmpire, Log, TEXT("Started building placement"));
+		BuildingPlacementComponent->StartPlacement(BuildingID);
+		UE_LOG(LogRomanEmpire, Log, TEXT("Started building placement for %s"), *BuildingID.ToString());
 	}
 }
 
@@ -772,113 +772,58 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 
 void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
 {
-	if (BuildingPlacementComponent)
-	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 200;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Barracks);
-	}
-	StartBuildingPlacement(ABarracks::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Barracks (200 Gold)"));
+	StartBuildingPlacementByQuickSlot(1);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey2Pressed()
 {
-	if (BuildingPlacementComponent)
-	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 100;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Farm);
-	}
-	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Farm (100 Gold)"));
+	StartBuildingPlacementByQuickSlot(2);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey3Pressed()
 {
-	if (BuildingPlacementComponent)
-	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 150;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Mine);
-	}
-	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Mine (150 Gold)"));
+	StartBuildingPlacementByQuickSlot(3);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey4Pressed()
 {
-	if (BuildingPlacementComponent)
-	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 120;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Lumbercamp);
-	}
-	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Lumber Camp (120 Gold)"));
+	StartBuildingPlacementByQuickSlot(4);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey5Pressed()
 {
-	if (BuildingPlacementComponent)
-	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 80;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Wall);
-	}
-	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Wall (80 Gold)"));
+	StartBuildingPlacementByQuickSlot(5);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 {
-	if (BuildingPlacementComponent)
+	StartBuildingPlacementByQuickSlot(6);
+}
+
+void ARomanEmpirePlayerController::StartBuildingPlacementByQuickSlot(int32 QuickSlot)
+{
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuildingByQuickSlot(QuickSlot) : nullptr;
+	if (!Asset)
 	{
-		FFactionResourceAmounts Cost;
-		Cost.Gold = 300;
-		BuildingPlacementComponent->SetBuildingCost(Cost);
-		BuildingPlacementComponent->SetBuildingTypeForPlacement(EBuildingType::Temple);
+		UE_LOG(LogRomanEmpire, Warning, TEXT("No building definition is assigned to quick slot %d"), QuickSlot);
+		return;
 	}
-	StartBuildingPlacement(ABuildingBase::StaticClass());
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Building: Temple (300 Gold)"));
+
+	StartBuildingPlacement(Asset->Definition.BuildingID);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
+			FString::Printf(TEXT("Building: %s (%s)"),
+				*Asset->Definition.DisplayName.ToString(),
+				*RomanEmpireEconomy::DescribeResourceCost(Asset->Definition.Cost)));
+	}
 }
 
 void ARomanEmpirePlayerController::OnAttackPressed()
 {
 	if (IsInFirstPersonMode() && PossessedUnit)
 	{
-		// FPS melee attack: line trace 200cm forward from camera
-		FVector CamLoc;
-		FRotator CamRot;
-		GetPlayerViewPoint(CamLoc, CamRot);
-
-		FVector TraceStart = CamLoc;
-		FVector TraceEnd = CamLoc + CamRot.Vector() * 200.0f;
-
-		FHitResult HitResult;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(PossessedUnit);
-
-		if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Pawn, Params))
-		{
-			AUnitBase* HitUnit = Cast<AUnitBase>(HitResult.GetActor());
-			if (HitUnit && HitUnit->GetOwnerFaction() != EFactionID::Rome && HitUnit->IsAlive())
-			{
-				HitUnit->TakeCombatDamage(25.0f, PossessedUnit, false);
-				if (GEngine)
-				{
-					GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red,
-						FString::Printf(TEXT("HIT! %s (-25 HP)"), *HitUnit->GetName()));
-				}
-			}
-		}
-
-		// Always play punch animation
 		PossessedUnit->PerformAttack();
 	}
 }
@@ -1037,12 +982,24 @@ void ARomanEmpirePlayerController::OnTrainButtonClicked()
 		return;
 	}
 
-	if (Barracks->TrainUnit(ALegionary::StaticClass()))
+	const TArray<FName>& TrainableUnits = Barracks->GetBuildingData().TrainableUnits;
+	if (TrainableUnits.IsEmpty())
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Legionary training request accepted"));
+		return;
+	}
+
+	const FName UnitID = TrainableUnits[0];
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(UnitID) : nullptr;
+	const FString UnitName = UnitAsset ? UnitAsset->Definition.DisplayName.ToString() : UnitID.ToString();
+	if (Barracks->TrainUnit(UnitID))
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+			FString::Printf(TEXT("%s training request accepted"), *UnitName));
 	}
 	else
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Legionary training request rejected"));
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+			FString::Printf(TEXT("%s training request rejected"), *UnitName));
 	}
 }
