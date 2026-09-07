@@ -18,3 +18,7 @@ Generated validation reports belong under `Tools/Reports/` and are ignored. A re
 `BuildProject.ps1 -Action Test` builds the Editor target and runs the `RomanEmpireGame` automation namespace, including `RomanEmpireGame.UI.CanonicalEventDrivenPIE`. That test starts and tears down its own `L_Testbed` PIE session, reads public reflected contracts, and creates only transient fixtures. It does not save map changes.
 
 The UI test checks synchronous canonical state updates, selection/possession/death cleanup, selected-barracks production, root detach/reattach subscriptions, and final-turn victory. Training clicks pass through Slate pointer press/release handlers using a virtual user and the live widget path; no OS cursor is moved and no UMG click delegate is invoked directly. This is an in-process routing test, not a complete desktop-input or visual-regression test. Rendered packaged smoke evidence is recorded separately in the implementation plan.
+
+## Enhanced Input integration
+
+M2.6 adds configuration/negative-contract tests, authored-default/modifier checks, and `RomanEmpireGame.Input.PhysicalKeysAndModeLifecyclePIE`. The latter owns a fresh PIE session, injects simulated physical keys into the real PlayerController/Enhanced PlayerInput stack, and verifies mode isolation, command guards, held-key transitions and block cleanup. It preserves unrelated mapping contexts and does not save its transient world fixtures. See `INPUT_CONTROLS.md` for defaults and explicit coverage limits.

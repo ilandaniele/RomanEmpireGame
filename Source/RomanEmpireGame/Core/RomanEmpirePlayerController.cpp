@@ -18,11 +18,15 @@
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 #include "InputAction.h"
-#include "InputMappingContext.h"
-#include "InputModifiers.h"
-#include "InputTriggers.h"
+#include "InputKeyEventArgs.h"
 #include "InputCoreTypes.h"
+#include "InputMappingContext.h"
+#include "Input/RomanInputConfig.h"
+#include "Engine/GameViewportClient.h"
+#include "UnrealClient.h"
+#include "InputTriggers.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/FloatingPawnMovement.h"
 
@@ -39,242 +43,49 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	GameMode = nullptr;
 	CachedCameraPawn = nullptr;
 
-	DefaultMappingContext = nullptr;
-	IA_Select = nullptr;
-	IA_Command = nullptr;
-	IA_Zoom = nullptr;
-	IA_Move = nullptr;
-	IA_Look = nullptr;
-	IA_EnterFPS = nullptr;
-	IA_BuildMenu = nullptr;
-	IA_Attack = nullptr;
-	IA_Block = nullptr;
-	IA_EndTurn = nullptr;
-	IA_BuildKey1 = nullptr;
-	IA_BuildKey2 = nullptr;
-	IA_BuildKey3 = nullptr;
-	IA_BuildKey4 = nullptr;
-	IA_BuildKey5 = nullptr;
-	IA_BuildKey6 = nullptr;
+	InputConfigurationAsset = TSoftObjectPtr<URomanInputConfig>(
+		FSoftObjectPath(TEXT("/Game/Input/DA_RomanInputConfig.DA_RomanInputConfig")));
 	SelectedBuilding = nullptr;
 	MainWidgetClass = URomanEmpireMainWidget::StaticClass();
 	MainWidget = nullptr;
 }
 
-void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
+bool ARomanEmpirePlayerController::LoadInputConfiguration()
 {
-	// Create Input Actions programmatically
-	IA_Select = NewObject<UInputAction>(this, TEXT("IA_Select"));
-	IA_Select->ValueType = EInputActionValueType::Boolean;
-
-	IA_Command = NewObject<UInputAction>(this, TEXT("IA_Command"));
-	IA_Command->ValueType = EInputActionValueType::Boolean;
-
-	IA_Zoom = NewObject<UInputAction>(this, TEXT("IA_Zoom"));
-	IA_Zoom->ValueType = EInputActionValueType::Axis1D;
-
-	IA_Move = NewObject<UInputAction>(this, TEXT("IA_Move"));
-	IA_Move->ValueType = EInputActionValueType::Axis2D;
-
-	IA_Look = NewObject<UInputAction>(this, TEXT("IA_Look"));
-	IA_Look->ValueType = EInputActionValueType::Axis2D;
-
-	IA_EnterFPS = NewObject<UInputAction>(this, TEXT("IA_EnterFPS"));
-	IA_EnterFPS->ValueType = EInputActionValueType::Boolean;
-
-	IA_BuildMenu = NewObject<UInputAction>(this, TEXT("IA_BuildMenu"));
-	IA_BuildMenu->ValueType = EInputActionValueType::Boolean;
-
-	IA_Attack = NewObject<UInputAction>(this, TEXT("IA_Attack"));
-	IA_Attack->ValueType = EInputActionValueType::Boolean;
-
-	IA_Block = NewObject<UInputAction>(this, TEXT("IA_Block"));
-	IA_Block->ValueType = EInputActionValueType::Boolean;
-
-	IA_EndTurn = NewObject<UInputAction>(this, TEXT("IA_EndTurn"));
-	IA_EndTurn->ValueType = EInputActionValueType::Boolean;
-
-	// Create Input Mapping Context
-	DefaultMappingContext = NewObject<UInputMappingContext>(this, TEXT("DefaultMappingContext"));
-
-	// --- Key bindings ---
-
-	// LMB = Select
-	FEnhancedActionKeyMapping& SelectMapping = DefaultMappingContext->MapKey(IA_Select, EKeys::LeftMouseButton);
-
-	// RMB = Command (move/attack)
-	FEnhancedActionKeyMapping& CommandMapping = DefaultMappingContext->MapKey(IA_Command, EKeys::RightMouseButton);
-
-	// Mouse Wheel = Zoom
-	FEnhancedActionKeyMapping& ZoomMapping = DefaultMappingContext->MapKey(IA_Zoom, EKeys::MouseWheelAxis);
-
-	// WASD = Move (2D axis: W=Y+, S=Y-, A=X-, D=X+)
-    FEnhancedActionKeyMapping& MoveW = DefaultMappingContext->MapKey(IA_Move, EKeys::W);
-    {
-        UInputModifierSwizzleAxis* SwizzleYX = NewObject<UInputModifierSwizzleAxis>(this);
-        SwizzleYX->Order = EInputAxisSwizzle::YXZ;
-        MoveW.Modifiers.Add(SwizzleYX);
-    }
-
-    FEnhancedActionKeyMapping& MoveS = DefaultMappingContext->MapKey(IA_Move, EKeys::S);
-    {
-        UInputModifierSwizzleAxis* SwizzleYX = NewObject<UInputModifierSwizzleAxis>(this);
-        SwizzleYX->Order = EInputAxisSwizzle::YXZ;
-        MoveS.Modifiers.Add(SwizzleYX);
-        UInputModifierNegate* Negate = NewObject<UInputModifierNegate>(this);
-        MoveS.Modifiers.Add(Negate);
-    }
-
-    FEnhancedActionKeyMapping& MoveD = DefaultMappingContext->MapKey(IA_Move, EKeys::D);
-    // D = positive X, no modifiers needed
-
-    FEnhancedActionKeyMapping& MoveA = DefaultMappingContext->MapKey(IA_Move, EKeys::A);
-    {
-        UInputModifierNegate* Negate = NewObject<UInputModifierNegate>(this);
-        MoveA.Modifiers.Add(Negate);
-    }
-
-	// Mouse XY = Look (for FPS mode)
-	FEnhancedActionKeyMapping& LookMapping = DefaultMappingContext->MapKey(IA_Look, EKeys::Mouse2D);
-
-	// F = Enter/Exit FPS mode
-	FEnhancedActionKeyMapping& FPSMapping = DefaultMappingContext->MapKey(IA_EnterFPS, EKeys::F);
-
-	// B = Build menu toggle
-	FEnhancedActionKeyMapping& BuildMapping = DefaultMappingContext->MapKey(IA_BuildMenu, EKeys::B);
-
-	// Left mouse = Attack (in FPS mode, same as select)
-	// Right mouse = Block (in FPS mode, same as command)
-
-	// T = End turn
-	FEnhancedActionKeyMapping& EndTurnMapping = DefaultMappingContext->MapKey(IA_EndTurn, EKeys::T);
-
-	// 1 = Build Barracks (when building menu is open)
-	IA_BuildKey1 = NewObject<UInputAction>(this, TEXT("IA_BuildKey1"));
-	IA_BuildKey1->ValueType = EInputActionValueType::Boolean;
-	FEnhancedActionKeyMapping& BuildKey1Mapping = DefaultMappingContext->MapKey(IA_BuildKey1, EKeys::One);
-
-	// 2-6 = Other buildings
-	IA_BuildKey2 = NewObject<UInputAction>(this, TEXT("IA_BuildKey2"));
-	IA_BuildKey2->ValueType = EInputActionValueType::Boolean;
-	DefaultMappingContext->MapKey(IA_BuildKey2, EKeys::Two);
-
-	IA_BuildKey3 = NewObject<UInputAction>(this, TEXT("IA_BuildKey3"));
-	IA_BuildKey3->ValueType = EInputActionValueType::Boolean;
-	DefaultMappingContext->MapKey(IA_BuildKey3, EKeys::Three);
-
-	IA_BuildKey4 = NewObject<UInputAction>(this, TEXT("IA_BuildKey4"));
-	IA_BuildKey4->ValueType = EInputActionValueType::Boolean;
-	DefaultMappingContext->MapKey(IA_BuildKey4, EKeys::Four);
-
-	IA_BuildKey5 = NewObject<UInputAction>(this, TEXT("IA_BuildKey5"));
-	IA_BuildKey5->ValueType = EInputActionValueType::Boolean;
-	DefaultMappingContext->MapKey(IA_BuildKey5, EKeys::Five);
-
-	IA_BuildKey6 = NewObject<UInputAction>(this, TEXT("IA_BuildKey6"));
-	IA_BuildKey6->ValueType = EInputActionValueType::Boolean;
-	DefaultMappingContext->MapKey(IA_BuildKey6, EKeys::Six);
-
-	UE_LOG(LogRomanEmpire, Log, TEXT("Input actions and mappings created programmatically"));
+	if (InputConfiguration)
+	{
+		return true;
+	}
+	URomanInputConfig* Configuration = InputConfigurationAsset.LoadSynchronous();
+	TArray<FText> Errors;
+	if (!Configuration || !Configuration->ValidateConfiguration(Errors))
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Input configuration is missing or invalid: %s"),
+			*InputConfigurationAsset.ToString());
+		for (const FText& Error : Errors)
+		{
+			UE_LOG(LogRomanEmpire, Error, TEXT("Input configuration: %s"), *Error.ToString());
+		}
+		return false;
+	}
+	InputConfiguration = Configuration;
+	return true;
 }
 
 void ARomanEmpirePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	// Create input actions and mappings programmatically
-	CreateInputActionsAndMappings();
 
-	// Setup Enhanced Input subsystem
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		if (DefaultMappingContext)
-		{
-			Subsystem->ClearAllMappings();
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-			UE_LOG(LogRomanEmpire, Log, TEXT("Enhanced Input mapping context registered"));
-		}
-	}
-	
-	// BIND INPUT ACTIONS — must happen here, AFTER actions are created
-	// (SetupInputComponent runs before BeginPlay, so actions would be null there)
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
-	{
-		if (IA_Select)
-		{
-			EIC->BindAction(IA_Select, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnSelectPressed);
-			EIC->BindAction(IA_Select, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnSelectReleased);
-		}
-		if (IA_Command)
-		{
-			EIC->BindAction(IA_Command, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnCommandPressed);
-		}
-		if (IA_Zoom)
-		{
-			EIC->BindAction(IA_Zoom, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnZoomInput);
-		}
-		if (IA_Move)
-		{
-			EIC->BindAction(IA_Move, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnMoveInput);
-		}
-		if (IA_Look)
-		{
-			EIC->BindAction(IA_Look, ETriggerEvent::Triggered, this, &ARomanEmpirePlayerController::OnLookInput);
-		}
-		if (IA_EnterFPS)
-		{
-			EIC->BindAction(IA_EnterFPS, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEnterFPSPressed);
-		}
-		if (IA_BuildMenu)
-		{
-			EIC->BindAction(IA_BuildMenu, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildMenuPressed);
-		}
-		if (IA_Attack)
-		{
-			EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnAttackPressed);
-		}
-		if (IA_Block)
-		{
-			EIC->BindAction(IA_Block, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBlockPressed);
-			EIC->BindAction(IA_Block, ETriggerEvent::Completed, this, &ARomanEmpirePlayerController::OnBlockReleased);
-		}
-		if (IA_EndTurn)
-		{
-			EIC->BindAction(IA_EndTurn, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnEndTurnPressed);
-		}
-		if (IA_BuildKey1)
-		{
-			EIC->BindAction(IA_BuildKey1, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey1Pressed);
-		}
-		if (IA_BuildKey2)
-		{
-			EIC->BindAction(IA_BuildKey2, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey2Pressed);
-		}
-		if (IA_BuildKey3)
-		{
-			EIC->BindAction(IA_BuildKey3, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey3Pressed);
-		}
-		if (IA_BuildKey4)
-		{
-			EIC->BindAction(IA_BuildKey4, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey4Pressed);
-		}
-		if (IA_BuildKey5)
-		{
-			EIC->BindAction(IA_BuildKey5, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey5Pressed);
-		}
-		if (IA_BuildKey6)
-		{
-			EIC->BindAction(IA_BuildKey6, ETriggerEvent::Started, this, &ARomanEmpirePlayerController::OnBuildingKey6Pressed);
-		}
-		UE_LOG(LogRomanEmpire, Log, TEXT("All input actions bound in BeginPlay"));
-	}
-	else
-	{
-		UE_LOG(LogRomanEmpire, Error, TEXT("FAILED to get EnhancedInputComponent — input will not work!"));
-	}
-	
 	// Cache game mode
 	GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+	if (GameMode)
+	{
+		GameMode->OnGameplayInitialized.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
+		GameMode->OnGameplayModeChanged.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
+	}
+	ApplyInputContexts();
 	CachedCameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
 	if (CachedCameraPawn)
 	{
@@ -313,11 +124,20 @@ void ARomanEmpirePlayerController::BeginPlay()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized — all input active"));
+	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized with authored mode-specific input"));
 }
 
 void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	CancelTransientInput();
+	RemoveOwnedInputContexts();
+	if (GameMode)
+	{
+		GameMode->OnGameplayInitialized.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
+		GameMode->OnGameplayModeChanged.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
+	}
 	if (MainWidget)
 	{
 		MainWidget->RemoveFromParent();
@@ -340,11 +160,217 @@ void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayRea
 void ARomanEmpirePlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	
-	// NOTE: Input bindings are done in BeginPlay() because
-	// SetupInputComponent runs before BeginPlay, and our
-	// input actions are created programmatically in BeginPlay.
-	// Binding here would fail silently since IA pointers are null.
+	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent);
+	if (!EIC || !LoadInputConfiguration())
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Enhanced Input setup failed; gameplay controls are disabled"));
+		return;
+	}
+	EIC->ClearBindingsForObject(this);
+	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Started, this, &ThisClass::OnSelectPressed);
+	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Completed, this, &ThisClass::OnSelectReleased);
+	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Canceled, this, &ThisClass::OnSelectCanceled);
+	EIC->BindAction(InputConfiguration->Command, ETriggerEvent::Started, this, &ThisClass::OnCommandPressed);
+	EIC->BindAction(InputConfiguration->CameraPan, ETriggerEvent::Triggered, this, &ThisClass::OnCameraPanInput);
+	EIC->BindAction(InputConfiguration->Zoom, ETriggerEvent::Triggered, this, &ThisClass::OnZoomInput);
+	EIC->BindAction(InputConfiguration->SoldierMove, ETriggerEvent::Triggered, this, &ThisClass::OnSoldierMoveInput);
+	EIC->BindAction(InputConfiguration->Look, ETriggerEvent::Triggered, this, &ThisClass::OnLookInput);
+	EIC->BindAction(InputConfiguration->EnterPossession, ETriggerEvent::Started, this, &ThisClass::OnEnterFPSPressed);
+	EIC->BindAction(InputConfiguration->ExitPossession, ETriggerEvent::Started, this, &ThisClass::ExitFirstPersonMode);
+	EIC->BindAction(InputConfiguration->BuildMenu, ETriggerEvent::Started, this, &ThisClass::OnBuildMenuPressed);
+	EIC->BindAction(InputConfiguration->Attack, ETriggerEvent::Started, this, &ThisClass::OnAttackPressed);
+	EIC->BindAction(InputConfiguration->Block, ETriggerEvent::Started, this, &ThisClass::OnBlockPressed);
+	EIC->BindAction(InputConfiguration->Block, ETriggerEvent::Completed, this, &ThisClass::OnBlockReleased);
+	EIC->BindAction(InputConfiguration->Block, ETriggerEvent::Canceled, this, &ThisClass::OnBlockReleased);
+	EIC->BindAction(InputConfiguration->EndTurn, ETriggerEvent::Started, this, &ThisClass::OnEndTurnPressed);
+	EIC->BindAction(InputConfiguration->Cancel, ETriggerEvent::Started, this, &ThisClass::OnCancelPressed);
+	for (int32 Index = 0; Index < InputConfiguration->BuildingSlots.Num(); ++Index)
+	{
+		EIC->BindAction(InputConfiguration->BuildingSlots[Index], ETriggerEvent::Started,
+			this, &ThisClass::OnBuildingSlotPressed, Index + 1);
+	}
+	ApplyInputContexts();
+}
+
+void ARomanEmpirePlayerController::RemoveOwnedInputContexts()
+{
+	if (InputConfiguration)
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			Subsystem->RemoveMappingContext(InputConfiguration->StrategicContext);
+			Subsystem->RemoveMappingContext(InputConfiguration->TacticalContext);
+			Subsystem->RemoveMappingContext(InputConfiguration->PossessionContext);
+			Subsystem->RemoveMappingContext(InputConfiguration->SharedContext);
+		}
+	}
+	ActiveGameplayContext = nullptr;
+}
+
+void ARomanEmpirePlayerController::ApplyInputContexts()
+{
+	if (!GameMode || !GameMode->IsGameplayInitialized() || !InputConfiguration || !IsLocalController())
+	{
+		return;
+	}
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	if (!Subsystem)
+	{
+		return;
+	}
+	UInputMappingContext* Desired = InputConfiguration->GetContextForMode(GameMode->GetCurrentGameplayMode());
+	if (Desired == ActiveGameplayContext && HasActiveModeContext())
+	{
+		return;
+	}
+	CaptureHeldMovementKeys(Desired);
+	CancelTransientInput();
+	RemoveOwnedInputContexts();
+	FModifyContextOptions Options;
+	Options.bIgnoreAllPressedKeysUntilRelease = true;
+	// Defer the rebuild: a transition may originate inside an action dispatch.
+	Options.bForceImmediately = false;
+	Subsystem->AddMappingContext(InputConfiguration->SharedContext, 100, Options);
+	if (Desired)
+	{
+		Subsystem->AddMappingContext(Desired, 0, Options);
+		ActiveGameplayContext = Desired;
+	}
+}
+
+bool ARomanEmpirePlayerController::HasActiveModeContext() const
+{
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	return IsLocalController() && GameMode && GameMode->IsGameplayInitialized() && InputConfiguration &&
+		ActiveGameplayContext && ActiveGameplayContext == InputConfiguration->GetContextForMode(GameMode->GetCurrentGameplayMode()) &&
+		Subsystem && Subsystem->HasMappingContext(ActiveGameplayContext) &&
+		Subsystem->HasMappingContext(InputConfiguration->SharedContext);
+}
+
+bool ARomanEmpirePlayerController::CanIssueTacticalCommands() const
+{
+	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
+	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() == EGameplayMode::Tactical &&
+		Campaign && Campaign->IsCampaignActive();
+}
+
+bool ARomanEmpirePlayerController::CanEndTurn() const
+{
+	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
+	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
+		Campaign && Campaign->IsCampaignActive();
+}
+
+bool ARomanEmpirePlayerController::CanControlCamera() const
+{
+	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
+		Cast<ASeamlessZoomCamera>(GetPawn()) != nullptr;
+}
+
+bool ARomanEmpirePlayerController::CanControlSoldier() const
+{
+	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
+	return HasActiveModeContext() && IsInFirstPersonMode() && IsValid(PossessedUnit) &&
+		PossessedUnit->IsAlive() && GetPawn() == PossessedUnit && Campaign && Campaign->IsCampaignActive();
+}
+
+void ARomanEmpirePlayerController::HandleGameplayInitialized()
+{
+	ApplyInputContexts();
+}
+
+void ARomanEmpirePlayerController::HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode)
+{
+	// An external mode change must also restore the actual pawn, not just the input context.
+	if (NewMode != EGameplayMode::Possessed && PossessedUnit)
+	{
+		ExitFirstPersonMode();
+	}
+	ApplyInputContexts();
+}
+
+void ARomanEmpirePlayerController::CancelTransientInput()
+{
+	bIsBoxSelecting = false;
+	OnBlockReleased();
+	CancelBuildingPlacement();
+	if (MainWidget)
+	{
+		MainWidget->HideBuildingMenu();
+	}
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->ConsumeMovementInputVector();
+		if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent())
+		{
+			Movement->StopMovementImmediately();
+		}
+	}
+}
+
+void ARomanEmpirePlayerController::FlushPressedKeys()
+{
+	MovementKeysAwaitingRelease.Reset();
+	CancelTransientInput();
+	Super::FlushPressedKeys();
+}
+
+void ARomanEmpirePlayerController::CaptureHeldMovementKeys(UInputMappingContext* DestinationContext)
+{
+	if (!DestinationContext || !InputConfiguration) return;
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	const UEnhancedInputUserSettings* Settings = Subsystem ? Subsystem->GetUserSettings() : nullptr;
+	const UEnhancedPlayerMappableKeyProfile* Profile = Settings ? Settings->GetActiveKeyProfile() : nullptr;
+	const FString ProfileID = Profile ? Profile->GetProfileIdString() : FString();
+	// UE's rebuild ignore-held option only covers Boolean actions. Movement is Axis2D.
+	// Inspect authored/profile mappings so this policy also follows future key remaps.
+	for (const FEnhancedActionKeyMapping& Mapping : DestinationContext->GetMappingsForProfile(ProfileID))
+	{
+		if ((Mapping.Action == InputConfiguration->CameraPan || Mapping.Action == InputConfiguration->SoldierMove) &&
+			Mapping.Key.IsDigital() && IsInputKeyDown(Mapping.Key))
+		{
+			MovementKeysAwaitingRelease.Add(Mapping.Key);
+		}
+	}
+}
+
+bool ARomanEmpirePlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	if (Params.Event == IE_Released)
+	{
+		MovementKeysAwaitingRelease.Remove(Params.Key);
+	}
+	return Super::InputKey(Params);
+}
+
+void ARomanEmpirePlayerController::OnSelectCanceled()
+{
+	bIsBoxSelecting = false;
+}
+
+void ARomanEmpirePlayerController::OnCancelPressed()
+{
+	if (PossessedUnit)
+	{
+		ExitFirstPersonMode();
+	}
+	else if (BuildingPlacementComponent && BuildingPlacementComponent->IsPlacing())
+	{
+		CancelBuildingPlacement();
+	}
+	else if (MainWidget && MainWidget->IsBuildingMenuVisible())
+	{
+		MainWidget->HideBuildingMenu();
+	}
+	else
+	{
+		bIsBoxSelecting = false;
+		ClearSelection();
+	}
 }
 
 void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
@@ -352,7 +378,7 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	
 	// Edge scrolling in RTS mode
-	if (!IsInFirstPersonMode())
+	if (CanControlCamera())
 	{
 		HandleEdgeScroll(DeltaSeconds);
 	}
@@ -360,6 +386,11 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 	// Update building placement preview if active
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement && BuildingPlacementComponent)
 	{
+		if (!CanIssueTacticalCommands())
+		{
+			CancelBuildingPlacement();
+			return;
+		}
 		FVector WorldPos, WorldDir;
 		if (DeprojectMousePositionToWorld(WorldPos, WorldDir))
 		{
@@ -395,6 +426,11 @@ void ARomanEmpirePlayerController::Tick(float DeltaSeconds)
 
 void ARomanEmpirePlayerController::HandleEdgeScroll(float DeltaTime)
 {
+	const UGameViewportClient* ViewportClient = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!CanControlCamera() || !ViewportClient || !ViewportClient->Viewport || !ViewportClient->Viewport->HasFocus())
+	{
+		return;
+	}
 	ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
 	if (!CameraPawn) return;
 
@@ -546,10 +582,12 @@ void ARomanEmpirePlayerController::HandlePossessedActorDestroyed(AActor* Actor)
 
 void ARomanEmpirePlayerController::StartBuildingPlacement(FName BuildingID)
 {
-	if (BuildingPlacementComponent && RomanEmpireContent::IsStableID(BuildingID))
+	if (CanIssueTacticalCommands() && BuildingPlacementComponent && RomanEmpireContent::IsStableID(BuildingID))
 	{
-		CurrentSelectionMode = ERomanSelectionMode::BuildingPlacement;
+		bIsBoxSelecting = false;
 		BuildingPlacementComponent->StartPlacement(BuildingID);
+		CurrentSelectionMode = BuildingPlacementComponent->IsPlacing()
+			? ERomanSelectionMode::BuildingPlacement : ERomanSelectionMode::None;
 		UE_LOG(LogRomanEmpire, Log, TEXT("Started building placement for %s"), *BuildingID.ToString());
 	}
 }
@@ -567,7 +605,7 @@ void ARomanEmpirePlayerController::CancelBuildingPlacement()
 void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess)
 {
 	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	if (!IsValid(UnitToPossess) || !UnitToPossess->IsAlive() || !FactionManager ||
+	if (!CanIssueTacticalCommands() || !IsValid(UnitToPossess) || !UnitToPossess->IsAlive() || !FactionManager ||
 		UnitToPossess->GetOwnerFaction() != FactionManager->GetPlayerFaction() ||
 		GameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical)
 	{
@@ -585,7 +623,7 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	{
 		return;
 	}
-	CancelBuildingPlacement();
+	CancelTransientInput();
 
 	AUnitBase* PreviousUnit = PossessedUnit;
 	PossessedUnit = UnitToPossess;
@@ -612,11 +650,12 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 
 void ARomanEmpirePlayerController::ExitFirstPersonMode()
 {
-	if (!IsInFirstPersonMode())
+	if (!PossessedUnit)
 	{
 		return;
 	}
 
+	CancelTransientInput();
 	AUnitBase* PreviousUnit = PossessedUnit;
 
 	// Unpossess the unit
@@ -645,7 +684,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 
-	if (GameMode)
+	if (GameMode && GameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed)
 	{
 		const EZoomLevel ZoomLevel = CachedCameraPawn
 			? CachedCameraPawn->GetZoomLevelEnum()
@@ -685,19 +724,11 @@ bool ARomanEmpirePlayerController::IsInFirstPersonMode() const
 
 void ARomanEmpirePlayerController::OnSelectPressed()
 {
-	if (IsInFirstPersonMode())
+	if (!CanIssueTacticalCommands() || (MainWidget && MainWidget->IsBuildingMenuVisible()))
 	{
-		OnAttackPressed();
 		return;
 	}
 
-	// Gameplay permissions depend on the explicit mode, not a raw zoom threshold.
-	if (GameMode && GameMode->GetCurrentGameplayMode() == EGameplayMode::Strategic)
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, TEXT("Zoom in for Tactical View to interact"));
-		return;
-	}
-	
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		if (BuildingPlacementComponent && BuildingPlacementComponent->CanPlace())
@@ -710,27 +741,28 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 		return;
 	}
 	
-	GetMousePosition(BoxSelectStart.X, BoxSelectStart.Y);
-	bIsBoxSelecting = true;
+	bIsBoxSelecting = GetMousePosition(BoxSelectStart.X, BoxSelectStart.Y);
 }
 
 void ARomanEmpirePlayerController::OnSelectReleased()
 {
-	if (bIsBoxSelecting)
+	const bool bShouldSelect = bIsBoxSelecting && CanIssueTacticalCommands() &&
+		(!MainWidget || !MainWidget->IsBuildingMenuVisible());
+	bIsBoxSelecting = false;
+	if (bShouldSelect)
 	{
 		PerformBoxSelect();
-		bIsBoxSelecting = false;
 	}
 }
 
 void ARomanEmpirePlayerController::OnCommandPressed()
 {
-	if (IsInFirstPersonMode())
+	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	if (!CanIssueTacticalCommands() || !FactionManager || (MainWidget && MainWidget->IsBuildingMenuVisible()))
 	{
-		OnBlockPressed();
 		return;
 	}
-	
+	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		CancelBuildingPlacement();
@@ -764,7 +796,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 					}
 				}
 
-				if (HitUnit && HitUnit->GetOwnerFaction() != EFactionID::Rome && HitUnit->IsAlive())
+				if (HitUnit && HitUnit->GetOwnerFaction() != PlayerFaction && HitUnit->IsAlive())
 				{
 					// Attack enemy!
 					if (GEngine)
@@ -774,7 +806,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 					}
 					for (AUnitBase* Unit : SelectedUnits)
 					{
-						if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+						if (IsValid(Unit) && Unit->IsAlive() && Unit->GetOwnerFaction() == PlayerFaction)
 						{
 							Unit->CommandAttack(HitUnit);
 						}
@@ -791,7 +823,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 					}
 					for (AUnitBase* Unit : SelectedUnits)
 					{
-						if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+						if (IsValid(Unit) && Unit->IsAlive() && Unit->GetOwnerFaction() == PlayerFaction)
 						{
 							Unit->CommandMoveTo(Dest);
 						}
@@ -818,7 +850,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 						for (AUnitBase* Unit : SelectedUnits)
 						{
-							if (Unit && Unit->GetOwnerFaction() == EFactionID::Rome)
+							if (IsValid(Unit) && Unit->IsAlive() && Unit->GetOwnerFaction() == PlayerFaction)
 							{
 								Unit->CommandMoveTo(Dest);
 							}
@@ -832,6 +864,7 @@ void ARomanEmpirePlayerController::OnCommandPressed()
 
 void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 {
+	if (!CanControlCamera()) return;
 	const ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
 	if (!CameraPawn)
 	{
@@ -850,28 +883,25 @@ void ARomanEmpirePlayerController::OnZoomInput(const FInputActionValue& Value)
 	}
 }
 
-void ARomanEmpirePlayerController::OnMoveInput(const FInputActionValue& Value)
+void ARomanEmpirePlayerController::OnCameraPanInput(const FInputActionValue& Value)
 {
-	if (IsInFirstPersonMode() && PossessedUnit)
+	if (CanControlCamera() && MovementKeysAwaitingRelease.IsEmpty())
 	{
-		FVector2D MoveValue = Value.Get<FVector2D>();
-		PossessedUnit->MoveInput(MoveValue);
+		CastChecked<ASeamlessZoomCamera>(GetPawn())->PanCamera(Value.Get<FVector2D>());
 	}
-	else
+}
+
+void ARomanEmpirePlayerController::OnSoldierMoveInput(const FInputActionValue& Value)
+{
+	if (CanControlSoldier() && MovementKeysAwaitingRelease.IsEmpty())
 	{
-		// RTS mode: WASD moves the camera using PanCamera
-		ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(GetPawn());
-		if (CameraPawn)
-		{
-			FVector2D MoveValue = Value.Get<FVector2D>();
-			CameraPawn->PanCamera(MoveValue);
-		}
+		PossessedUnit->MoveInput(Value.Get<FVector2D>());
 	}
 }
 
 void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
 {
-	if (IsInFirstPersonMode() && PossessedUnit)
+	if (CanControlSoldier())
 	{
 		FVector2D LookValue = Value.Get<FVector2D>();
 		PossessedUnit->LookInput(LookValue);
@@ -880,11 +910,7 @@ void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
 
 void ARomanEmpirePlayerController::OnEnterFPSPressed()
 {
-	if (IsInFirstPersonMode())
-	{
-		ExitFirstPersonMode();
-	}
-	else if (SelectedUnits.Num() > 0)
+	if (CanIssueTacticalCommands() && !SelectedUnits.IsEmpty())
 	{
 		EnterFirstPersonMode(SelectedUnits[0]);
 	}
@@ -892,14 +918,17 @@ void ARomanEmpirePlayerController::OnEnterFPSPressed()
 
 void ARomanEmpirePlayerController::OnBuildMenuPressed()
 {
-	if (MainWidget)
+	if (CanIssueTacticalCommands() && MainWidget)
 	{
+		bIsBoxSelecting = false;
+		CancelBuildingPlacement();
 		MainWidget->ToggleBuildingMenu();
 	}
+}
 
-	// If building menu is now visible, enter building placement with Barracks
-	// (The user presses B to open, then 1-6 keys or clicks to select a building)
-	UE_LOG(LogRomanEmpire, Log, TEXT("Build menu toggled"));
+void ARomanEmpirePlayerController::OnBuildingSlotPressed(int32 QuickSlot)
+{
+	StartBuildingPlacementByQuickSlot(QuickSlot);
 }
 
 void ARomanEmpirePlayerController::OnBuildingKey1Pressed()
@@ -932,29 +961,32 @@ void ARomanEmpirePlayerController::OnBuildingKey6Pressed()
 	StartBuildingPlacementByQuickSlot(6);
 }
 
-void ARomanEmpirePlayerController::StartBuildingPlacementByQuickSlot(int32 QuickSlot)
+bool ARomanEmpirePlayerController::StartBuildingPlacementByQuickSlot(int32 QuickSlot)
 {
+	if (!CanIssueTacticalCommands() || !MainWidget || !MainWidget->IsBuildingMenuVisible() ||
+		QuickSlot < 1 || QuickSlot > URomanInputConfig::BuildingSlotCount)
+	{
+		return false;
+	}
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
 	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuildingByQuickSlot(QuickSlot) : nullptr;
 	if (!Asset)
 	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("No building definition is assigned to quick slot %d"), QuickSlot);
-		return;
+		return false;
 	}
-
 	StartBuildingPlacement(Asset->Definition.BuildingID);
-	if (GEngine)
+	const bool bStarted = BuildingPlacementComponent && BuildingPlacementComponent->IsPlacing() &&
+		BuildingPlacementComponent->GetCurrentBuildingID() == Asset->Definition.BuildingID;
+	if (bStarted)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
-			FString::Printf(TEXT("Building: %s (%s)"),
-				*Asset->Definition.DisplayName.ToString(),
-				*RomanEmpireEconomy::DescribeResourceCost(Asset->Definition.Cost)));
+		MainWidget->HideBuildingMenu();
 	}
+	return bStarted;
 }
 
 void ARomanEmpirePlayerController::OnAttackPressed()
 {
-	if (IsInFirstPersonMode() && PossessedUnit)
+	if (CanControlSoldier())
 	{
 		PossessedUnit->PerformAttack();
 	}
@@ -962,7 +994,7 @@ void ARomanEmpirePlayerController::OnAttackPressed()
 
 void ARomanEmpirePlayerController::OnBlockPressed()
 {
-	if (IsInFirstPersonMode() && PossessedUnit)
+	if (CanControlSoldier())
 	{
 		PossessedUnit->StartBlocking();
 	}
@@ -970,7 +1002,8 @@ void ARomanEmpirePlayerController::OnBlockPressed()
 
 void ARomanEmpirePlayerController::OnBlockReleased()
 {
-	if (IsInFirstPersonMode() && PossessedUnit)
+	// Cleanup must work after permissions or the canonical mode have already changed.
+	if (IsValid(PossessedUnit))
 	{
 		PossessedUnit->StopBlocking();
 	}
@@ -978,20 +1011,17 @@ void ARomanEmpirePlayerController::OnBlockReleased()
 
 void ARomanEmpirePlayerController::OnEndTurnPressed()
 {
-	if (GameMode)
+	RequestEndTurn();
+}
+
+bool ARomanEmpirePlayerController::RequestEndTurn()
+{
+	if (!CanEndTurn())
 	{
-		const FCampaignTurnResult Result = GameMode->EndTurn();
-		if (Result.WasSuccessful())
-		{
-			UE_LOG(LogRomanEmpire, Log, TEXT("Turn %d ended by player; turn %d active"),
-				Result.StartingTurn, Result.CompletedTurn);
-		}
-		else
-		{
-			UE_LOG(LogRomanEmpire, Warning, TEXT("End-turn request rejected (%s)"),
-				RomanEmpireCampaign::GetTurnFailureName(Result.Failure));
-		}
+		return false;
 	}
+	const FCampaignTurnResult Result = GameMode->EndTurn();
+	return Result.WasSuccessful();
 }
 
 void ARomanEmpirePlayerController::HandleCameraZoomLevelChanged(
@@ -1087,7 +1117,7 @@ bool ARomanEmpirePlayerController::OnTrainButtonClicked()
 	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
 	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
 	if (!IsValid(Barracks) || !FactionManager || !Campaign || !Campaign->IsCampaignActive() ||
-		GameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical ||
+		!CanIssueTacticalCommands() ||
 		Barracks->GetOwnerFaction() != FactionManager->GetPlayerFaction())
 	{
 		return false;

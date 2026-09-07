@@ -1,9 +1,9 @@
 # UE Project Context
 
-*Last updated: 2026-09-06*
+*Last updated: 2026-09-07*
 *Audit baseline: `89d8d66e5051d303dea9c965317cdb961d8a52f6`*
 *M1 baseline: `0b74ad1566306d7487629812de68bc6abd7f0594`*
-*Status: M1 complete and clean-clone proven; M2.1–M2.5 canonical state, Primary Data Assets, and event-driven UMG complete; M2.6 input contexts active*
+*Status: M1 complete and clean-clone proven; M2.1–M2.6 implementation packages complete; aggregate M2 exit audit active before M3*
 
 ## Engine & Project Overview
 
@@ -44,11 +44,11 @@
 
 - Public: `Core`, `CoreUObject`, `Engine`, `EnhancedInput`, `UMG`.
 - Private: `InputCore`, `Slate`, `SlateCore`, `HTTP`, `Json`, `ProceduralMeshComponent`.
-- Test module private: `Core`, `CoreUObject`, `Engine`, `RomanEmpireGame`, `UMG`, `Slate`, `SlateCore`, `InputCore`, `UnrealEd`.
+- Test module private: `Core`, `CoreUObject`, `Engine`, `RomanEmpireGame`, `UMG`, `Slate`, `SlateCore`, `InputCore`, `ApplicationCore`, `EnhancedInput`, `UnrealEd`.
 - Both modules explicitly set UE 5.8's current `IWYUSupport.Full` policy. `BuildProject.ps1 -Action IWYU` performs the strict non-unity/no-PCH Editor build once the toolchain is installed.
 - No general-purpose editor/developer module exists. Automation Driver remains disabled and has no dependency from either current module.
 
-**Source organization:** One runtime module organized by domain. Cross-module contracts live under `Public` (`Building`, `Camera`, `Campaign`, `Content`, `Core`, `Faction`, and `Units`); the module root is a private include path so runtime implementations remain internal. New cross-module contracts must go under `Public`, while implementation-only code remains private.
+**Source organization:** One runtime module organized by domain. Cross-module contracts live under `Public` (`Building`, `Camera`, `Campaign`, `Content`, `Core`, `Faction`, `Input`, and `Units`); the module root is a private include path so runtime implementations remain internal. New cross-module contracts must go under `Public`, while implementation-only code remains private.
 
 ## Plugin Dependencies
 
@@ -133,8 +133,8 @@
 **Planned data model:** Data Tables only for future large flat tabular data; stable Primary Data Asset IDs remain the content/save boundary.
 **Current UI:** Native UMG is instantiated by the local controller and reads canonical state through queries/events. Resource, mode/turn, objectives/outcome, selection/production, and possession panels have no UI tick, owned gameplay counters, or world scans. NativeDestruct unbinds observers; reattachment catches up. Canvas is debug-only, with no gameplay panels or hit testing. The UMG canonical diagnostic panel is hidden in Shipping.
 **Planned UI:** M6 adds presentation polish, menus, accessibility, and richer authored widgets without changing gameplay authority; native UMG remains the functional baseline.
-**Current input:** Enhanced Input objects are constructed in C++ alongside legacy config mappings.
-**Planned input:** Committed Enhanced Input assets with Strategic, Tactical, Possession, and Shared contexts.
+**Current input:** `/Game/Input/DA_RomanInputConfig` links 19 saved actions and Strategic, Tactical, Possession and Shared contexts. SetupInputComponent loads/validates and binds them; canonical mode/readiness events select exactly one gameplay context plus Shared without clearing unrelated mappings. Keyboard/UMG share eligibility guards; building quick slots require a visible menu. Mode/focus/death cleanup clears blocking, partial selection and placement. A digital movement-key release latch supplements UE 5.8 Boolean-only rebuild suppression. No runtime-generated or legacy action/axis mappings remain. Defaults and test scope: `INPUT_CONTROLS.md`.
+**Planned input:** End-user remapping UI, saved profiles, dynamic labels and gamepad support remain later work; physical keys/modifiers already live in assets, separate from gameplay commands.
 **Current save:** TODO logging plus an incomplete Supabase prototype that is explicitly disabled in committed configuration.
 **Planned save:** Versioned local `USaveGame` first; authenticated cloud synchronization is optional M8 work.
 
@@ -142,7 +142,7 @@
 
 **Current build entrypoint:** `BuildProject.ps1`, with UE 5.8 discovery, optional `-EngineRoot`, Visual Studio/Git LFS prerequisite checks, and UBT/UAT actions. UBA is disabled by default because the audited workstation's Smart App Control policy rejects its locally generated unsigned Editor DLL; `-UseBuildAcceleration` is an explicit opt-in for compatible machines. `build.bat` is a compatibility wrapper.
 **Current local editor/toolchain:** VS Code 1.136.1 with Microsoft's C/C++ Extension Pack, Visual Studio Build Tools 2022 17.14, MSVC 14.44, the .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100. VS Code remains the selected editor while Build Tools supplies the compiler and SDK.
-**Latest build evidence:** M2.5 passes Development Editor, Development Game, Shipping Game, strict non-unity/no-PCH IWYU, repository validation, and 10/10 tests (`Artifacts/Automation/20260906_230652_892`). `Artifacts/Packages/M2_5` is a successful Development BuildCookRun archive with 535 cooked packages and 0 errors/0 warnings. Its actual archived player initialized `L_VerticalSlice` and production UMG, rendered the inspected 1920×1080 screenshot `Artifacts/M2_5-PackagedUMG.png`, and exited with code 0 and no error/fatal/assert/ensure signatures (`Artifacts/M2_5-PackagedRendered-Smoke.log`). Development/Shipping receipts exclude MCP, its editor toolsets, and the test module. The Smart App Control failures recorded for M2.2–M2.4 did not reproduce for the final M2.5 player; no security policy was changed. M1 remains clean-clone proven at `0b74ad1566306d7487629812de68bc6abd7f0594`; detailed historical and current gate evidence is in the implementation plan.
+**Latest build evidence:** M2.6 passes Development Editor/Game, Shipping Game, strict non-unity/no-PCH IWYU, repository validation and 13/13 tests (`Artifacts/Automation/20260907_142956_715`). `Artifacts/Packages/M2_6` contains 559 cooked packages with 0 cook errors/warnings. The actual archived player initialized `L_VerticalSlice`, production UMG and authored input, rendered the inspected `Artifacts/M2_6-PackagedUMG.png` at 1920×1080, and exited 0 without error/fatal/assert/ensure signatures (`Artifacts/M2_6-PackagedRendered-Smoke.log`). Game/Shipping receipts exclude MCP, editor toolsets and tests. A long-idle asset-editor GPU failure preceded a successful null-RHI asset-authoring recovery; short smoke success is not sustained GPU stability proof. No Windows security or driver settings were changed. M1 remains clean-clone proven at `0b74ad1566306d7487629812de68bc6abd7f0594`; full gate history is in the implementation plan.
 **Custom engine fork:** None recorded.
 **Third-party C++ libraries:** None recorded beyond engine modules.
 **Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output. This workstation can also reject newly generated unsigned player executables even after a successful package; release candidates therefore require signing or execution on a controlled runner whose application-control policy trusts the build output.
@@ -150,7 +150,7 @@
 **Current tests:**
 
 - The broken Python/pytest Remote Control scenarios were retired; `scripts/README.md` records why and names their replacements.
-- One Editor-only native automation module with ten tests: required content paths/map/framework defaults, zero-default resources, atomic typed resource transactions, exact campaign turn order, canonical gameplay-mode/zoom boundaries, territory ownership/definition invariants, diplomacy symmetry/legal transitions, Primary Data Asset discovery/canonical values, cross-content validation failures, and event-driven UMG integration in live PIE.
+- One Editor-only native automation module with thirteen tests: required content paths/map/framework defaults, zero-default resources, atomic typed resource transactions, exact campaign turn order, canonical gameplay-mode/zoom boundaries, territory ownership/definition invariants, diplomacy symmetry/legal transitions, Primary Data Asset discovery/canonical values, cross-content validation failures, event-driven UMG integration in live PIE, input-config negative contracts, saved input defaults/modifiers, and physical-key/mode lifecycle integration in PIE.
 - `L_Testbed` is the deterministic world/PIE test map; dedicated Functional Test actors and scenarios remain planned.
 - The retired Python/Remote Control files remain recoverable from Git history but are not part of the supported test path.
 
@@ -193,7 +193,7 @@
 ## Known Baseline Blockers
 
 - M1 is closed at approved commit `0b74ad1566306d7487629812de68bc6abd7f0594`; its clean-clone/LFS reproduction passed and no remote push was performed.
-- Resource, turn/mode/zoom, territory, diplomacy, content-definition, and campaign outcome authority are canonical after M2.1–M2.5. Production UMG reads these authorities through lifecycle-managed events. M2.6 must now replace runtime-created/legacy mappings with committed contexts and enforce command eligibility/held-input cleanup.
+- Resource, turn/mode/zoom, territory, diplomacy, content-definition, and outcome authority are canonical after M2.1–M2.5. Production UMG uses lifecycle-managed events; M2.6 adds saved contexts, command eligibility and held-input cleanup. Aggregate M2 closure still requires explicit definition-asset change propagation into runtime/UI and a requirement-by-requirement exit audit before M3.
 - Full RTS/possession gameplay, UI polish, audio, and art assets remain future milestone work and require provenance/licensing records. The existing procedural figures/buildings remain placeholders, not finished game art.
 
 Update this context after M0 decisions, every engine/module/plugin migration, and any change to authoritative system ownership.

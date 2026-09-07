@@ -19,6 +19,8 @@ public class RomanEmpireGameTests : ModuleRules
 			"Slate",
 			"SlateCore",
 			"InputCore",
+			"ApplicationCore",
+			"EnhancedInput",
 			"UnrealEd"
 		});
 	}

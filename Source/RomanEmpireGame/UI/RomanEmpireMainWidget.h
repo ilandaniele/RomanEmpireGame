@@ -49,6 +49,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Building")
 	void ToggleBuildingMenu();
 
+	UFUNCTION(BlueprintPure, Category = "UI|Building")
+	bool IsBuildingMenuVisible() const;
+
 	UFUNCTION(BlueprintCallable, Category = "UI|Resources")
 	void UpdateResourceDisplay(const FFactionResourceAmounts& Resources);
 
@@ -141,7 +144,6 @@ private:
 	TObjectPtr<ABarracks> ObservedBarracks;
 
 	bool bCanonicalEventsBound = false;
-	bool bBuildingMenuVisible = false;
 
 	void BuildNativeWidgetTree();
 	void BindCanonicalEvents();

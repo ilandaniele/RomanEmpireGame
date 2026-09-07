@@ -5,6 +5,7 @@
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
+#include "Core/RomanEmpirePlayerController.h"
 #include "Faction/FactionManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -33,6 +34,12 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (bIsPlacing && !CanIssuePlacementCommands())
+	{
+		CancelPlacement();
+		return;
+	}
+
 	if (bIsPlacing && PreviewBuilding)
 	{
 		// Continuously validate placement
@@ -43,6 +50,12 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 {
+	if (!CanIssuePlacementCommands())
+	{
+		CancelPlacement();
+		return;
+	}
+
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
 	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuilding(BuildingID) : nullptr;
 	UClass* BuildingClass = Asset ? Asset->BuildingClass.Get() : nullptr;
@@ -81,6 +94,12 @@ void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 
 void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
 {
+	if (!CanIssuePlacementCommands())
+	{
+		CancelPlacement();
+		return;
+	}
+
 	if (!bIsPlacing || !PreviewBuilding)
 	{
 		return;
@@ -101,6 +120,12 @@ void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
 
 void UBuildingPlacementComponent::RotatePreview(float Degrees)
 {
+	if (!CanIssuePlacementCommands())
+	{
+		CancelPlacement();
+		return;
+	}
+
 	if (!bIsPlacing)
 	{
 		return;
@@ -117,6 +142,12 @@ void UBuildingPlacementComponent::RotatePreview(float Degrees)
 
 bool UBuildingPlacementComponent::ConfirmPlacement()
 {
+	if (!CanIssuePlacementCommands())
+	{
+		CancelPlacement();
+		return false;
+	}
+
 	if (!bIsPlacing || !bCanPlace || !CurrentBuildingClass || CurrentBuildingID.IsNone())
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: invalid state"));
@@ -222,6 +253,12 @@ void UBuildingPlacementComponent::CancelPlacement()
 	OnPlacementCancelled.Broadcast();
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Building placement cancelled"));
+}
+
+bool UBuildingPlacementComponent::CanIssuePlacementCommands() const
+{
+	const ARomanEmpirePlayerController* Controller = Cast<ARomanEmpirePlayerController>(GetOwner());
+	return Controller && Controller->CanIssueTacticalCommands();
 }
 
 void UBuildingPlacementComponent::CreatePreviewBuilding()

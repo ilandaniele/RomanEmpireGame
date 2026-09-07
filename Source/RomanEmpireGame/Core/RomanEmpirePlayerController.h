@@ -4,13 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Camera/ZoomConfiguration.h"
+#include "Core/GameplayMode.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
 #include "RomanEmpirePlayerController.generated.h"
 
 class ARomanEmpireGameMode;
 class UInputMappingContext;
-class UInputAction;
+class URomanInputConfig;
 class AUnitBase;
 class ABuildingBase;
 class ABarracks;
@@ -33,7 +34,7 @@ enum class ERomanSelectionMode : uint8
 
 /**
  * Main player controller handling input for all game modes
- * Creates Enhanced Input actions programmatically (no .uasset files needed)
+ * Binds authored Enhanced Input assets and owns only its mode-specific contexts.
  */
 UCLASS()
 class ROMANEMPIREGAME_API ARomanEmpirePlayerController : public APlayerController
@@ -47,6 +48,33 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void FlushPressedKeys() override;
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+	virtual bool ShouldFlushKeysWhenViewportFocusChanges() const override { return true; }
+
+	UFUNCTION(BlueprintPure, Category = "Input")
+	bool CanIssueTacticalCommands() const;
+
+	UFUNCTION(BlueprintPure, Category = "Input")
+	bool CanEndTurn() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Campaign")
+	bool RequestEndTurn();
+
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	bool StartBuildingPlacementByQuickSlot(int32 QuickSlot);
+
+	UFUNCTION(BlueprintPure, Category = "Input")
+	URomanInputConfig* GetInputConfiguration() const { return InputConfiguration; }
+
+	UFUNCTION(BlueprintPure, Category = "Input")
+	UInputMappingContext* GetActiveGameplayContext() const { return ActiveGameplayContext; }
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void CancelTransientInput();
+
+	UFUNCTION(BlueprintPure, Category = "Selection")
+	bool IsBoxSelecting() const { return bIsBoxSelecting; }
 
 	// Selection
 	UFUNCTION(BlueprintCallable, Category = "Selection")
@@ -125,57 +153,14 @@ public:
 	URomanEmpireMainWidget* GetMainWidget() const { return MainWidget; }
 
 protected:
-	// Enhanced Input — created programmatically, no Blueprint assets needed
-	UPROPERTY()
-	UInputMappingContext* DefaultMappingContext;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TSoftObjectPtr<URomanInputConfig> InputConfigurationAsset;
 
-	UPROPERTY()
-	UInputAction* IA_Select;
+	UPROPERTY(Transient)
+	TObjectPtr<URomanInputConfig> InputConfiguration;
 
-	UPROPERTY()
-	UInputAction* IA_Command;
-
-	UPROPERTY()
-	UInputAction* IA_Zoom;
-
-	UPROPERTY()
-	UInputAction* IA_Move;
-
-	UPROPERTY()
-	UInputAction* IA_Look;
-
-	UPROPERTY()
-	UInputAction* IA_EnterFPS;
-
-	UPROPERTY()
-	UInputAction* IA_BuildMenu;
-
-	UPROPERTY()
-	UInputAction* IA_Attack;
-
-	UPROPERTY()
-	UInputAction* IA_Block;
-
-	UPROPERTY()
-	UInputAction* IA_EndTurn;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey1;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey2;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey3;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey4;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey5;
-
-	UPROPERTY()
-	UInputAction* IA_BuildKey6;
+	UPROPERTY(Transient)
+	TObjectPtr<UInputMappingContext> ActiveGameplayContext;
 
 	// Selection state
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Selection")
@@ -207,7 +192,11 @@ protected:
 	void OnSelectReleased();
 	void OnCommandPressed();
 	void OnZoomInput(const FInputActionValue& Value);
-	void OnMoveInput(const FInputActionValue& Value);
+	void OnCameraPanInput(const FInputActionValue& Value);
+	void OnSoldierMoveInput(const FInputActionValue& Value);
+	void OnSelectCanceled();
+	void OnCancelPressed();
+	void OnBuildingSlotPressed(int32 QuickSlot);
 	void OnLookInput(const FInputActionValue& Value);
 	void OnEnterFPSPressed();
 	void OnBuildMenuPressed();
@@ -231,8 +220,20 @@ private:
 	UPROPERTY()
 	TObjectPtr<ARomanEmpireGameMode> GameMode;
 
-	void CreateInputActionsAndMappings();
-	void StartBuildingPlacementByQuickSlot(int32 QuickSlot);
+	bool LoadInputConfiguration();
+	void ApplyInputContexts();
+	void RemoveOwnedInputContexts();
+	bool HasActiveModeContext() const;
+	bool CanControlSoldier() const;
+	bool CanControlCamera() const;
+	void CaptureHeldMovementKeys(UInputMappingContext* DestinationContext);
+	TSet<FKey> MovementKeysAwaitingRelease;
+
+	UFUNCTION()
+	void HandleGameplayInitialized();
+
+	UFUNCTION()
+	void HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode);
 	void PerformBoxSelect();
 	void ClearSelectedActors();
 	void BroadcastSelectionChanged();

@@ -1,7 +1,7 @@
 # Asset Inventory
 
-Inventory date: 2026-09-05
-Status: M0 legacy search and M1 bootstrap complete; M2.4 Primary Data Assets created and validated
+Inventory date: 2026-09-07
+Status: M0/M1 bootstrap and M2.4 data assets complete; M2.6 input assets authored and automation-validated
 
 ## Search evidence
 
@@ -51,6 +51,18 @@ These assets have no import settings or separate source-art files because they c
 
 Engine basic shapes and engine materials referenced by C++ are engine-provided prerequisites, not repository assets. Their object paths load in the native content test and their packaging behavior was verified with UE 5.8.2.
 
+## M2.6 authored input assets
+
+Created on 2026-09-07 through Epic's narrowed loopback Unreal MCP, saved and read back as 24 assets. They contain project-authored control data only: no third-party art, generator output, import settings or attribution requirement. Project license applies; Git LFS covers all binary assets.
+
+| Repository path | Count | Purpose |
+|---|---:|---|
+| `Content/Input/DA_RomanInputConfig.uasset` | 1 | `URomanInputConfig` primary asset linking the logical actions and contexts; AlwaysCook |
+| `Content/Input/Contexts/IMC_{Strategic,Tactical,Possession,Shared}.uasset` | 4 | Mode-specific keys and modifiers |
+| `Content/Input/Actions/IA_*.uasset` | 19 | CameraPan, Zoom, Select, Command, EnterPossession, SoldierMove, Look, Attack, Block, ExitPossession, BuildMenu, EndTurn, Cancel, BuildingSlot1–6 |
+
+The defaults and lifecycle policy are in `INPUT_CONTROLS.md`. The native tests load the saved assets, validate their logical contract and Asset Manager discovery, assert exact defaults and evaluate WASD modifiers. The live PIE test exercises the actual Enhanced Input stack. Final cook/package/smoke evidence is maintained in the M2.6 implementation-plan section.
+
 ## Required bootstrap assets
 
 M1 created these source assets through Unreal Editor and they are committed:
@@ -58,7 +70,7 @@ M1 created these source assets through Unreal Editor and they are committed:
 - `/Game/Maps/L_Testbed.umap`.
 - `/Game/Maps/L_VerticalSlice.umap`.
 
-Faction, unit, building, and territory Data Assets are present from M2.4. M2.5 implements the functional production UI as native UMG trees in C++; no new Widget Blueprint, imported font, texture, external art, or generated image is introduced. Visual asset authoring remains M6 work. Dedicated Enhanced Input actions/mapping contexts remain planned for M2.6 and must follow the same provenance, LFS, validation, cook, and package rules.
+Faction, unit, building, and territory Data Assets are present from M2.4. M2.5 implements the functional production UI as native UMG trees in C++; no new Widget Blueprint, imported font, texture, external art, or generated image is introduced. M2.6 adds the input assets above. Visual asset authoring remains M6 work.
 
 No generated asset is accepted merely because a script or MCP call succeeds. It must load without warnings, validate, cook, package, and remain covered by Git LFS.
 

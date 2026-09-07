@@ -87,6 +87,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Unit|FPS")
 	void StopBlocking();
 
+	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
+	bool IsBlocking() const { return bIsBlocking; }
+
 	UFUNCTION(BlueprintCallable, Category = "Unit|FPS")
 	void PerformDodge(const FVector2D& Direction);
 

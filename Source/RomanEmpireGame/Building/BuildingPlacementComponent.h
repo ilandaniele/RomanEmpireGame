@@ -45,7 +45,7 @@ public:
 	bool IsPlacing() const { return bIsPlacing; }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
-	bool CanPlace() const { return bCanPlace; }
+	bool CanPlace() const { return bCanPlace && CanIssuePlacementCommands(); }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
 	FName GetCurrentBuildingID() const { return CurrentBuildingID; }
@@ -96,6 +96,7 @@ protected:
 	FOnPlacementCancelled OnPlacementCancelled;
 
 private:
+	bool CanIssuePlacementCommands() const;
 	void CreatePreviewBuilding();
 	void DestroyPreviewBuilding();
 	FVector SnapToGrid(const FVector& Location) const;

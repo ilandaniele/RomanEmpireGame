@@ -754,13 +754,14 @@ void AUnitBase::StartBlocking()
 
 void AUnitBase::StopBlocking()
 {
+	if (!bIsBlocking) return;
 	bIsBlocking = false;
 	
 	// Restore movement speed
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (Movement)
 	{
-		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed;
+		Movement->MaxWalkSpeed = bIsPossessedByPlayer ? 500.0f : UnitData.BaseStats.Speed;
 	}
 }
 
@@ -842,6 +843,10 @@ float AUnitBase::CalculateDamageReduction(float RawDamage, bool bIsRanged) const
 void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 {
 	bIsPossessedByPlayer = bPossessed;
+	if (!bPossessed)
+	{
+		StopBlocking();
+	}
 
 	// Enable/disable FPS mode settings
 	bUseControllerRotationYaw = bPossessed;
@@ -999,6 +1004,7 @@ void AUnitBase::UpdateStamina(float DeltaSeconds)
 
 void AUnitBase::OnDeath()
 {
+	StopBlocking();
 	UE_LOG(LogRomanEmpire, Log, TEXT("Unit died: %s"), *GetName());
 	
 	OnUnitDied.Broadcast(this);

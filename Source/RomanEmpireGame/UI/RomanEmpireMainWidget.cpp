@@ -87,6 +87,7 @@ void URomanEmpireMainWidget::NativeConstruct()
 
 void URomanEmpireMainWidget::NativeDestruct()
 {
+	HideBuildingMenu();
 	UnbindCanonicalEvents();
 	Super::NativeDestruct();
 }
@@ -435,33 +436,33 @@ void URomanEmpireMainWidget::RefreshCommands()
 {
 	const EGameplayMode Mode = CachedGameMode
 		? CachedGameMode->GetCurrentGameplayMode() : EGameplayMode::Tactical;
-	const bool bActive = CachedCampaignManager && CachedCampaignManager->IsCampaignActive();
+	const bool bCanBuild = CachedController && CachedController->CanIssueTacticalCommands();
 	if (BuildMenuButton)
 	{
-		BuildMenuButton->SetIsEnabled(bActive && Mode == EGameplayMode::Tactical);
+		BuildMenuButton->SetIsEnabled(bCanBuild);
 		BuildMenuButton->SetVisibility(Mode == EGameplayMode::Possessed
 			? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 	if (EndTurnButton)
 	{
-		EndTurnButton->SetIsEnabled(bActive && Mode != EGameplayMode::Possessed);
+		EndTurnButton->SetIsEnabled(CachedController && CachedController->CanEndTurn());
 		EndTurnButton->SetVisibility(Mode == EGameplayMode::Possessed
 			? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
-	if (!bActive || Mode != EGameplayMode::Tactical)
+	if (!bCanBuild)
 	{
 		HideBuildingMenu();
 	}
 	if (ControlsText)
 	{
-		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nMouse wheel: zoom | Click / drag: select\nRight click: order | F: possess unit\nB: build menu | 1-6: build | T: end turn");
+		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nRight click: order | F: possess unit\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
 		if (Mode == EGameplayMode::Possessed)
 		{
-			Help = TEXT("SOLDIER CONTROLS\nWASD: move | Mouse: look\nLeft click: attack | Right click: block\nF: return to tactical view");
+			Help = TEXT("SOLDIER CONTROLS\nWASD: move | Mouse: look\nLeft click: attack | Hold right click: block\nF / Esc: return to camera");
 		}
 		else if (Mode == EGameplayMode::Strategic)
 		{
-			Help = TEXT("STRATEGIC CONTROLS\nWASD / screen edge: move camera\nMouse wheel: zoom into tactical view\nT: end turn");
+			Help = TEXT("STRATEGIC CONTROLS\nWASD / screen edge: move camera\nMouse wheel: zoom into tactical view\nT: end turn | Esc: clear selection");
 		}
 		ControlsText->SetText(FText::FromString(Help));
 	}
@@ -482,6 +483,7 @@ void URomanEmpireMainWidget::RefreshObjectives(const FCampaignObjectiveState& St
 
 void URomanEmpireMainWidget::RefreshSelection()
 {
+	if (TrainButton) TrainButton->SetIsEnabled(false);
 	if (!SelectionPanel || !SelectionText || !ProductionText || !TrainButton)
 	{
 		return;
@@ -577,9 +579,8 @@ void URomanEmpireMainWidget::RefreshSelection()
 		ProductionText->SetText(FText::FromString(TEXT("Production: idle")));
 	}
 
-	const bool bCanTrain = Building->IsComplete() && CachedGameMode &&
-		CachedGameMode->GetCurrentGameplayMode() == EGameplayMode::Tactical &&
-		CachedCampaignManager && CachedCampaignManager->IsCampaignActive() &&
+	const bool bCanTrain = Building->IsComplete() && CachedController &&
+		CachedController->CanIssueTacticalCommands() &&
 		CachedFactionManager && Building->GetOwnerFaction() == CachedFactionManager->GetPlayerFaction() &&
 		!Data.TrainableUnits.IsEmpty();
 	TrainButton->SetVisibility(bCanTrain ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -668,19 +669,16 @@ void URomanEmpireMainWidget::RefreshOutcome(ECampaignOutcome Outcome)
 
 void URomanEmpireMainWidget::ShowBuildingMenu()
 {
-	if (!BuildMenuPanel || !CachedGameMode ||
-		CachedGameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical ||
-		!CachedCampaignManager || !CachedCampaignManager->IsCampaignActive())
+	if (!BuildMenuPanel || !IsInViewport() || !IsVisible() || !CachedController ||
+		!CachedController->CanIssueTacticalCommands())
 	{
 		return;
 	}
-	bBuildingMenuVisible = true;
 	BuildMenuPanel->SetVisibility(ESlateVisibility::Visible);
 }
 
 void URomanEmpireMainWidget::HideBuildingMenu()
 {
-	bBuildingMenuVisible = false;
 	if (BuildMenuPanel)
 	{
 		BuildMenuPanel->SetVisibility(ESlateVisibility::Collapsed);
@@ -689,7 +687,7 @@ void URomanEmpireMainWidget::HideBuildingMenu()
 
 void URomanEmpireMainWidget::ToggleBuildingMenu()
 {
-	if (bBuildingMenuVisible)
+	if (IsBuildingMenuVisible())
 	{
 		HideBuildingMenu();
 	}
@@ -697,6 +695,12 @@ void URomanEmpireMainWidget::ToggleBuildingMenu()
 	{
 		ShowBuildingMenu();
 	}
+}
+
+bool URomanEmpireMainWidget::IsBuildingMenuVisible() const
+{
+	return IsInViewport() && IsVisible() && RootCanvas && RootCanvas->IsVisible() &&
+		BuildMenuPanel && BuildMenuPanel->IsVisible() && BuildingMenu && BuildingMenu->IsVisible();
 }
 
 void URomanEmpireMainWidget::SetDiagnosticVisible(bool bVisible)
@@ -855,7 +859,7 @@ void URomanEmpireMainWidget::HandleBuildingStateChanged(ABuildingBase* Building)
 
 void URomanEmpireMainWidget::HandleBuildingSelected(FName BuildingID)
 {
-	if (CachedController)
+	if (IsBuildingMenuVisible() && CachedController && CachedController->CanIssueTacticalCommands())
 	{
 		CachedController->StartBuildingPlacement(BuildingID);
 		HideBuildingMenu();
@@ -864,7 +868,8 @@ void URomanEmpireMainWidget::HandleBuildingSelected(FName BuildingID)
 
 void URomanEmpireMainWidget::HandleTrainClicked()
 {
-	if (CachedController && !CachedController->OnTrainButtonClicked() && ProductionText)
+	if (CachedController && CachedController->CanIssueTacticalCommands() &&
+		!CachedController->OnTrainButtonClicked() && ProductionText)
 	{
 		ProductionText->SetText(FText::FromString(TEXT("Cannot train: check resources, building state, and queue capacity")));
 	}
@@ -872,9 +877,8 @@ void URomanEmpireMainWidget::HandleTrainClicked()
 
 void URomanEmpireMainWidget::HandleEndTurnClicked()
 {
-	if (CachedGameMode && CachedGameMode->GetCurrentGameplayMode() != EGameplayMode::Possessed)
+	if (CachedController && CachedController->RequestEndTurn())
 	{
-		CachedGameMode->EndTurn();
 		RefreshFromCanonicalState();
 	}
 }
