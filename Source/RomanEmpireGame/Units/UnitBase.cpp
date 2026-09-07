@@ -395,7 +395,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 					if (AttackCooldownRemaining <= 0.0f)
 					{
 						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
-						Target->CurrentHealth = FMath::Max(0, Target->CurrentHealth - (int32)Dmg);
+						Target->TakeCombatDamage(Dmg, this, false);
 						AttackCooldownRemaining = AttackCooldown;
 
 						// Arm swing
@@ -409,8 +409,6 @@ void AUnitBase::Tick(float DeltaSeconds)
 								Dmg, Target->CurrentHealth,
 								Target->UnitData.BaseStats.MaxHealth));
 
-						// Kill if dead
-						if (Target->CurrentHealth <= 0) Target->OnDeath();
 					}
 					// Face target while fighting
 					FVector FaceDir = Target->GetActorLocation() - GetActorLocation();
@@ -709,6 +707,7 @@ void AUnitBase::PerformAttack()
 	bIsAttacking = true;
 	AttackCooldownRemaining = AttackCooldown / UnitData.BaseStats.AttackSpeed;
 	CurrentStamina -= 10.0f;
+	OnUnitVitalsChanged.Broadcast(this);
 
 	// Perform melee attack trace
 	FVector Start = GetActorLocation() + FVector(0, 0, 80);
@@ -773,6 +772,7 @@ void AUnitBase::PerformDodge(const FVector2D& Direction)
 	}
 
 	CurrentStamina -= 20.0f;
+	OnUnitVitalsChanged.Broadcast(this);
 
 	// Launch in direction
 	FVector DodgeVector = GetActorRightVector() * Direction.X + GetActorForwardVector() * Direction.Y;
@@ -799,10 +799,25 @@ void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRan
 	CurrentMorale = FMath::Max(0, CurrentMorale - FMath::RoundToInt(ActualDamage * 0.1f));
 
 	OnUnitDamaged.Broadcast(this, ActualDamage);
+	OnUnitVitalsChanged.Broadcast(this);
 
 	if (CurrentHealth <= 0)
 	{
 		OnDeath();
+	}
+}
+
+void AUnitBase::SetCurrentHealth(int32 NewHealth)
+{
+	const int32 PreviousHealth = CurrentHealth;
+	CurrentHealth = FMath::Clamp(NewHealth, 0, UnitData.BaseStats.MaxHealth);
+	if (CurrentHealth != PreviousHealth)
+	{
+		OnUnitVitalsChanged.Broadcast(this);
+		if (PreviousHealth > 0 && CurrentHealth == 0)
+		{
+			OnDeath();
+		}
 	}
 }
 
@@ -973,7 +988,12 @@ void AUnitBase::UpdateStamina(float DeltaSeconds)
 	if (!bIsBlocking && !bIsAttacking)
 	{
 		float RegenRate = 10.0f; // Stamina per second
+		const int32 PreviousPercent = FMath::FloorToInt(GetStaminaPercent() * 100.0f);
 		CurrentStamina = FMath::Min(UnitData.BaseStats.Stamina, CurrentStamina + RegenRate * DeltaSeconds);
+		if (PreviousPercent != FMath::FloorToInt(GetStaminaPercent() * 100.0f))
+		{
+			OnUnitVitalsChanged.Broadcast(this);
+		}
 	}
 }
 

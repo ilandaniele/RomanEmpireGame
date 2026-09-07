@@ -114,7 +114,7 @@ public:
 	FString GetUnitDisplayName() const { return UnitData.DisplayName.ToString(); }
 
 	UFUNCTION(BlueprintCallable, Category = "Unit|Health")
-	void SetCurrentHealth(int32 NewHealth) { CurrentHealth = FMath::Clamp(NewHealth, 0, UnitData.BaseStats.MaxHealth); }
+	void SetCurrentHealth(int32 NewHealth);
 
 	// Apply faction-based color to visual mesh
 	void ApplyFactionColor();
@@ -132,6 +132,20 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Unit")
 	void SetPossessedByPlayer(bool bPossessed);
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUnitDamaged, AUnitBase*, Unit, float, Damage);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitDied, AUnitBase*, Unit);
+
+	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
+	FOnUnitDamaged OnUnitDamaged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
+	FOnUnitDied OnUnitDied;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitVitalsChanged, AUnitBase*, Unit);
+
+	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
+	FOnUnitVitalsChanged OnUnitVitalsChanged;
 
 protected:
 	/** Stable ID only; authored values live in URomanUnitDefinition assets. */
@@ -245,16 +259,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|Combat")
 	float AttackCooldownRemaining;
-
-	// Events
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUnitDamaged, AUnitBase*, Unit, float, Damage);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitDied, AUnitBase*, Unit);
-
-	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
-	FOnUnitDamaged OnUnitDamaged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
-	FOnUnitDied OnUnitDied;
 
 	// Internal
 	virtual void UpdateAIMovement(float DeltaSeconds);

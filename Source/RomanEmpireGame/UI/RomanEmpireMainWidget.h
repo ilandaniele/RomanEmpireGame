@@ -4,22 +4,30 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Building/ProductionEvent.h"
+#include "Campaign/CampaignObjectiveState.h"
+#include "Campaign/CampaignTurn.h"
+#include "Core/GameplayMode.h"
 #include "Faction/FactionData.h"
 #include "RomanEmpireMainWidget.generated.h"
 
-class UCanvasPanel;
-class UHorizontalBox;
-class UVerticalBox;
-class UTextBlock;
-class UButton;
-class UImage;
-class UProgressBar;
-class UBorder;
+class ABuildingBase;
+class ABarracks;
+class ACampaignManager;
+class AFactionManager;
+class ARomanEmpireGameMode;
+class ARomanEmpirePlayerController;
 class AUnitBase;
+class AWorldMapManager;
+class UBorder;
+class UBuildingMenuWidget;
+class UButton;
+class UCanvasPanel;
+class UTextBlock;
 
 /**
- * Main HUD widget containing all sub-panels
- * Manages strategic, tactical, and FPS UI modes
+ * Production UMG root. It observes authoritative gameplay objects and never
+ * owns resource, turn, objective, production, possession, or victory state.
  */
 UCLASS()
 class ROMANEMPIREGAME_API URomanEmpireMainWidget : public UUserWidget
@@ -27,114 +35,181 @@ class ROMANEMPIREGAME_API URomanEmpireMainWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+	virtual TSharedRef<SWidget> RebuildWidget() override;
 
-	// Building menu
-	UFUNCTION(BlueprintCallable, Category = "UI")
+	UFUNCTION(BlueprintCallable, Category = "UI|Building")
 	void ShowBuildingMenu();
 
-	UFUNCTION(BlueprintCallable, Category = "UI")
+	UFUNCTION(BlueprintCallable, Category = "UI|Building")
 	void HideBuildingMenu();
 
-	// Unit panel
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void UpdateUnitPanel(const TArray<AUnitBase*>& SelectedUnits);
+	UFUNCTION(BlueprintCallable, Category = "UI|Building")
+	void ToggleBuildingMenu();
 
-	// Resources
-	UFUNCTION(BlueprintCallable, Category = "UI")
+	UFUNCTION(BlueprintCallable, Category = "UI|Resources")
 	void UpdateResourceDisplay(const FFactionResourceAmounts& Resources);
 
-	// FPS mode
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void SetFPSMode(bool bEnabled);
-
-	// Visibility control
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void SetStrategicUIVisible(bool bVisible);
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void SetTacticalUIVisible(bool bVisible);
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void SetFPSUIVisible(bool bVisible);
-
-	// Minimap
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void UpdateMinimap();
-
-protected:
-	// Main containers
-	UPROPERTY(meta = (BindWidget), BlueprintReadOnly, Category = "UI")
-	UCanvasPanel* RootCanvas;
-
-	// Resource bar (top)
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UHorizontalBox* ResourceBar;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* GoldText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* FoodText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* IronText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* WoodText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* StoneText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Resources")
-	UTextBlock* PopulationText;
-
-	// Building menu (left side)
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Building")
-	UVerticalBox* BuildingMenuPanel;
-
-	// Unit panel (bottom)
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Unit")
-	UHorizontalBox* UnitPanel;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Unit")
-	UImage* UnitPortrait;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Unit")
-	UTextBlock* UnitNameText;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Unit")
-	UProgressBar* UnitHealthBar;
-
-	// Minimap (bottom right)
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Minimap")
-	UBorder* MinimapContainer;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Minimap")
-	UImage* MinimapImage;
-
-	// FPS overlay
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|FPS")
-	UCanvasPanel* FPSOverlay;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|FPS")
-	UProgressBar* HealthBar;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|FPS")
-	UProgressBar* StaminaBar;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|FPS")
-	UImage* CrosshairImage;
-
-	// Strategic overlay (world map)
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI|Strategic")
-	UCanvasPanel* StrategicOverlay;
-
-	// State
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI|State")
-	bool bFPSModeActive;
+	UFUNCTION(BlueprintCallable, Category = "UI|Diagnostics")
+	void SetDiagnosticVisible(bool bVisible);
 
 private:
-	void SetupBuildingButtons();
-};
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> RootCanvas;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> ResourceText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> PhaseText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> ObjectiveText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> DiagnosticText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> SelectionText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> ProductionText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> OutcomeText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TrainButtonText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> PossessionText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> CrosshairText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> ControlsText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> BuildMenuPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> SelectionPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> DiagnosticPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> OutcomePanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBuildingMenuWidget> BuildingMenu;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> TrainButton;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> EndTurnButton;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> BuildMenuButton;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ARomanEmpirePlayerController> CachedController;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ARomanEmpireGameMode> CachedGameMode;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AFactionManager> CachedFactionManager;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AWorldMapManager> CachedWorldMapManager;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACampaignManager> CachedCampaignManager;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AUnitBase> ObservedUnit;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ABuildingBase> ObservedBuilding;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ABarracks> ObservedBarracks;
+
+	bool bCanonicalEventsBound = false;
+	bool bBuildingMenuVisible = false;
+
+	void BuildNativeWidgetTree();
+	void BindCanonicalEvents();
+	void UnbindCanonicalEvents();
+	void BindSelectionEvents(const TArray<AUnitBase*>& Units, ABuildingBase* Building);
+	void UnbindSelectionEvents();
+	void RefreshFromCanonicalState();
+	void RefreshModeAndTurn();
+	void RefreshCommands();
+	void RefreshObjectives(const FCampaignObjectiveState& State);
+	void RefreshSelection();
+	void RefreshDiagnostic();
+	void RefreshOutcome(ECampaignOutcome Outcome);
+
+	UFUNCTION()
+	void HandleSelectionChanged(const TArray<AUnitBase*>& Units, ABuildingBase* Building);
+
+	UFUNCTION()
+	void HandleResourcesChanged(EFactionID FactionID, FFactionResourceAmounts NewBalance);
+
+	UFUNCTION()
+	void HandleGameplayInitialized();
+
+	UFUNCTION()
+	void HandlePlayerFactionChanged(EFactionID PlayerFaction);
+
+	UFUNCTION()
+	void HandleCampaignStarted(EFactionID PlayerFaction);
+
+	UFUNCTION()
+	void HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode);
+
+	UFUNCTION()
+	void HandleTurnStepStarted(int32 TurnNumber, ECampaignTurnStep Step);
+
+	UFUNCTION()
+	void HandleTurnProcessed(int32 TurnNumber);
+
+	UFUNCTION()
+	void HandleProductionChanged(ABarracks* Producer, FProductionEvent Event);
+
+	UFUNCTION()
+	void HandlePossessedUnitChanged(AUnitBase* PreviousUnit, AUnitBase* NewUnit);
+
+	UFUNCTION()
+	void HandleObjectivesChanged(FCampaignObjectiveState State);
+
+	UFUNCTION()
+	void HandleVictory(EFactionID WinningFaction, EVictoryCondition Condition);
+
+	UFUNCTION()
+	void HandleDefeat(EFactionID LosingFaction);
+
+	UFUNCTION()
+	void HandleUnitVitalsChanged(AUnitBase* Unit);
+
+	UFUNCTION()
+	void HandleBuildingStateChanged(ABuildingBase* Building);
+
+	UFUNCTION()
+	void HandleBuildingSelected(FName BuildingID);
+
+	UFUNCTION()
+	void HandleTrainClicked();
+
+	UFUNCTION()
+	void HandleEndTurnClicked();
+
+	UFUNCTION()
+	void HandleBuildMenuClicked();
+};

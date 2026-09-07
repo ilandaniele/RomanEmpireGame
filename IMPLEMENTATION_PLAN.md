@@ -113,7 +113,7 @@ Keep one runtime game module during recovery. Add a separate developer/test modu
 
 Skills are workflow instructions, not proof that the engine, plugin, application, or external service they describe is installed. They never replace milestone acceptance evidence or authorize a broader mutation than the active implementation ticket.
 
-The following skills were installed globally for Codex on 2026-09-03. They are not vendored into the game repository; their reviewed source revisions are recorded so another workstation can reproduce or re-audit the selection.
+The following skills were installed globally for Codex on 2026-09-03, with `ue-input-system` added on 2026-09-06 for M2.6. They are not vendored into the game repository; their reviewed source revisions are recorded so another workstation can reproduce or re-audit the selection.
 
 | Skill | Reviewed source | Intended use | Activation point / constraint |
 |---|---|---|---|
@@ -126,6 +126,7 @@ The following skills were installed globally for Codex on 2026-09-03. They are n
 | `ue-testing-debugging` | [Quod Soler](https://github.com/quodsoler/unreal-engine-skills/tree/231c8571be6f3335685edc566a28ec6f9621361d/skills/ue-testing-debugging) | Native automation tests, Functional Tests, logging, assertions, and profiling | Tests inside M1–M7; the dedicated module design must be proven by UBT. |
 | `ue-data-assets-tables` | [Quod Soler](https://github.com/quodsoler/unreal-engine-skills/tree/231c8571be6f3335685edc566a28ec6f9621361d/skills/ue-data-assets-tables) | Primary Data Assets, Data Tables, soft references, Asset Manager, and content validation | M2, M5, and M6; avoid synchronous loads in active gameplay. |
 | `ue-ui-umg-slate` | [Quod Soler](https://github.com/quodsoler/unreal-engine-skills/tree/231c8571be6f3335685edc566a28ec6f9621361d/skills/ue-ui-umg-slate) | Replace the Canvas/UMG split with a production UMG lifecycle and correct input routing | M2 and M6; Common UI/MVVM remain optional decisions, not automatic additions. |
+| `ue-input-system` | [Quod Soler](https://github.com/quodsoler/unreal-engine-skills/tree/231c8571be6f3335685edc566a28ec6f9621361d/skills/ue-input-system) | Enhanced Input assets, mapping ownership, trigger lifecycle, modifiers, held-key suppression, and legacy migration | Added for M2.6; documentation only, verified against installed UE 5.8 APIs and behavioral tests. |
 | `security-best-practices` | [OpenAI curated](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices) | Secure-by-default review for supported Python, JavaScript/TypeScript, and Go tooling | M7/M8 scripts or services only; it does not cover the core UE C++ module. |
 | `security-threat-model` | [OpenAI curated](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-threat-model) | Repository-grounded threat model for MCP, CI, credentials, Supabase, and distribution boundaries | Run by explicit request before enabling online/MCP exposure or release infrastructure. |
 | `gh-fix-ci` | [OpenAI curated](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/gh-fix-ci) | Inspect and diagnose failing GitHub Actions PR checks | M7 only, after a PR-based GitHub Actions workflow exists and `gh` is authenticated. |
@@ -375,12 +376,36 @@ Implementation evidence recorded 2026-09-05:
 - Define events for selection, resources, phase, turn, production, possession, objectives, and victory.
 - Eliminate tick-based UI resource correction and disconnected UI-owned counters.
 
+Implementation evidence (completed 2026-09-06):
+
+- The local player controller creates the native `URomanEmpireMainWidget` production tree. It supplies resources, mode/turn, objectives, selection, selected-barracks training, possession vitals, building choices, command buttons, and campaign outcome. No Widget Blueprint or external art dependency is required for this milestone.
+- UMG subscribes to canonical gameplay-ready, selection, wallet/player-faction, mode, turn, production, possession, objectives, and outcome events. Construction/damage/death events update or prune the selected actor. Removing the root unsubscribes observers; reattaching catches up from authoritative queries without duplicate bindings or a UI tick.
+- Canvas contains only an opt-in diagnostic overlay, disabled by default. Its gameplay panels, actor scans, hit-test rectangles, kill counter, and independent victory calculation are removed. The native UMG diagnostic view is hidden in Shipping.
+- `FCampaignObjectiveState` is a read-only projection; campaign outcome remains owned by CampaignManager. Final-turn victory/defeat is retained instead of overwritten by a draw. Campaign/production operations guard reentrant requests and publish committed state; failed unit spawns emit `Failed`, never `Completed`.
+- Building choices come from the canonical stable-ID registry. TRAIN routes through the controller to the selected eligible barracks; affordability is a query and the actual spend remains in the production command. Unit selection/vitals and possession/death notifications restore the camera and remove stale HUD state.
+- Skills applied: `ue-ui-umg-slate` for native widget lifecycle and event routing; `unreal-cpp-gameplay` and `ue-data-assets-tables` for canonical commands/contracts; `ue-testing-debugging` for real-world PIE assertions; `ue-module-build-system` and `unreal-packaging` for non-unity and distribution gates.
+- The native `RomanEmpireGame.UI.CanonicalEventDrivenPIE` test exercises the actual framework/managers and UMG tree in `L_Testbed`, with transient fixtures and no saved map mutations. It proves resource/objective synchronization, unit damage/selection, possession and camera restoration on death, selected-barracks training, root detach/reattach subscription counts, and economic victory on the final allowed turn. TRAIN uses virtual-user Slate pointer press/release routing through the live widget path, with the real `SButton` consuming both events; it does not broadcast UMG click delegates directly or move the OS cursor.
+- The final automation report `Artifacts/Automation/20260906_230652_892` contains 10 successes, 0 failures, 0 not-run, and 0 in-process tests. Repository validation and `git diff --check` also pass. The pointer fixture explicitly initializes per-widget pointer entries: a navigation-only `FWidgetPath` is not a valid substitute for UE 5.8 event routing.
+- Development Editor, strict non-unity/no-PCH IWYU, Development Game, and Shipping Game compile successfully. The final Development BuildCookRun compiled, cooked 535 packages with 0 errors/0 warnings, and archived to `Artifacts/Packages/M2_5` (`Artifacts/M2_5-Package.log`). Game receipts exclude `ModelContextProtocol`, `EditorToolset`, `AutomationTestToolset`, `AllToolsets`, and the Editor-only test module.
+- The archived Development player passed both startup and rendered smoke checks. `Artifacts/M2_5-PackagedRendered-Smoke.log` proves `L_VerticalSlice`, canonical content/gameplay initialization, the production UMG root, normal shutdown, and no error/fatal/assert/ensure signatures. `Artifacts/M2_5-PackagedUMG.png` was inspected at 1920×1080: wallet/objective/diagnostic values agree, buttons have readable contrast, and help text fits. These are short startup smokes, not sustained gameplay/performance certification. The M2.2–M2.4 application-control restriction did not reproduce for this final player; no Windows security setting was changed and future hashes still require their own launch check.
+- M2.5 is complete. M2.6 is the active implementation package; M2 as a whole remains open.
+
 #### M2.6 Input contexts
 
 - Create committed Enhanced Input assets for strategic, tactical, possession, and shared/system input.
 - Activate mapping contexts on mode transitions.
 - Prevent build/train/command actions when their context or UI mode is inactive.
 - Document keyboard/mouse defaults and ensure remapping can be added without changing gameplay code.
+
+Execution preparation from the M2.5 review:
+
+- Skill intake: `find-skills` checked the directory and CLI search; `skill-installer` installed `ue-input-system` at pinned revision `231c8571be6f3335685edc566a28ec6f9621361d`. At review, the CLI reported 827 installs and the GitHub API reported 334 repository stars; these are popularity signals, not correctness guarantees. The selected folder contains only `SKILL.md` and `references/input-action-reference.md`, no executables. Its exact input/mode coverage and compatibility with the already selected UE context suite motivated the choice. Reproduce with the installer helper using `--repo quodsoler/unreal-engine-skills --ref 231c8571be6f3335685edc566a28ec6f9621361d --path skills/ue-input-system`.
+
+- Author `DA_RomanInputConfig`, actions under `/Game/Input/Actions`, and `IMC_Strategic`, `IMC_Tactical`, `IMC_Possession`, and `IMC_Shared` under `/Game/Input/Contexts`. Separate camera pan from soldier movement, and map soldier attack/block directly in the possession context. Training remains a UMG command.
+- Let the local controller own exactly one gameplay mapping context plus Shared, synchronized from gameplay readiness and canonical mode changes. Remove only project-owned mappings; cancel held input, selection drags, and placement before transitions.
+- Consolidate eligibility checks shared by keyboard and UMG: tactical commands require an active campaign; build quick slots additionally require the open building menu; end turn is unavailable while possessed. Use the canonical player faction for command ownership.
+- Fix the inherited RMB block-release defect: the old mapping bound press through Command but never its release. Handle Completed/Canceled and explicitly clear blocking on possession exit/death/context removal/focus loss. Remove dead legacy config mappings instead of advertising unsupported jump/sprint controls.
+- Add asset/value validation and real local-player mapping/injection tests for exclusivity, held-key transitions, guarded shortcuts, and block cleanup. Record keyboard/mouse defaults in `INPUT_CONTROLS.md`. M2 remains open until these gates pass.
 
 Evidence and exit gate:
 

@@ -43,6 +43,8 @@ $requiredFiles = @(
     'Source\RomanEmpireGame\Public\Campaign\CampaignTurn.h',
     'Source\RomanEmpireGame\Public\Campaign\TerritoryData.h',
     'Source\RomanEmpireGame\Public\Building\BuildingTypes.h',
+    'Source\RomanEmpireGame\Public\Building\ProductionEvent.h',
+    'Source\RomanEmpireGame\Public\Campaign\CampaignObjectiveState.h',
     'Source\RomanEmpireGame\Public\Content\RomanContentDefinitions.h',
     'Source\RomanEmpireGame\Public\Content\RomanContentRegistry.h',
     'Source\RomanEmpireGame\Public\Core\GameplayMode.h',
@@ -51,6 +53,7 @@ $requiredFiles = @(
     'Source\RomanEmpireGame\Public\Units\UnitTypes.h',
     'Source\RomanEmpireGameTests\RomanEmpireGameTests.Build.cs',
     'Source\RomanEmpireGameTests\Private\CampaignStateRulesTests.cpp',
+    'Source\RomanEmpireGameTests\Private\CanonicalUIIntegrationTests.cpp',
     'Source\RomanEmpireGameTests\Private\ContentDefinitionValidationTests.cpp',
     'Source\RomanEmpireGameTests\Private\ContentPathValidationTests.cpp',
     'Source\RomanEmpireGameTests\Private\FactionResourceRulesTests.cpp'
@@ -271,8 +274,10 @@ foreach ($assignment in @(
 }
 
 $controllerSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpirePlayerController.cpp')
-Assert-True -Condition ($controllerSource -notmatch 'REHUD->HUDSelectedBuilding') `
-    -Message 'PlayerController must use the HUD public building-selection API.'
+Assert-True -Condition ($controllerSource -notmatch 'REHUD|TrainButtonMin|TrainButtonMax') `
+    -Message 'PlayerController may not route production UI actions through Canvas or manual screen bounds.'
+Assert-True -Condition ($controllerSource -match 'CreateWidget<URomanEmpireMainWidget>') `
+    -Message 'PlayerController must create the production UMG root.'
 Assert-True -Condition ($controllerSource -notmatch '\b(?:TrainingProgress|TrainingTimeRemaining|UnitBeingTrained)\b') `
     -Message 'PlayerController may not own duplicate unit-training state.'
 Assert-True -Condition ($controllerSource -notmatch '\b(?:CurrentZoomLevel|TargetZoomLevel|bIsInFirstPersonMode)\b') `
@@ -284,11 +289,24 @@ Assert-True -Condition ($controllerSource -notmatch 'Cost\.Gold\s*=|TEXT\("Build
 Assert-True -Condition ($controllerSource -match 'FindBuildingByQuickSlot\s*\(') `
     -Message 'PlayerController building hotkeys must resolve stable definitions through the content registry.'
 
-$hudSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireHUD.cpp')
-Assert-True -Condition ($hudSource -match 'GetAllBuildings\s*\(') `
-    -Message 'HUD building presentation must enumerate the canonical content registry.'
-Assert-True -Condition ($hudSource -notmatch 'TEXT\("(?:Barracks|Farm|Mine|Lumber Camp|Wall|Temple)\s*\(') `
-    -Message 'HUD may not duplicate building menu names or costs from Primary Data Assets.'
+$hudHeader = Read-Utf8 -Path (Join-Path $runtimeRoot 'Core\RomanEmpireHUD.h')
+Assert-True -Condition (($hudSource + $hudHeader) -notmatch 'EnemiesKilled|bVictory|bDefeated|DrawResourceBar|DrawBuildingPanel|CheckVictoryCondition|TrainButton') `
+    -Message 'Canvas HUD must remain diagnostic-only, without gameplay panels or outcome counters.'
+Assert-True -Condition ($hudSource -match 'bShowDebugOverlay\s*=\s*false') `
+    -Message 'Canvas diagnostics must be disabled by default.'
+
+$mainWidgetSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'UI\RomanEmpireMainWidget.cpp')
+Assert-True -Condition ($mainWidgetSource -notmatch 'NativeTick|GetAllActorsOfClass|TrySpendFactionResources') `
+    -Message 'Production UMG must observe canonical events and issue commands without polling or spending locally.'
+foreach ($eventName in @('OnSelectionChanged', 'OnPossessedUnitChanged', 'OnFactionResourcesChanged', 'OnGameplayModeChanged', 'OnTurnProcessed', 'OnProductionChanged', 'OnCampaignObjectivesChanged', 'OnVictory')) {
+    Assert-True -Condition ($mainWidgetSource -match ([regex]::Escape($eventName) + '\.AddUniqueDynamic')) `
+        -Message "UMG is missing a canonical event binding: $eventName"
+    Assert-True -Condition ($mainWidgetSource -match ([regex]::Escape($eventName) + '\.RemoveDynamic')) `
+        -Message "UMG must release the canonical event binding at teardown: $eventName"
+}
+$menuSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'UI\BuildingMenuWidget.cpp')
+Assert-True -Condition ($menuSource -match 'GetAllBuildings\s*\(' -and $menuSource -match 'OnBuildingSelected\.Broadcast') `
+    -Message 'UMG building buttons must enumerate the content registry and send stable-ID commands.'
 
 $placementSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\BuildingPlacementComponent.cpp')
 $placementSpendCount = [regex]::Matches($placementSource, '\bTrySpendFactionResources\s*\(').Count

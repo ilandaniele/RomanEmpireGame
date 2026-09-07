@@ -50,14 +50,6 @@ namespace
 		}
 	}
 
-	bool AreUnitStatsValid(const FUnitStats& Stats)
-	{
-		return Stats.MaxHealth > 0 && Stats.MeleeAttack >= 0 && Stats.RangedAttack >= 0 &&
-			Stats.MeleeDefense >= 0 && Stats.RangedDefense >= 0 && Stats.Armor >= 0 &&
-			Stats.Speed > 0.0f && Stats.Morale >= 0 && Stats.Stamina > 0.0f &&
-			Stats.AttackSpeed > 0.0f && Stats.BlockStrength >= 0.0f && Stats.DodgeSpeed >= 0.0f;
-	}
-
 	template <typename TValue>
 	bool AddUniqueOrReport(
 		TSet<TValue>& Seen,

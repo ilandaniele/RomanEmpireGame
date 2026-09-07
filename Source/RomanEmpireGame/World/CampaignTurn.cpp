@@ -46,6 +46,7 @@ const TCHAR* RomanEmpireCampaign::GetTurnFailureName(ECampaignTurnFailure Failur
 	case ECampaignTurnFailure::MissingWorldMapManager: return TEXT("MissingWorldMapManager");
 	case ECampaignTurnFailure::ResourceTransactionFailed: return TEXT("ResourceTransactionFailed");
 	case ECampaignTurnFailure::AutosaveFailed: return TEXT("AutosaveFailed");
+	case ECampaignTurnFailure::TurnAlreadyProcessing: return TEXT("TurnAlreadyProcessing");
 	default: return TEXT("Unknown");
 	}
 }

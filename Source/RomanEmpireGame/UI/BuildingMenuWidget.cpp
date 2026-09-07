@@ -1,142 +1,183 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingMenuWidget.h"
+
+#include "Blueprint/WidgetTree.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
-#include "Components/VerticalBox.h"
-#include "Components/Button.h"
-#include "Components/Image.h"
-#include "Components/TextBlock.h"
+#include "Styling/SlateTypes.h"
+
+URomanHUDButton::URomanHUDButton(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	InitIsFocusable(false);
+
+	// Opaque dark fills keep HUD labels readable over bright tactical terrain.
+	// Retain the native button's padding, sounds, input, and accessibility behavior.
+	FButtonStyle HUDStyle = GetStyle();
+	HUDStyle.SetNormal(FSlateRoundedBoxBrush(
+		FLinearColor(0.025f, 0.032f, 0.05f), 3.0f,
+		FLinearColor(0.28f, 0.23f, 0.13f), 1.0f));
+	HUDStyle.SetHovered(FSlateRoundedBoxBrush(
+		FLinearColor(0.075f, 0.10f, 0.145f), 3.0f,
+		FLinearColor(0.85f, 0.63f, 0.25f), 1.5f));
+	HUDStyle.SetPressed(FSlateRoundedBoxBrush(
+		FLinearColor(0.012f, 0.018f, 0.03f), 3.0f,
+		FLinearColor(1.0f, 0.76f, 0.30f), 2.0f));
+	HUDStyle.SetDisabled(FSlateRoundedBoxBrush(
+		FLinearColor(0.055f, 0.055f, 0.06f), 3.0f,
+		FLinearColor(0.12f, 0.12f, 0.13f), 1.0f));
+	SetStyle(HUDStyle);
+}
+
+void URomanBuildingButton::InitializeBuildingButton(
+	FName InBuildingID,
+	EBuildingCategory InCategory)
+{
+	BuildingID = InBuildingID;
+	BuildingCategory = InCategory;
+	OnClicked.RemoveDynamic(this, &URomanBuildingButton::HandleClicked);
+	OnClicked.AddDynamic(this, &URomanBuildingButton::HandleClicked);
+}
+
+void URomanBuildingButton::HandleClicked()
+{
+	if (!BuildingID.IsNone())
+	{
+		OnBuildingButtonClicked.Broadcast(BuildingID);
+	}
+}
+
+void UBuildingMenuWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	BuildNativeWidgetTree();
+}
 
 void UBuildingMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-
-	// Bind tab buttons
-	if (MilitaryTabButton)
-	{
-		MilitaryTabButton->OnClicked.AddDynamic(this, &UBuildingMenuWidget::OnMilitaryTabClicked);
-	}
-	if (EconomicTabButton)
-	{
-		EconomicTabButton->OnClicked.AddDynamic(this, &UBuildingMenuWidget::OnEconomicTabClicked);
-	}
-	if (CivilTabButton)
-	{
-		CivilTabButton->OnClicked.AddDynamic(this, &UBuildingMenuWidget::OnCivilTabClicked);
-	}
-	if (DefenseTabButton)
-	{
-		DefenseTabButton->OnClicked.AddDynamic(this, &UBuildingMenuWidget::OnDefenseTabClicked);
-	}
-
-	CurrentCategory = EBuildingCategory::Military;
+	BuildNativeWidgetTree();
 	PopulateBuildingList();
 }
 
-void UBuildingMenuWidget::PopulateBuildingList()
+TSharedRef<SWidget> UBuildingMenuWidget::RebuildWidget()
 {
-	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
-	if (!Registry || !Registry->IsReady())
+	BuildNativeWidgetTree();
+	return Super::RebuildWidget();
+}
+
+void UBuildingMenuWidget::BuildNativeWidgetTree()
+{
+	if (!WidgetTree)
+	{
+		WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree"), RF_Transient);
+	}
+	if (WidgetTree->RootWidget)
 	{
 		return;
 	}
 
-	for (const URomanBuildingDefinition* Asset : Registry->GetAllBuildings())
-	{
-		if (!Asset)
-		{
-			continue;
-		}
+	BuildingListBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("BuildingList"));
+	WidgetTree->RootWidget = BuildingListBox;
+}
 
-		UVerticalBox* Container = nullptr;
-		switch (Asset->Definition.Category)
-		{
-		case EBuildingCategory::Military: Container = MilitaryBuildingsBox; break;
-		case EBuildingCategory::Economic: Container = EconomicBuildingsBox; break;
-		case EBuildingCategory::Civil: Container = CivilBuildingsBox; break;
-		case EBuildingCategory::Defense: Container = DefenseBuildingsBox; break;
-		default: break;
-		}
-		if (Container)
-		{
-			CreateBuildingButton(Asset->Definition.BuildingID, Asset->Definition, Container);
-		}
+void UBuildingMenuWidget::PopulateBuildingList()
+{
+	if (!BuildingListBox)
+	{
+		return;
 	}
 
-	// Set initial visibility
-	FilterByCategory(EBuildingCategory::Military);
+	BuildingListBox->ClearChildren();
+	BuildingButtons.Reset();
+
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (!Registry || !Registry->IsReady())
+	{
+		UE_LOG(LogRomanEmpire, Warning, TEXT("Building menu cannot populate before content registry initialization"));
+		return;
+	}
+
+	TArray<const URomanBuildingDefinition*> Definitions = Registry->GetAllBuildings();
+	Definitions.Sort([](const URomanBuildingDefinition& Left, const URomanBuildingDefinition& Right)
+	{
+		return Left.QuickSlot < Right.QuickSlot;
+	});
+
+	for (const URomanBuildingDefinition* Asset : Definitions)
+	{
+		if (Asset)
+		{
+			CreateBuildingButton(Asset->Definition.BuildingID, Asset->Definition, Asset->QuickSlot);
+		}
+	}
+	ApplyFilter();
+}
+
+void UBuildingMenuWidget::CreateBuildingButton(
+	FName BuildingID,
+	const FBuildingData& Data,
+	int32 QuickSlot)
+{
+	URomanBuildingButton* Button = WidgetTree->ConstructWidget<URomanBuildingButton>(
+		URomanBuildingButton::StaticClass(),
+		*FString::Printf(TEXT("Build_%s"), *BuildingID.ToString()));
+	UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(
+		UTextBlock::StaticClass(),
+		*FString::Printf(TEXT("BuildLabel_%s"), *BuildingID.ToString()));
+	if (!Button || !Label)
+	{
+		return;
+	}
+
+	Button->InitializeBuildingButton(BuildingID, Data.Category);
+	Button->OnBuildingButtonClicked.AddUniqueDynamic(
+		this, &UBuildingMenuWidget::HandleBuildingButtonClicked);
+	Label->SetText(FText::FromString(FString::Printf(
+		TEXT("[%d] %s  |  %s"),
+		QuickSlot,
+		*Data.DisplayName.ToString(),
+		*RomanEmpireEconomy::DescribeResourceCost(Data.Cost))));
+	Label->SetColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.90f, 0.75f)));
+	FSlateFontInfo Font = Label->GetFont();
+	Font.Size = 14;
+	Label->SetFont(Font);
+	Label->SetAutoWrapText(true);
+	Button->AddChild(Label);
+	BuildingListBox->AddChildToVerticalBox(Button);
+	BuildingButtons.Add(Button);
 }
 
 void UBuildingMenuWidget::FilterByCategory(EBuildingCategory Category)
 {
 	CurrentCategory = Category;
-	SetCategoryVisibility(Category);
+	bShowAllCategories = false;
+	ApplyFilter();
 }
 
 void UBuildingMenuWidget::ShowAllBuildings()
 {
-	if (MilitaryBuildingsBox) MilitaryBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-	if (EconomicBuildingsBox) EconomicBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-	if (CivilBuildingsBox) CivilBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-	if (DefenseBuildingsBox) DefenseBuildingsBox->SetVisibility(ESlateVisibility::Visible);
+	bShowAllCategories = true;
+	ApplyFilter();
 }
 
-void UBuildingMenuWidget::SetCategoryVisibility(EBuildingCategory Category)
+void UBuildingMenuWidget::ApplyFilter()
 {
-	// Hide all
-	if (MilitaryBuildingsBox) MilitaryBuildingsBox->SetVisibility(ESlateVisibility::Collapsed);
-	if (EconomicBuildingsBox) EconomicBuildingsBox->SetVisibility(ESlateVisibility::Collapsed);
-	if (CivilBuildingsBox) CivilBuildingsBox->SetVisibility(ESlateVisibility::Collapsed);
-	if (DefenseBuildingsBox) DefenseBuildingsBox->SetVisibility(ESlateVisibility::Collapsed);
-
-	// Show selected
-	switch (Category)
+	for (URomanBuildingButton* Button : BuildingButtons)
 	{
-		case EBuildingCategory::Military:
-			if (MilitaryBuildingsBox) MilitaryBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-			break;
-		case EBuildingCategory::Economic:
-			if (EconomicBuildingsBox) EconomicBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-			break;
-		case EBuildingCategory::Civil:
-			if (CivilBuildingsBox) CivilBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-			break;
-		case EBuildingCategory::Defense:
-			if (DefenseBuildingsBox) DefenseBuildingsBox->SetVisibility(ESlateVisibility::Visible);
-			break;
+		if (Button)
+		{
+			const bool bVisible = bShowAllCategories || Button->GetBuildingCategory() == CurrentCategory;
+			Button->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		}
 	}
 }
 
-void UBuildingMenuWidget::CreateBuildingButton(FName BuildingID, const FBuildingData& Data, UVerticalBox* Container)
+void UBuildingMenuWidget::HandleBuildingButtonClicked(FName BuildingID)
 {
-	// In a full implementation, this would instantiate the button template
-	// and set up click handlers to broadcast OnBuildingSelected
-	
-	// The Blueprint version would create a button widget with:
-	// - Icon image
-	// - Name text
-	// - Cost display
-	// - Click handler calling OnBuildingSelected.Broadcast(BuildingID)
+	OnBuildingSelected.Broadcast(BuildingID);
 }
-
-void UBuildingMenuWidget::OnMilitaryTabClicked()
-{
-	FilterByCategory(EBuildingCategory::Military);
-}
-
-void UBuildingMenuWidget::OnEconomicTabClicked()
-{
-	FilterByCategory(EBuildingCategory::Economic);
-}
-
-void UBuildingMenuWidget::OnCivilTabClicked()
-{
-	FilterByCategory(EBuildingCategory::Civil);
-}
-
-void UBuildingMenuWidget::OnDefenseTabClicked()
-{
-	FilterByCategory(EBuildingCategory::Defense);
-}
-

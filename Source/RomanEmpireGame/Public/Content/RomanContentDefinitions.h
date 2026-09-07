@@ -21,6 +21,7 @@ namespace RomanEmpireContent
 
 	ROMANEMPIREGAME_API bool IsStableID(FName DefinitionID);
 	ROMANEMPIREGAME_API bool IsRuntimeFaction(EFactionID FactionID);
+	ROMANEMPIREGAME_API bool AreUnitStatsValid(const FUnitStats& Stats);
 }
 
 /** Immutable authored definition for one faction. Runtime resource wallets live elsewhere. */

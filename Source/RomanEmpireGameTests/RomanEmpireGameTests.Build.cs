@@ -14,7 +14,12 @@ public class RomanEmpireGameTests : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"RomanEmpireGame"
+			"RomanEmpireGame",
+			"UMG",
+			"Slate",
+			"SlateCore",
+			"InputCore",
+			"UnrealEd"
 		});
 	}
 }

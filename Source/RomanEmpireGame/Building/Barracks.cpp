@@ -8,6 +8,7 @@
 #include "Units/UnitBase.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Templates/UnrealTemplate.h"
 
 ABarracks::ABarracks()
 {
@@ -25,30 +26,36 @@ ABarracks::ABarracks()
 
 void ABarracks::Tick(float DeltaSeconds)
 {
+	if (bIsUpdatingProduction)
+	{
+		return;
+	}
 	Super::Tick(DeltaSeconds);
 
 	if (!IsComplete() || !bIsTraining)
 	{
 		return;
 	}
+	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
 
 	// Progress training
 	TrainingProgress += DeltaSeconds / TrainingTime;
 
 	if (TrainingProgress >= 1.0f)
 	{
-		SpawnTrainedUnit();
-		TrainingProgress = 0.0f;
-		bIsTraining = false;
-		CurrentlyTrainingID = NAME_None;
-
-		// Start next in queue
-		StartNextInQueue();
+		const bool bSpawnedUnit = SpawnTrainedUnit();
+		FinishCurrentOrder(bSpawnedUnit ? EProductionEventType::Completed : EProductionEventType::Failed);
 	}
 }
 
 bool ABarracks::TrainUnit(FName UnitID)
 {
+	if (bIsUpdatingProduction)
+	{
+		return false;
+	}
+	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
+
 	if (!RomanEmpireContent::IsStableID(UnitID) || !IsComplete() ||
 		!BuildingData.TrainableUnits.Contains(UnitID))
 	{
@@ -98,6 +105,7 @@ bool ABarracks::TrainUnit(FName UnitID)
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
 		TrainingTime = UnitDefinition.TrainingTime;
+		BroadcastProductionEvent(EProductionEventType::Started, UnitID);
 		
 		UE_LOG(LogRomanEmpire, Log, TEXT("Started training: %s"), *UnitID.ToString());
 	}
@@ -105,6 +113,7 @@ bool ABarracks::TrainUnit(FName UnitID)
 	{
 		// Add to queue
 		TrainingQueue.Add(UnitID);
+		BroadcastProductionEvent(EProductionEventType::Queued, UnitID);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Added to queue: %s (Queue size: %d)"), 
 			*UnitID.ToString(), TrainingQueue.Num());
 	}
@@ -114,24 +123,25 @@ bool ABarracks::TrainUnit(FName UnitID)
 
 void ABarracks::CancelTraining()
 {
+	if (bIsUpdatingProduction)
+	{
+		return;
+	}
+	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
+
 	if (bIsTraining)
 	{
-		bIsTraining = false;
-		TrainingProgress = 0.0f;
-		CurrentlyTrainingID = NAME_None;
-		
 		// Accepted orders consume their full reservation. A cancellation-refund policy is deferred.
-		
-		StartNextInQueue();
+		FinishCurrentOrder(EProductionEventType::Cancelled);
 	}
 }
 
-void ABarracks::SpawnTrainedUnit()
+bool ABarracks::SpawnTrainedUnit()
 {
 	UWorld* World = GetWorld();
 	if (!World || CurrentlyTrainingID.IsNone())
 	{
-		return;
+		return false;
 	}
 
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
@@ -141,7 +151,7 @@ void ABarracks::SpawnTrainedUnit()
 	{
 		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot spawn trained unit %s: factory class is unavailable"),
 			*CurrentlyTrainingID.ToString());
-		return;
+		return false;
 	}
 
 	const FVector SpawnLocation = GetActorLocation() + GetActorRotation().RotateVector(SpawnOffset);
@@ -157,28 +167,74 @@ void ABarracks::SpawnTrainedUnit()
 	if (NewUnit && NewUnit->InitializeUnit(CurrentlyTrainingID, OwnerFaction))
 	{
 		UGameplayStatics::FinishSpawningActor(NewUnit, SpawnTransform);
-		UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
+		if (IsValid(NewUnit) && NewUnit->IsAlive())
+		{
+			UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
+			return true;
+		}
 	}
 	else if (NewUnit)
 	{
 		NewUnit->Destroy();
 	}
+	UE_LOG(LogRomanEmpire, Warning, TEXT("Training failed to create unit %s"), *CurrentlyTrainingID.ToString());
+	return false;
 }
 
-void ABarracks::StartNextInQueue()
+FName ABarracks::StartNextInQueue(TArray<FName>& FailedOrders)
 {
-	if (TrainingQueue.Num() > 0)
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	while (!TrainingQueue.IsEmpty())
 	{
-		CurrentlyTrainingID = TrainingQueue[0];
+		const FName NextUnitID = TrainingQueue[0];
 		TrainingQueue.RemoveAt(0);
+
+		const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(NextUnitID) : nullptr;
+		if (!UnitAsset || !UnitAsset->UnitClass.Get() || UnitAsset->Definition.TrainingTime <= 0.0f)
+		{
+			FailedOrders.Add(NextUnitID);
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Queued production definition %s is unavailable"),
+				*NextUnitID.ToString());
+			continue;
+		}
+		CurrentlyTrainingID = NextUnitID;
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
-
-		const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
-		if (const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(CurrentlyTrainingID) : nullptr)
-		{
-			TrainingTime = UnitAsset->Definition.TrainingTime;
-		}
+		TrainingTime = UnitAsset->Definition.TrainingTime;
+		return NextUnitID;
 	}
+	return NAME_None;
+}
+
+void ABarracks::FinishCurrentOrder(EProductionEventType Type)
+{
+	const FName FinishedUnitID = CurrentlyTrainingID;
+	bIsTraining = false;
+	TrainingProgress = 0.0f;
+	TrainingTime = 0.0f;
+	CurrentlyTrainingID = NAME_None;
+
+	TArray<FName> FailedOrders;
+	const FName StartedUnitID = StartNextInQueue(FailedOrders);
+
+	// Every observer sees the next active order and final pending count, never a half-advanced queue.
+	BroadcastProductionEvent(Type, FinishedUnitID);
+	for (const FName FailedUnitID : FailedOrders)
+	{
+		BroadcastProductionEvent(EProductionEventType::Failed, FailedUnitID);
+	}
+	if (!StartedUnitID.IsNone())
+	{
+		BroadcastProductionEvent(EProductionEventType::Started, StartedUnitID);
+	}
+}
+
+void ABarracks::BroadcastProductionEvent(EProductionEventType Type, FName UnitID)
+{
+	FProductionEvent Event;
+	Event.Type = Type;
+	Event.UnitID = UnitID;
+	Event.PendingOrders = TrainingQueue.Num();
+	OnProductionChanged.Broadcast(this, Event);
 }
 

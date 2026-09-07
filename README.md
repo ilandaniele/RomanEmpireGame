@@ -78,7 +78,11 @@ Tools/                          Legacy orchestration/reporting tools
 
 Remote Control and Automation Driver are disabled in normal project defaults. Epic's UE 5.8 Unreal MCP is configured only for Editor targets with the narrowed `EditorToolset` and `AutomationTestToolset`; the broad `AllToolsets` plugin is disabled. The server is loopback-only, started manually per session, and absent from Game and Shipping receipts.
 
-## M1 implementation status
+## Current implementation status
+
+M1 is complete; M2.1–M2.5 now provide canonical resources/turns/territories/diplomacy, authored Primary Data Assets, and a native event-driven UMG interface. Ten automation tests cover rules, content, and live PIE UI interactions; Development/Shipping builds and the M2.5 packaged rendered smoke pass. Next is M2.6: committed Enhanced Input contexts and consistent command eligibility. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for exact gate evidence and remaining scope. The game still uses placeholder art and is not a finished vertical slice.
+
+### M1 baseline evidence
 
 - Visual Studio Build Tools 2022 17.14, MSVC 14.44, .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100 are installed and accepted by UE 5.8.2.
 - The supported build path leaves Windows Smart App Control enabled and uses direct non-UBA compilation by default; full Development and Shipping rebuilds, IWYU, tests, cook, package, and smoke launch pass on that path.

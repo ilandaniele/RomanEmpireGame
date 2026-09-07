@@ -58,6 +58,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentTurn() const;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnGameplayModeChanged,
+		EGameplayMode, OldMode,
+		EGameplayMode, NewMode);
+
+	UPROPERTY(BlueprintAssignable, Category = "Gameplay Mode")
+	FOnGameplayModeChanged OnGameplayModeChanged;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameplayInitialized);
+
+	UPROPERTY(BlueprintAssignable, Category = "Managers")
+	FOnGameplayInitialized OnGameplayInitialized;
+
+	UFUNCTION(BlueprintPure, Category = "Managers")
+	bool IsGameplayInitialized() const { return bGameplayInitialized; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Gameplay Mode")
 	EGameplayMode CurrentGameplayMode;
@@ -72,16 +88,8 @@ protected:
 	UPROPERTY()
 	TObjectPtr<ACampaignManager> CampaignManager;
 
-	// Gameplay mode change delegate
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
-		FOnGameplayModeChanged,
-		EGameplayMode, OldMode,
-		EGameplayMode, NewMode);
-	
-	UPROPERTY(BlueprintAssignable, Category = "Gameplay Mode")
-	FOnGameplayModeChanged OnGameplayModeChanged;
-
 private:
+	bool bGameplayInitialized = false;
 	static constexpr int32 PrototypeRandomSeed = 1337;
 	FRandomStream PrototypeRandomStream;
 

@@ -143,7 +143,12 @@ void ABuildingBase::OnConstruction(const FTransform& Transform)
 
 void ABuildingBase::SetOwnerFaction(EFactionID NewOwner)
 {
+	if (OwnerFaction == NewOwner)
+	{
+		return;
+	}
 	OwnerFaction = NewOwner;
+	OnBuildingStateChanged.Broadcast(this);
 	UE_LOG(LogRomanEmpire, Log, TEXT("Building %s now owned by faction %d"), 
 		*GetName(), static_cast<int32>(NewOwner));
 }
@@ -164,6 +169,7 @@ void ABuildingBase::StartConstruction()
 		
 		UE_LOG(LogRomanEmpire, Log, TEXT("Started construction of %s"), 
 			*BuildingData.DisplayName.ToString());
+		OnBuildingStateChanged.Broadcast(this);
 	}
 }
 
@@ -175,6 +181,7 @@ void ABuildingBase::UpdateConstruction(float DeltaSeconds)
 	}
 
 	// Progress construction
+	const int32 PreviousPercent = FMath::FloorToInt(ConstructionProgress * 100.0f);
 	float ProgressRate = 1.0f / BuildingData.ConstructionTime;
 	ConstructionProgress += ProgressRate * DeltaSeconds;
 
@@ -191,6 +198,10 @@ void ABuildingBase::UpdateConstruction(float DeltaSeconds)
 		ConstructionProgress = 1.0f;
 		OnConstructionFinished();
 	}
+	else if (PreviousPercent != FMath::FloorToInt(ConstructionProgress * 100.0f))
+	{
+		OnBuildingStateChanged.Broadcast(this);
+	}
 }
 
 void ABuildingBase::OnConstructionFinished()
@@ -204,6 +215,7 @@ void ABuildingBase::OnConstructionFinished()
 	
 	UpdateVisuals();
 	OnConstructionComplete.Broadcast(this);
+	OnBuildingStateChanged.Broadcast(this);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Construction complete: %s"), 
 		*BuildingData.DisplayName.ToString());
@@ -228,9 +240,14 @@ void ABuildingBase::ApplyBuildingDamage(float Damage, AActor* DamageSource)
 	}
 	else if (GetHealthPercent() < 0.5f)
 	{
-		CurrentState = EBuildingState::Damaged;
+		// Construction must keep progressing when damaged before completion.
+		if (CurrentState == EBuildingState::Complete)
+		{
+			CurrentState = EBuildingState::Damaged;
+		}
 		UpdateVisuals();
 	}
+	OnBuildingStateChanged.Broadcast(this);
 }
 
 void ABuildingBase::Repair(float Amount)
@@ -242,11 +259,12 @@ void ABuildingBase::Repair(float Amount)
 
 	CurrentHealth = FMath::Min(BuildingData.MaxHealth, CurrentHealth + FMath::RoundToInt(Amount));
 	
-	if (CurrentHealth > BuildingData.MaxHealth / 2)
+	if (CurrentHealth > BuildingData.MaxHealth / 2 && CurrentState == EBuildingState::Damaged)
 	{
 		CurrentState = EBuildingState::Complete;
 		UpdateVisuals();
 	}
+	OnBuildingStateChanged.Broadcast(this);
 }
 
 void ABuildingBase::OnDestroyed()

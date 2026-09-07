@@ -69,7 +69,7 @@ public:
 	void Repair(float Amount);
 
 	UFUNCTION(BlueprintPure, Category = "Building|Health")
-	float GetHealthPercent() const { return (float)CurrentHealth / (float)BuildingData.MaxHealth; }
+	float GetHealthPercent() const { return BuildingData.MaxHealth > 0 ? (float)CurrentHealth / (float)BuildingData.MaxHealth : 0.0f; }
 
 	// Placement validation
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
@@ -85,6 +85,24 @@ public:
 	// Visual feedback for placement
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void SetPlacementMode(bool bPlacing, bool bValidPlacement);
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConstructionComplete, ABuildingBase*, Building);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnBuildingDamaged, ABuildingBase*, Building, float, Damage);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingDestroyed, ABuildingBase*, Building);
+
+	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
+	FOnConstructionComplete OnConstructionComplete;
+
+	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
+	FOnBuildingDamaged OnBuildingDamaged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
+	FOnBuildingDestroyed OnBuildingDestroyed;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingStateChanged, ABuildingBase*, Building);
+
+	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
+	FOnBuildingStateChanged OnBuildingStateChanged;
 
 protected:
 	/** Stable ID only; authored values live in URomanBuildingDefinition assets. */
@@ -136,20 +154,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Visuals")
 	UMaterialInterface* CompleteMaterial;
-
-	// Events
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConstructionComplete, ABuildingBase*, Building);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnBuildingDamaged, ABuildingBase*, Building, float, Damage);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingDestroyed, ABuildingBase*, Building);
-
-	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
-	FOnConstructionComplete OnConstructionComplete;
-
-	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
-	FOnBuildingDamaged OnBuildingDamaged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Building|Events")
-	FOnBuildingDestroyed OnBuildingDestroyed;
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void UpdateConstruction(float DeltaSeconds);

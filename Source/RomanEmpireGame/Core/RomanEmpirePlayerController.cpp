@@ -2,14 +2,16 @@
 
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireGameMode.h"
-#include "RomanEmpireHUD.h"
 #include "RomanEmpireGame.h"
 #include "Content/RomanContentRegistry.h"
+#include "Faction/FactionManager.h"
+#include "World/CampaignManager.h"
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
 #include "Building/BuildingPlacementComponent.h"
 #include "Camera/SeamlessZoomCamera.h"
+#include "UI/RomanEmpireMainWidget.h"
 #include "CollisionQueryParams.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
@@ -55,6 +57,8 @@ ARomanEmpirePlayerController::ARomanEmpirePlayerController()
 	IA_BuildKey5 = nullptr;
 	IA_BuildKey6 = nullptr;
 	SelectedBuilding = nullptr;
+	MainWidgetClass = URomanEmpireMainWidget::StaticClass();
+	MainWidget = nullptr;
 }
 
 void ARomanEmpirePlayerController::CreateInputActionsAndMappings()
@@ -289,6 +293,19 @@ void ARomanEmpirePlayerController::BeginPlay()
 		BuildingPlacementComponent->RegisterComponent();
 	}
 
+	const TSubclassOf<URomanEmpireMainWidget> WidgetClass = MainWidgetClass
+		? MainWidgetClass.Get()
+		: URomanEmpireMainWidget::StaticClass();
+	MainWidget = IsLocalController() ? CreateWidget<URomanEmpireMainWidget>(this, WidgetClass) : nullptr;
+	if (MainWidget)
+	{
+		MainWidget->AddToViewport();
+	}
+	else if (IsLocalController())
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Failed to create the production UMG root widget"));
+	}
+
 	// Set input mode: game + UI, mouse visible, not locked
 	bShowMouseCursor = true;
 	FInputModeGameAndUI InputMode;
@@ -297,6 +314,27 @@ void ARomanEmpirePlayerController::BeginPlay()
 	SetInputMode(InputMode);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized — all input active"));
+}
+
+void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (MainWidget)
+	{
+		MainWidget->RemoveFromParent();
+		MainWidget = nullptr;
+	}
+	ClearSelectedActors();
+	if (CachedCameraPawn)
+	{
+		CachedCameraPawn->OnZoomLevelChanged.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleCameraZoomLevelChanged);
+	}
+	if (PossessedUnit)
+	{
+		PossessedUnit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
+		PossessedUnit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void ARomanEmpirePlayerController::SetupInputComponent()
@@ -395,39 +433,115 @@ void ARomanEmpirePlayerController::HandleEdgeScroll(float DeltaTime)
 
 void ARomanEmpirePlayerController::SelectUnit(AUnitBase* Unit)
 {
-	ClearSelection();
-	if (Unit)
-	{
-		SelectedUnits.Add(Unit);
-		Unit->SetSelected(true);
-		UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected unit: %s"), *Unit->GetName());
-	}
+	SelectUnits({ Unit });
 }
 
 void ARomanEmpirePlayerController::SelectUnits(const TArray<AUnitBase*>& Units)
 {
-	ClearSelection();
-	for (AUnitBase* Unit : Units)
+	const TArray<AUnitBase*> RequestedUnits = Units;
+	ClearSelectedActors();
+	for (AUnitBase* Unit : RequestedUnits)
 	{
-		if (Unit)
+		if (IsValid(Unit) && Unit->IsAlive() && !SelectedUnits.Contains(Unit))
 		{
 			SelectedUnits.Add(Unit);
 			Unit->SetSelected(true);
+			Unit->OnUnitDied.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitDied);
+			Unit->OnDestroyed.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 		}
 	}
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected %d units"), SelectedUnits.Num());
+	BroadcastSelectionChanged();
 }
 
 void ARomanEmpirePlayerController::ClearSelection()
 {
+	ClearSelectedActors();
+	BroadcastSelectionChanged();
+}
+
+void ARomanEmpirePlayerController::SelectBuilding(ABuildingBase* Building)
+{
+	ClearSelectedActors();
+	SelectedBuilding = IsValid(Building) && Building->GetBuildingState() != EBuildingState::Destroyed ? Building : nullptr;
+	if (SelectedBuilding)
+	{
+		SelectedBuilding->SetSelected(true);
+		SelectedBuilding->OnBuildingDestroyed.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed);
+		SelectedBuilding->AActor::OnDestroyed.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
+		UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected building: %s"), *SelectedBuilding->GetName());
+	}
+	BroadcastSelectionChanged();
+}
+
+void ARomanEmpirePlayerController::ClearSelectedActors()
+{
 	for (AUnitBase* Unit : SelectedUnits)
 	{
-		if (Unit)
+		if (IsValid(Unit))
 		{
 			Unit->SetSelected(false);
+			Unit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitDied);
+			Unit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 		}
 	}
 	SelectedUnits.Empty();
+	if (SelectedBuilding)
+	{
+		SelectedBuilding->SetSelected(false);
+		SelectedBuilding->OnBuildingDestroyed.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed);
+		SelectedBuilding->AActor::OnDestroyed.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
+	}
+	SelectedBuilding = nullptr;
+}
+
+void ARomanEmpirePlayerController::BroadcastSelectionChanged()
+{
+	OnSelectionChanged.Broadcast(SelectedUnits, SelectedBuilding);
+}
+
+void ARomanEmpirePlayerController::HandleSelectedUnitDied(AUnitBase* Unit)
+{
+	HandleSelectedActorDestroyed(Unit);
+}
+
+void ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed(ABuildingBase* Building)
+{
+	HandleSelectedActorDestroyed(Building);
+}
+
+void ARomanEmpirePlayerController::HandleSelectedActorDestroyed(AActor* Actor)
+{
+	if (Actor == SelectedBuilding)
+	{
+		ClearSelection();
+	}
+	else if (AUnitBase* Unit = Cast<AUnitBase>(Actor); SelectedUnits.Contains(Unit))
+	{
+		TArray<AUnitBase*> RemainingUnits = SelectedUnits;
+		RemainingUnits.Remove(Unit);
+		SelectUnits(RemainingUnits);
+	}
+}
+
+void ARomanEmpirePlayerController::HandlePossessedUnitDied(AUnitBase* Unit)
+{
+	if (Unit == PossessedUnit)
+	{
+		ExitFirstPersonMode();
+	}
+}
+
+void ARomanEmpirePlayerController::HandlePossessedActorDestroyed(AActor* Actor)
+{
+	if (Actor == PossessedUnit)
+	{
+		ExitFirstPersonMode();
+	}
 }
 
 void ARomanEmpirePlayerController::StartBuildingPlacement(FName BuildingID)
@@ -452,9 +566,12 @@ void ARomanEmpirePlayerController::CancelBuildingPlacement()
 
 void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess)
 {
-	if (!UnitToPossess)
+	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	if (!IsValid(UnitToPossess) || !UnitToPossess->IsAlive() || !FactionManager ||
+		UnitToPossess->GetOwnerFaction() != FactionManager->GetPlayerFaction() ||
+		GameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical)
 	{
-		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot enter FPS mode: no unit specified"));
+		UE_LOG(LogRomanEmpire, Verbose, TEXT("Possession request requires a living player unit in tactical mode"));
 		return;
 	}
 
@@ -464,12 +581,20 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	{
 		CachedCameraPawn = CamPawn;
 	}
+	if (!IsValid(CachedCameraPawn))
+	{
+		return;
+	}
+	CancelBuildingPlacement();
 
+	AUnitBase* PreviousUnit = PossessedUnit;
 	PossessedUnit = UnitToPossess;
 	bShowMouseCursor = false;
 
 	// Mark unit as player-possessed
 	UnitToPossess->SetPossessedByPlayer(true);
+	UnitToPossess->OnUnitDied.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
+	UnitToPossess->OnDestroyed.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
 
 	// Actually possess the unit pawn so the camera follows it
 	Possess(UnitToPossess);
@@ -480,6 +605,7 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	{
 		GameMode->SetGameplayMode(EGameplayMode::Possessed);
 	}
+	OnPossessedUnitChanged.Broadcast(PreviousUnit, PossessedUnit);
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Entered FPS mode with unit: %s"), *UnitToPossess->GetName());
 }
@@ -491,19 +617,24 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 		return;
 	}
 
+	AUnitBase* PreviousUnit = PossessedUnit;
+
 	// Unpossess the unit
 	if (PossessedUnit)
 	{
 		PossessedUnit->SetPossessedByPlayer(false);
-
-		// Spawn AI controller for the unit again
-		PossessedUnit->SpawnDefaultController();
+		PossessedUnit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
+		PossessedUnit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
 	}
 
 	// Re-possess the camera pawn
 	if (CachedCameraPawn)
 	{
 		Possess(CachedCameraPawn);
+	}
+	if (IsValid(PreviousUnit) && PreviousUnit->IsAlive())
+	{
+		PreviousUnit->SpawnDefaultController();
 	}
 
 	PossessedUnit = nullptr;
@@ -521,6 +652,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 			: EZoomLevel::City;
 		GameMode->SetGameplayMode(RomanEmpireGameplay::GetExplorationModeForZoomLevel(ZoomLevel));
 	}
+	OnPossessedUnitChanged.Broadcast(PreviousUnit, nullptr);
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Exited FPS mode — camera restored"));
 }
@@ -760,9 +892,9 @@ void ARomanEmpirePlayerController::OnEnterFPSPressed()
 
 void ARomanEmpirePlayerController::OnBuildMenuPressed()
 {
-	if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
+	if (MainWidget)
 	{
-		REHUD->ToggleBuildingMenu();
+		MainWidget->ToggleBuildingMenu();
 	}
 
 	// If building menu is now visible, enter building placement with Barracks
@@ -888,49 +1020,24 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 		AActor* HitActor = GetActorUnderCursor();
 		if (AUnitBase* Unit = Cast<AUnitBase>(HitActor))
 		{
-			SelectedBuilding = nullptr;
-			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->SetSelectedBuilding(nullptr);
 			SelectUnit(Unit);
 		}
 		else if (ABuildingBase* Building = Cast<ABuildingBase>(HitActor))
 		{
-			// Building clicked — show its panel
-			ClearSelection();
-			SelectedBuilding = Building;
-			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
-			{
-				REHUD->SetSelectedBuilding(Building);
-			}
+			// Building clicked - UMG observes this canonical selection event.
+			SelectBuilding(Building);
 			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::White,
 				FString::Printf(TEXT("Selected building: %s"), *Building->GetName()));
-
-			// Check if TRAIN button was clicked (Barracks panel)
-			if (ABarracks* Bar = Cast<ABarracks>(Building))
-			{
-				if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD()))
-				{
-					float MX, MY;
-					GetMousePosition(MX, MY);
-					if (MX >= REHUD->TrainButtonMin.X && MX <= REHUD->TrainButtonMax.X &&
-						MY >= REHUD->TrainButtonMin.Y && MY <= REHUD->TrainButtonMax.Y)
-					{
-						OnTrainButtonClicked();
-					}
-				}
-			}
 		}
 		else
 		{
-			SelectedBuilding = nullptr;
-			if (ARomanEmpireHUD* REHUD = Cast<ARomanEmpireHUD>(GetHUD())) REHUD->SetSelectedBuilding(nullptr);
 			ClearSelection();
 		}
 	}
 	else
 	{
 		// Box selection — find all units within screen rect
-		ClearSelection();
-		
+		TArray<AUnitBase*> UnitsInBox;
 		TArray<AActor*> AllUnits;
 		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
 		
@@ -948,13 +1055,13 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 				if (ScreenPos.X >= MinBox.X && ScreenPos.X <= MaxBox.X &&
 					ScreenPos.Y >= MinBox.Y && ScreenPos.Y <= MaxBox.Y)
 				{
-					SelectedUnits.Add(Unit);
-					Unit->SetSelected(true);
+					UnitsInBox.Add(Unit);
 				}
 			}
 		}
-		
-		UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), SelectedUnits.Num());
+
+		SelectUnits(UnitsInBox);
+		UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), UnitsInBox.Num());
 	}
 }
 
@@ -974,18 +1081,22 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 	return nullptr;
 }
 
-void ARomanEmpirePlayerController::OnTrainButtonClicked()
+bool ARomanEmpirePlayerController::OnTrainButtonClicked()
 {
 	ABarracks* Barracks = Cast<ABarracks>(SelectedBuilding);
-	if (!Barracks)
+	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
+	if (!IsValid(Barracks) || !FactionManager || !Campaign || !Campaign->IsCampaignActive() ||
+		GameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical ||
+		Barracks->GetOwnerFaction() != FactionManager->GetPlayerFaction())
 	{
-		return;
+		return false;
 	}
 
 	const TArray<FName>& TrainableUnits = Barracks->GetBuildingData().TrainableUnits;
 	if (TrainableUnits.IsEmpty())
 	{
-		return;
+		return false;
 	}
 
 	const FName UnitID = TrainableUnits[0];
@@ -996,10 +1107,10 @@ void ARomanEmpirePlayerController::OnTrainButtonClicked()
 	{
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
 			FString::Printf(TEXT("%s training request accepted"), *UnitName));
+		return true;
 	}
-	else
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
-			FString::Printf(TEXT("%s training request rejected"), *UnitName));
-	}
+
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+		FString::Printf(TEXT("%s training request rejected"), *UnitName));
+	return false;
 }

@@ -58,7 +58,7 @@ M1 created these source assets through Unreal Editor and they are committed:
 - `/Game/Maps/L_Testbed.umap`.
 - `/Game/Maps/L_VerticalSlice.umap`.
 
-Faction, unit, building, and territory Data Assets are now present from M2.4. Dedicated Enhanced Input actions/mapping contexts and production UMG assets remain planned for M2.5–M2.6 and must follow the same provenance, LFS, validation, cook, and package rules.
+Faction, unit, building, and territory Data Assets are present from M2.4. M2.5 implements the functional production UI as native UMG trees in C++; no new Widget Blueprint, imported font, texture, external art, or generated image is introduced. Visual asset authoring remains M6 work. Dedicated Enhanced Input actions/mapping contexts remain planned for M2.6 and must follow the same provenance, LFS, validation, cook, and package rules.
 
 No generated asset is accepted merely because a script or MCP call succeeds. It must load without warnings, validate, cook, package, and remain covered by Git LFS.
 

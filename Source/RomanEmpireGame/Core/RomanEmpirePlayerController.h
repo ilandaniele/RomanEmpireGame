@@ -17,6 +17,7 @@ class ABarracks;
 class ALegionary;
 class UBuildingPlacementComponent;
 class ASeamlessZoomCamera;
+class URomanEmpireMainWidget;
 
 /**
  * Selection mode for the player
@@ -43,6 +44,7 @@ public:
 	ARomanEmpirePlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -58,6 +60,20 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Selection")
 	TArray<AUnitBase*> GetSelectedUnits() const { return SelectedUnits; }
+
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void SelectBuilding(ABuildingBase* Building);
+
+	UFUNCTION(BlueprintPure, Category = "Selection")
+	ABuildingBase* GetSelectedBuilding() const { return SelectedBuilding; }
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnSelectionChanged,
+		const TArray<AUnitBase*>&, Units,
+		ABuildingBase*, Building);
+
+	UPROPERTY(BlueprintAssignable, Category = "Selection|Events")
+	FOnSelectionChanged OnSelectionChanged;
 
 	// Building
 	UFUNCTION(BlueprintCallable, Category = "Building")
@@ -83,6 +99,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "FPS")
 	bool IsInFirstPersonMode() const;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnPossessedUnitChanged,
+		AUnitBase*, PreviousUnit,
+		AUnitBase*, NewUnit);
+
+	UPROPERTY(BlueprintAssignable, Category = "FPS|Events")
+	FOnPossessedUnitChanged OnPossessedUnitChanged;
+
 	// Zoom control
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetTargetZoom(float NewZoom);
@@ -95,7 +119,10 @@ public:
 	TObjectPtr<ABuildingBase> SelectedBuilding;
 
 	// Building select / training
-	void OnTrainButtonClicked();
+	bool OnTrainButtonClicked();
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	URomanEmpireMainWidget* GetMainWidget() const { return MainWidget; }
 
 protected:
 	// Enhanced Input — created programmatically, no Blueprint assets needed
@@ -169,6 +196,12 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UBuildingPlacementComponent> BuildingPlacementComponent;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<URomanEmpireMainWidget> MainWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<URomanEmpireMainWidget> MainWidget;
+
 	// Input handlers
 	void OnSelectPressed();
 	void OnSelectReleased();
@@ -201,5 +234,22 @@ private:
 	void CreateInputActionsAndMappings();
 	void StartBuildingPlacementByQuickSlot(int32 QuickSlot);
 	void PerformBoxSelect();
+	void ClearSelectedActors();
+	void BroadcastSelectionChanged();
+
+	UFUNCTION()
+	void HandleSelectedUnitDied(AUnitBase* Unit);
+
+	UFUNCTION()
+	void HandleSelectedBuildingDestroyed(ABuildingBase* Building);
+
+	UFUNCTION()
+	void HandleSelectedActorDestroyed(AActor* Actor);
+
+	UFUNCTION()
+	void HandlePossessedUnitDied(AUnitBase* Unit);
+
+	UFUNCTION()
+	void HandlePossessedActorDestroyed(AActor* Actor);
 	AActor* GetActorUnderCursor() const;
 };

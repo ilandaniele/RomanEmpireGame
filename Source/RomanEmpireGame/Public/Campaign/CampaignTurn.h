@@ -30,7 +30,8 @@ enum class ECampaignTurnFailure : uint8
 	MissingFactionManager	UMETA(DisplayName = "Missing Faction Manager"),
 	MissingWorldMapManager	UMETA(DisplayName = "Missing World Map Manager"),
 	ResourceTransactionFailed UMETA(DisplayName = "Resource Transaction Failed"),
-	AutosaveFailed			UMETA(DisplayName = "Autosave Failed")
+	AutosaveFailed			UMETA(DisplayName = "Autosave Failed"),
+	TurnAlreadyProcessing	UMETA(DisplayName = "Turn Already Processing")
 };
 
 /** Audit result for one attempted campaign turn. */

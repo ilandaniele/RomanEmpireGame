@@ -59,6 +59,11 @@ void ARomanEmpireGameMode::BeginPlay()
 		SetExplorationModeForZoomLevel(CameraPawn->GetZoomLevelEnum());
 		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to tactical zoom %.2f"), Zoom.DefaultTactical);
 	}
+	bGameplayInitialized = FactionManager && WorldMapManager && CampaignManager;
+	if (bGameplayInitialized)
+	{
+		OnGameplayInitialized.Broadcast();
+	}
 }
 
 void ARomanEmpireGameMode::SetGameplayMode(EGameplayMode NewMode)

@@ -5,93 +5,91 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Building/BuildingTypes.h"
+#include "Components/Button.h"
 #include "BuildingMenuWidget.generated.h"
 
-class UVerticalBox;
-class UButton;
-class UImage;
 class UTextBlock;
-class ABuildingBase;
+class UVerticalBox;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBuildingSelected, FName, BuildingID);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnRomanBuildingButtonClicked, FName, BuildingID);
 
-/**
- * Building selection menu (Age of Empires style)
- * Shows available buildings organized by category
- */
+/** Mouse-operated HUD control that leaves keyboard focus with gameplay. */
+UCLASS()
+class ROMANEMPIREGAME_API URomanHUDButton : public UButton
+{
+	GENERATED_BODY()
+
+public:
+	URomanHUDButton(const FObjectInitializer& ObjectInitializer);
+};
+
+/** UMG button that carries only a stable content ID. */
+UCLASS()
+class ROMANEMPIREGAME_API URomanBuildingButton : public URomanHUDButton
+{
+	GENERATED_BODY()
+
+public:
+	void InitializeBuildingButton(FName InBuildingID, EBuildingCategory InCategory);
+
+	FName GetBuildingID() const { return BuildingID; }
+	EBuildingCategory GetBuildingCategory() const { return BuildingCategory; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Building Menu")
+	FOnRomanBuildingButtonClicked OnBuildingButtonClicked;
+
+private:
+	UPROPERTY(Transient)
+	FName BuildingID = NAME_None;
+
+	UPROPERTY(Transient)
+	EBuildingCategory BuildingCategory = EBuildingCategory::Military;
+
+	UFUNCTION()
+	void HandleClicked();
+};
+
+/** Data-driven native UMG building menu. */
 UCLASS()
 class ROMANEMPIREGAME_API UBuildingMenuWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
+	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
+	virtual TSharedRef<SWidget> RebuildWidget() override;
 
-	// Populate menu with available buildings
 	UFUNCTION(BlueprintCallable, Category = "Building Menu")
 	void PopulateBuildingList();
 
-	// Filter by category
 	UFUNCTION(BlueprintCallable, Category = "Building Menu")
 	void FilterByCategory(EBuildingCategory Category);
 
-	// Show all buildings
 	UFUNCTION(BlueprintCallable, Category = "Building Menu")
 	void ShowAllBuildings();
 
-	// Event when building is selected
 	UPROPERTY(BlueprintAssignable, Category = "Building Menu")
 	FOnBuildingSelected OnBuildingSelected;
 
-protected:
-	// UI containers
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UVerticalBox* MilitaryBuildingsBox;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UVerticalBox* EconomicBuildingsBox;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UVerticalBox* CivilBuildingsBox;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UVerticalBox* DefenseBuildingsBox;
-
-	// Category buttons
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UButton* MilitaryTabButton;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UButton* EconomicTabButton;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UButton* CivilTabButton;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "UI")
-	UButton* DefenseTabButton;
-
-	// Building button template
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Menu")
-	TSubclassOf<UUserWidget> BuildingButtonTemplate;
-
-	// Current filter
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building Menu")
-	EBuildingCategory CurrentCategory;
-
-	UFUNCTION()
-	void OnMilitaryTabClicked();
-
-	UFUNCTION()
-	void OnEconomicTabClicked();
-
-	UFUNCTION()
-	void OnCivilTabClicked();
-
-	UFUNCTION()
-	void OnDefenseTabClicked();
-
 private:
-	void CreateBuildingButton(FName BuildingID, const FBuildingData& Data, UVerticalBox* Container);
-	void SetCategoryVisibility(EBuildingCategory Category);
-};
+	UPROPERTY(Transient)
+	TObjectPtr<UVerticalBox> BuildingListBox;
 
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<URomanBuildingButton>> BuildingButtons;
+
+	UPROPERTY(Transient)
+	EBuildingCategory CurrentCategory = EBuildingCategory::Military;
+
+	UPROPERTY(Transient)
+	bool bShowAllCategories = true;
+
+	void BuildNativeWidgetTree();
+	void CreateBuildingButton(FName BuildingID, const FBuildingData& Data, int32 QuickSlot);
+	void ApplyFilter();
+
+	UFUNCTION()
+	void HandleBuildingButtonClicked(FName BuildingID);
+};

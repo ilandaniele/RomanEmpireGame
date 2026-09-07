@@ -147,7 +147,12 @@ bool AFactionManager::AreAllied(EFactionID Faction1, EFactionID Faction2) const
 
 void AFactionManager::SetPlayerFaction(EFactionID NewFaction)
 {
+	if (NewFaction == PlayerFaction || !FactionInfoMap.Contains(NewFaction))
+	{
+		return;
+	}
 	PlayerFaction = NewFaction;
+	OnPlayerFactionChanged.Broadcast(PlayerFaction);
 	UE_LOG(LogRomanEmpire, Log, TEXT("Player faction set to: %d"), static_cast<int32>(NewFaction));
 }
 

@@ -55,20 +55,23 @@ FPrimaryAssetId URomanTerritoryDefinition::GetPrimaryAssetId() const
 	return FPrimaryAssetId(RomanEmpireContent::TerritoryAssetType, GetFName());
 }
 
-#if WITH_EDITOR
-namespace
+namespace RomanEmpireContent
 {
-	void AddError(FDataValidationContext& Context, const TCHAR* Message)
-	{
-		Context.AddError(FText::FromString(Message));
-	}
-
 	bool AreUnitStatsValid(const FUnitStats& Stats)
 	{
 		return Stats.MaxHealth > 0 && Stats.MeleeAttack >= 0 && Stats.RangedAttack >= 0 &&
 			Stats.MeleeDefense >= 0 && Stats.RangedDefense >= 0 && Stats.Armor >= 0 &&
 			Stats.Speed > 0.0f && Stats.Morale >= 0 && Stats.Stamina > 0.0f &&
 			Stats.AttackSpeed > 0.0f && Stats.BlockStrength >= 0.0f && Stats.DodgeSpeed >= 0.0f;
+	}
+}
+
+#if WITH_EDITOR
+namespace
+{
+	void AddError(FDataValidationContext& Context, const TCHAR* Message)
+	{
+		Context.AddError(FText::FromString(Message));
 	}
 }
 
@@ -107,7 +110,7 @@ EDataValidationResult URomanUnitDefinition::IsDataValid(FDataValidationContext& 
 		Result = EDataValidationResult::Invalid;
 	}
 	if (!Definition.TrainingCost.IsNonNegative() || Definition.TrainingTime <= 0.0f ||
-		Definition.AttackRange <= 0.0f || !AreUnitStatsValid(Definition.BaseStats) ||
+		Definition.AttackRange <= 0.0f || !RomanEmpireContent::AreUnitStatsValid(Definition.BaseStats) ||
 		Definition.StartingRangedAmmo < 0 || Definition.SpecialRangedDamage < 0.0f ||
 		Definition.SpecialRangedRange < 0.0f ||
 		(Definition.bCanUseRanged &&

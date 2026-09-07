@@ -78,6 +78,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Faction")
 	void SetPlayerFaction(EFactionID NewFaction);
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerFactionChanged, EFactionID, NewFaction);
+
+	UPROPERTY(BlueprintAssignable, Category = "Faction|Events")
+	FOnPlayerFactionChanged OnPlayerFactionChanged;
+
 	// AI turn processing
 	UFUNCTION(BlueprintCallable, Category = "Faction|AI")
 	void ProcessAITurns();

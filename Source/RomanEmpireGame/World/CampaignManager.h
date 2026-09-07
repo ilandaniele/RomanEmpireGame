@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Campaign/CampaignObjectiveState.h"
 #include "Campaign/CampaignTurn.h"
 #include "GameFramework/Actor.h"
 #include "Faction/FactionData.h"
@@ -11,18 +12,6 @@
 
 class AFactionManager;
 class AWorldMapManager;
-
-/**
- * Victory condition types
- */
-UENUM(BlueprintType)
-enum class EVictoryCondition : uint8
-{
-	Conquest		UMETA(DisplayName = "Conquest"),        // Control all territories
-	Economic		UMETA(DisplayName = "Economic"),        // Accumulate wealth
-	Military		UMETA(DisplayName = "Military"),        // Destroy all enemy armies
-	Diplomatic		UMETA(DisplayName = "Diplomatic")       // Allied victory
-};
 
 /**
  * Manages the campaign/strategic layer of the game
@@ -37,6 +26,7 @@ public:
 	ACampaignManager();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// Turn management
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
@@ -55,6 +45,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool HasPlayerLost() const;
 
+	UFUNCTION(BlueprintPure, Category = "Campaign|Objectives")
+	FCampaignObjectiveState GetObjectiveState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Campaign|Objectives")
+	ECampaignOutcome GetCampaignOutcome() const { return CampaignOutcome; }
+
+	UFUNCTION(BlueprintPure, Category = "Campaign|Objectives")
+	EVictoryCondition GetResolvedVictoryCondition() const { return ResolvedVictoryCondition; }
+
 	// Game state
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void StartNewCampaign(EFactionID PlayerFaction);
@@ -71,6 +70,41 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void LoadCampaign(const FString& SaveName);
+
+	// Public event surface consumed by UMG, controllers, and tests.
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+		FOnTurnStepStarted,
+		int32, TurnNumber,
+		ECampaignTurnStep, Step);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnProcessed, int32, TurnNumber);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignAutosaveRequested, int32, TurnNumber);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignStarted, EFactionID, PlayerFaction);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+		FOnCampaignObjectivesChanged,
+		FCampaignObjectiveState, ObjectiveState);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnVictory, EFactionID, WinningFaction, EVictoryCondition, Condition);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefeat, EFactionID, LosingFaction);
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnTurnStepStarted OnTurnStepStarted;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnTurnProcessed OnTurnProcessed;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnCampaignAutosaveRequested OnCampaignAutosaveRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnCampaignStarted OnCampaignStarted;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnCampaignObjectivesChanged OnCampaignObjectivesChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnVictory OnVictory;
+
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
+	FOnDefeat OnDefeat;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
@@ -91,6 +125,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign")
 	int32 LastAutosaveRequestedTurn;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign|Objectives")
+	ECampaignOutcome CampaignOutcome;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign|Objectives")
+	EVictoryCondition ResolvedVictoryCondition;
+
 	// References
 	UPROPERTY()
 	TObjectPtr<AFactionManager> FactionManager;
@@ -98,34 +138,11 @@ protected:
 	UPROPERTY()
 	TObjectPtr<AWorldMapManager> WorldMapManager;
 
-	// Events
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
-		FOnTurnStepStarted,
-		int32, TurnNumber,
-		ECampaignTurnStep, Step);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnProcessed, int32, TurnNumber);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignAutosaveRequested, int32, TurnNumber);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnVictory, EFactionID, WinningFaction, EVictoryCondition, Condition);
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefeat, EFactionID, LosingFaction);
-
-	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
-	FOnTurnStepStarted OnTurnStepStarted;
-
-	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
-	FOnTurnProcessed OnTurnProcessed;
-
-	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
-	FOnCampaignAutosaveRequested OnCampaignAutosaveRequested;
-
-	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
-	FOnVictory OnVictory;
-
-	UPROPERTY(BlueprintAssignable, Category = "Campaign|Events")
-	FOnDefeat OnDefeat;
-
 private:
 	static constexpr int32 PrototypeTurnRandomSeed = 1337;
 	FRandomStream TurnRandomStream;
+	bool bIsProcessingTurn = false;
+	bool bIsStartingCampaign = false;
 
 	ECampaignTurnFailure ExecuteTurnStep(ECampaignTurnStep Step);
 	ECampaignTurnFailure ValidateTurnRequest() const;
@@ -135,5 +152,16 @@ private:
 	ECampaignTurnFailure ResolveTurnConflicts();
 	ECampaignTurnFailure RequestAutosave();
 	void CheckAllVictoryConditions();
+	void BroadcastObjectiveProgress();
+	bool IsPlayerDefeatConditionMet() const;
+
+	UFUNCTION()
+	void HandleFactionResourcesChanged(EFactionID FactionID, FFactionResourceAmounts NewBalance);
+
+	UFUNCTION()
+	void HandlePlayerFactionChanged(EFactionID PlayerFaction);
+
+	UFUNCTION()
+	void HandleTerritoryOwnerChanged(FName TerritoryID, EFactionID PreviousOwner, EFactionID NewOwner);
 };
 
