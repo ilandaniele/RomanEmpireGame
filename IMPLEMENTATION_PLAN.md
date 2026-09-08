@@ -427,6 +427,14 @@ Evidence and exit gate:
 - Searches find no duplicate resource wallet, turn counter, or territory-ownership store.
 - Changing one data asset updates the runtime and UI without changing C++ constants.
 
+Aggregate exit review update (2026-09-08; M2 remains open):
+
+- The new `RomanEmpireGame.Content.DefinitionPropagationAndAtomicPlacementPIE` test proves a real loaded Barracks definition change reaches the normal registry, build menu, placement factory, construction duration and selected-building UI. The fixture restores the definition/dirty state without saving; the asset's disk hash matches its committed LFS payload. This is startup/spawn propagation, not live hot-reload of existing actors.
+- The audit found that a single placement spend call did not ensure exactly-once execution: synchronous wallet observers could recursively confirm. Placement now guards confirmation/start/transform reentry, initializes the captured definition before spending, and publishes only after clearing consumed preview state. Tests cover all six currencies, event/actor counts, cancel/restart observers, insufficient funds and retry.
+- The regression is mutation-proven: temporarily removing the confirmation guard produced two buildings and 74 gold spent instead of 37. After restoring the guard, the final suite passed 14/14 (`Artifacts/Automation/20260908_151420_304`), with strict non-unity/no-PCH compilation passing as well. Full evidence and limits are in `M2_EXIT_REVIEW.md`.
+- **Remaining architecture requirement:** the responsibility map still calls for `ARomanEmpireGameState` as the public phase/turn/resources/match contract, but the runtime currently instantiates `AGameStateBase`. Implement that public read contract and consumer/test integration without duplicating the canonical managers' mutable state, then repeat the final M2 audit. Do not remove this requirement or begin M3 on the assumption that the existing base GameState fulfills it.
+- Shipping and Development BuildCookRun also pass; `Artifacts/Packages/M2_Exit` contains 559 archived packages and cook reports 0 errors/warnings. The new standalone player is rejected before startup by Windows Code Integrity (3033/3077, 2026-09-08); no security policy was changed. Its hash and the pending standalone launch gate are recorded in `M2_EXIT_REVIEW.md`. The older M2.6 smoke does not certify this new binary.
+
 Estimated effort: 1–2 focused weeks.
 
 ### M3 — Tactical RTS vertical slice

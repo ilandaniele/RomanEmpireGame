@@ -310,8 +310,13 @@ Assert-True -Condition ($menuSource -match 'GetAllBuildings\s*\(' -and $menuSour
 
 $placementSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\BuildingPlacementComponent.cpp')
 $placementSpendCount = [regex]::Matches($placementSource, '\bTrySpendFactionResources\s*\(').Count
+# This constrains call sites, not execution count: synchronous event reentry is
+# covered by the live PIE regression, whose passing report must also be inspected.
 Assert-True -Condition ($placementSpendCount -eq 1) `
-    -Message "Building placement must perform exactly one canonical spend call; found $placementSpendCount."
+    -Message "Building placement must contain one canonical spend call site; found $placementSpendCount."
+$placementIntegrationTests = Read-Utf8 -Path (Join-Path $repositoryRoot 'Source\RomanEmpireGameTests\Private\CanonicalUIIntegrationTests.cpp')
+Assert-True -Condition ($placementIntegrationTests -match 'RomanEmpireGame\.Content\.DefinitionPropagationAndAtomicPlacementPIE') `
+    -Message 'The definition-propagation and placement-reentry PIE regression must remain registered.'
 
 $barracksSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\Barracks.cpp')
 $trainingSpendCount = [regex]::Matches($barracksSource, '\bTrySpendFactionResources\s*\(').Count

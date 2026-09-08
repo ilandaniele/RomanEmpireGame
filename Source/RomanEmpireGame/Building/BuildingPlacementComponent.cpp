@@ -50,6 +50,8 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 {
+	if (bIsConfirmingPlacement) return;
+
 	if (!CanIssuePlacementCommands())
 	{
 		CancelPlacement();
@@ -94,6 +96,8 @@ void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 
 void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
 {
+	if (bIsConfirmingPlacement) return;
+
 	if (!CanIssuePlacementCommands())
 	{
 		CancelPlacement();
@@ -120,6 +124,8 @@ void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
 
 void UBuildingPlacementComponent::RotatePreview(float Degrees)
 {
+	if (bIsConfirmingPlacement) return;
+
 	if (!CanIssuePlacementCommands())
 	{
 		CancelPlacement();
@@ -142,6 +148,9 @@ void UBuildingPlacementComponent::RotatePreview(float Degrees)
 
 bool UBuildingPlacementComponent::ConfirmPlacement()
 {
+	if (bIsConfirmingPlacement) return false;
+	TGuardValue<bool> ConfirmGuard(bIsConfirmingPlacement, true);
+
 	if (!CanIssuePlacementCommands())
 	{
 		CancelPlacement();
@@ -171,6 +180,11 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
+	// Snapshot and initialize before spending: wallet observers may cancel placement
+	// (for example on a mode change), but cannot mutate or charge this command twice.
+	const FName BuildingID = CurrentBuildingID;
+	const FFactionResourceAmounts Cost = Asset->Definition.Cost;
+	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
 	const FRotator Rotation(0.0f, CurrentRotation, 0.0f);
 	const FTransform PlacementTransform(Rotation, CurrentPlacementLocation);
 	ABuildingBase* NewBuilding = World->SpawnActorDeferred<ABuildingBase>(
@@ -185,9 +199,15 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
-	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
+	if (!NewBuilding->InitializeBuilding(BuildingID, PlayerFaction))
+	{
+		NewBuilding->Destroy();
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot confirm placement: building definition initialization failed"));
+		return false;
+	}
+
 	const FFactionResourceTransactionResult SpendResult =
-		FactionManager->TrySpendFactionResources(PlayerFaction, Asset->Definition.Cost);
+		FactionManager->TrySpendFactionResources(PlayerFaction, Cost);
 	LastTransactionFailure = SpendResult.Failure;
 	if (!SpendResult.WasSuccessful())
 	{
@@ -197,24 +217,16 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
-	if (!NewBuilding->InitializeBuilding(CurrentBuildingID, PlayerFaction))
-	{
-		FFactionResourceDelta Refund;
-		Refund.Gold = Asset->Definition.Cost.Gold;
-		Refund.Food = Asset->Definition.Cost.Food;
-		Refund.Iron = Asset->Definition.Cost.Iron;
-		Refund.Wood = Asset->Definition.Cost.Wood;
-		Refund.Stone = Asset->Definition.Cost.Stone;
-		Refund.Population = Asset->Definition.Cost.Population;
-		FactionManager->ApplyFactionResourceDelta(PlayerFaction, Refund);
-		NewBuilding->Destroy();
-		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot confirm placement: building definition initialization failed"));
-		return false;
-	}
 	UGameplayStatics::FinishSpawningActor(NewBuilding, PlacementTransform);
 	NewBuilding->StartConstruction();
 
 	DestroyPreviewBuilding();
+	// Publish only after the consumed preview state is cleared.
+	bIsPlacing = false;
+	bCanPlace = false;
+	CurrentBuildingClass = nullptr;
+	CurrentBuildingID = NAME_None;
+	CurrentRotation = 0.0f;
 	OnBuildingPlaced.Broadcast(NewBuilding);
 
 	if (GEngine)
@@ -225,12 +237,6 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Building placed and construction started: %s"),
 		*NewBuilding->GetName());
-
-	// Reset state
-	bIsPlacing = false;
-	bCanPlace = false;
-	CurrentBuildingClass = nullptr;
-	CurrentBuildingID = NAME_None;
 
 	return true;
 }

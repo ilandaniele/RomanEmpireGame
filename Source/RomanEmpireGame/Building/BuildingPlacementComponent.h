@@ -45,7 +45,7 @@ public:
 	bool IsPlacing() const { return bIsPlacing; }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
-	bool CanPlace() const { return bCanPlace && CanIssuePlacementCommands(); }
+	bool CanPlace() const { return !bIsConfirmingPlacement && bCanPlace && CanIssuePlacementCommands(); }
 
 	UFUNCTION(BlueprintPure, Category = "Building|Placement")
 	FName GetCurrentBuildingID() const { return CurrentBuildingID; }
@@ -96,6 +96,9 @@ protected:
 	FOnPlacementCancelled OnPlacementCancelled;
 
 private:
+	// Resource and building delegates run synchronously and may issue more commands.
+	bool bIsConfirmingPlacement = false;
+
 	bool CanIssuePlacementCommands() const;
 	void CreatePreviewBuilding();
 	void DestroyPreviewBuilding();

@@ -80,7 +80,7 @@ Remote Control and Automation Driver are disabled in normal project defaults. Ep
 
 ## Current implementation status
 
-M1 and M2.1–M2.6 implementation packages are complete: canonical resources/turns/territories/diplomacy, authored Primary Data Assets, event-driven UMG, and committed mode-specific Enhanced Input. Thirteen automation tests cover rules, content, UI and physical-key routing in PIE; strict IWYU, Development/Shipping builds and the M2.6 packaged rendered smoke pass. Next is the aggregate M2 exit audit, including explicit asset-change/runtime/UI proof, before M3 tactical gameplay. See [INPUT_CONTROLS.md](INPUT_CONTROLS.md) for defaults and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for gate evidence and remaining scope. The game still uses placeholder art and is not a finished vertical slice.
+M1 and M2.1–M2.6 implementation packages are complete: canonical resources/turns/territories/diplomacy, authored Primary Data Assets, event-driven UMG, and committed mode-specific Enhanced Input. Fourteen automation tests now include explicit definition-change/runtime/UI propagation and reentrant placement protection. The aggregate M2 audit found that the planned public GameState contract is still missing; M2 remains open before M3 tactical gameplay. See [M2_EXIT_REVIEW.md](M2_EXIT_REVIEW.md) for current findings and evidence, [INPUT_CONTROLS.md](INPUT_CONTROLS.md) for defaults, and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the complete remaining scope. The game still uses placeholder art and is not a finished vertical slice.
 
 ### M1 baseline evidence
 

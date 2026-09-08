@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+#include "PlacementTransactionProbe.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
@@ -9,6 +10,8 @@
 #include "Campaign/CampaignTurn.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/ActorComponent.h"
+#include "Content/RomanContentRegistry.h"
 #include "Core/GameplayMode.h"
 #include "Editor.h"
 #include "Engine/World.h"
@@ -29,9 +32,11 @@
 #include "Layout/WidgetPath.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "UObject/Class.h"
+#include "UObject/Package.h"
 #include "UObject/ScriptDelegates.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/StructOnScope.h"
+#include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 #include "Widgets/SWidget.h"
 
@@ -91,6 +96,23 @@ namespace RomanEmpireUITests
 			if (FIntProperty* Property = GetProperty<FIntProperty>(Name, false))
 			{
 				Property->SetPropertyValue_InContainer(Parameters.GetStructMemory(), Value);
+			}
+		}
+
+		void SetName(FName Name, FName Value)
+		{
+			if (FNameProperty* Property = GetProperty<FNameProperty>(Name, false))
+			{
+				Property->SetPropertyValue_InContainer(Parameters.GetStructMemory(), Value);
+			}
+		}
+
+		void SetVector(FName Name, const FVector& Value)
+		{
+			FStructProperty* Property = GetProperty<FStructProperty>(Name, false);
+			if (Property && Validate(Property->Struct == TBaseStructure<FVector>::Get(), TEXT("Input is a reflected FVector")))
+			{
+				Property->CopyCompleteValue(Property->ContainerPtrToValuePtr<void>(Parameters.GetStructMemory()), &Value);
 			}
 		}
 
@@ -605,6 +627,292 @@ bool FCanonicalUIIntegrationTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FExerciseCanonicalUI(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FWaitForOwnedPIEToEnd(this));
+	return true;
+}
+
+void UPlacementTransactionProbe::OnResourcesChanged(EFactionID FactionID, FFactionResourceAmounts NewBalance)
+{
+	(void)FactionID;
+	(void)NewBalance;
+	using namespace RomanEmpireUITests;
+	++WalletNotifications;
+	// Bound recursion ensures a broken implementation reports failure, not a stack overflow.
+	if (!Test || WalletNotifications > 1) return;
+	Test->TestFalse(TEXT("Wallet observer cannot recursively confirm the same placement"),
+		ReadBool(*Test, Placement.Get(), TEXT("ConfirmPlacement")));
+	Test->TestFalse(TEXT("Placement is not actionable while committing"),
+		ReadBool(*Test, Placement.Get(), TEXT("CanPlace")));
+	if (bCancelDuringSpend) FCall(*Test, Placement.Get(), TEXT("CancelPlacement"), 0).Execute();
+	FCall Start(*Test, Placement.Get(), TEXT("StartPlacement"), 1);
+	Start.SetName(TEXT("BuildingID"), BuildingID);
+	Start.Execute();
+}
+
+void UPlacementTransactionProbe::OnPlaced(ABuildingBase* Building)
+{
+	(void)Building;
+	using namespace RomanEmpireUITests;
+	++PlacedNotifications;
+	if (!Test || PlacedNotifications > 1) return;
+	Test->TestFalse(TEXT("Placed observer sees the preview already consumed"),
+		ReadBool(*Test, Placement.Get(), TEXT("IsPlacing")));
+	Test->TestFalse(TEXT("Placed observer cannot recursively confirm"),
+		ReadBool(*Test, Placement.Get(), TEXT("ConfirmPlacement")));
+}
+
+namespace RomanEmpireUITests
+{
+	// Change a real loaded definition before normal PIE startup; never save it. Holding
+	// the original and restoring at scope exit also protects abort/timeout paths.
+	class FScopedBuildingDefinition
+	{
+	public:
+		explicit FScopedBuildingDefinition(URomanBuildingDefinition* InAsset)
+			: Asset(InAsset), Original(InAsset->Definition), bWasDirty(InAsset->GetPackage()->IsDirty())
+		{
+			Asset->Definition.DisplayName = FText::FromString(TEXT("Audit Barracks Variant"));
+			Asset->Definition.Cost.Gold = 37;
+			Asset->Definition.Cost.Food = 11;
+			Asset->Definition.Cost.Iron = 13;
+			Asset->Definition.Cost.Wood = 17;
+			Asset->Definition.Cost.Stone = 19;
+			Asset->Definition.Cost.Population = 2;
+			Asset->Definition.ConstructionTime = 3.25f;
+			Asset->Definition.MaxHealth = 2468;
+		}
+		~FScopedBuildingDefinition() { Restore(); }
+		void Restore()
+		{
+			if (bRestored) return;
+			Asset->Definition = Original;
+			Asset->GetPackage()->SetDirtyFlag(bWasDirty);
+			bRestored = true;
+		}
+		TStrongObjectPtr<URomanBuildingDefinition> Asset;
+		FBuildingData Original;
+		bool bWasDirty;
+	private:
+		bool bRestored = false;
+	};
+
+	class FScopedProbeBinding
+	{
+	public:
+		FScopedProbeBinding(FAutomationTestBase& Test, UObject* InSource, FName Event,
+			UPlacementTransactionProbe* Probe, FName Handler) : Source(InSource)
+		{
+			Property = InSource ? FindFProperty<FMulticastDelegateProperty>(InSource->GetClass(), Event) : nullptr;
+			UFunction* Function = Probe->FindFunction(Handler);
+			bValid = Test.TestTrue(TEXT("Regression probe matches the real event signature"),
+				Property && Function && Property->SignatureFunction->IsSignatureCompatibleWith(Function));
+			if (bValid)
+			{
+				Delegate.BindUFunction(Probe, Handler);
+				Property->AddDelegate(Delegate, Source.Get());
+			}
+		}
+		~FScopedProbeBinding()
+		{
+			if (bValid && Source.IsValid()) Property->RemoveDelegate(Delegate, Source.Get());
+		}
+		bool bValid = false;
+	private:
+		TWeakObjectPtr<UObject> Source;
+		FMulticastDelegateProperty* Property = nullptr;
+		FScriptDelegate Delegate;
+	};
+
+	class FExerciseDefinitionPlacement : public IAutomationLatentCommand
+	{
+	public:
+		FExerciseDefinitionPlacement(FAutomationTestBase* InTest, TSharedRef<FScopedBuildingDefinition> InDefinition)
+			: Test(*InTest), Definition(InDefinition) {}
+		virtual bool Update() override
+		{
+			if (StartedAt == 0.0) StartedAt = FPlatformTime::Seconds();
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			APlayerController* Controller = World ? World->GetFirstPlayerController() : nullptr;
+			if (!World || !World->HasBegunPlay() || !Controller)
+			{
+				if (FPlatformTime::Seconds() - StartedAt < 30.0) return false;
+				Test.AddError(TEXT("Definition/placement test did not reach PIE startup within 30 seconds"));
+				return true;
+			}
+			if (!bRequestedTactical)
+			{
+				Controller->SetActorTickEnabled(false); // No OS cursor updates between assertions.
+				FCall Mode(Test, World->GetAuthGameMode(), TEXT("SetGameplayMode"), 1);
+				Mode.SetEnum(TEXT("NewMode"), EGameplayMode::Tactical);
+				Mode.Execute();
+				bRequestedTactical = true;
+				return false; // Enhanced Input's context rebuild is deferred to the next frame.
+			}
+			if (!Test.TestTrue(TEXT("Normal Tactical eligibility is active"),
+				ReadBool(Test, Controller, TEXT("CanIssueTacticalCommands")))) return true;
+			Exercise(World, Controller);
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		TSharedRef<FScopedBuildingDefinition> Definition;
+		double StartedAt = 0.0;
+		bool bRequestedTactical = false;
+
+		void Exercise(UWorld* World, APlayerController* Controller)
+		{
+			const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(World);
+			const FBuildingData Expected = Definition->Asset->Definition;
+			if (!Test.TestTrue(TEXT("Normal registry resolves the edited authored asset by its stable ID"),
+				Registry && Registry->IsReady() && Registry->FindBuilding(Expected.BuildingID) == Definition->Asset.Get())) return;
+			UUserWidget* Root = Cast<UUserWidget>(ReadObject(Test, Controller, TEXT("GetMainWidget")));
+			UUserWidget* Menu = Root ? Cast<UUserWidget>(Root->GetWidgetFromName(TEXT("BuildingMenu"))) : nullptr;
+			UTextBlock* Label = Menu ? Cast<UTextBlock>(Menu->GetWidgetFromName(
+				*FString::Printf(TEXT("BuildLabel_%s"), *Expected.BuildingID.ToString()))) : nullptr;
+			if (!Test.TestNotNull(TEXT("Normal UMG startup creates the definition's menu label"), Label)) return;
+			Test.TestEqual(TEXT("Edited name and all costs reach the production menu without runtime constants"),
+				Label->GetText().ToString(), FString::Printf(TEXT("[%d] %s  |  %s"), Definition->Asset->QuickSlot,
+					*Expected.DisplayName.ToString(), *RomanEmpireEconomy::DescribeResourceCost(Expected.Cost)));
+			UObject* Manager = ReadObject(Test, World->GetAuthGameMode(), TEXT("GetFactionManager"));
+			UClass* PlacementClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.BuildingPlacementComponent")).TryLoadClass<UActorComponent>();
+			UActorComponent* Placement = PlacementClass ? Controller->GetComponentByClass(PlacementClass) : nullptr;
+			UClass* BuildingClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.BuildingBase")).TryLoadClass<AActor>();
+			if (!Test.TestTrue(TEXT("Real placement, building class and faction authority exist"), Placement && BuildingClass && Manager)) return;
+			Placement->SetComponentTickEnabled(false);
+			for (int32 Scenario = 0; Scenario < 2; ++Scenario)
+			{
+				Test.PushContext(Scenario == 0 ? TEXT("Recursive observers") : TEXT("Cancel and restart during committed spend"));
+				FCall Start(Test, Placement, TEXT("StartPlacement"), 1);
+				Start.SetName(TEXT("BuildingID"), Expected.BuildingID);
+				Start.Execute();
+				FCall Move(Test, Placement, TEXT("UpdatePreview"), 1);
+				Move.SetVector(TEXT("WorldLocation"), FVector(50000.0 + Scenario * 2000.0, 50000.0, 300.0));
+				Move.Execute();
+				Test.TestTrue(TEXT("Preview can be committed through the public command"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				TSet<AActor*> BeforeActors;
+				for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) BeforeActors.Add(*It);
+				const FFactionResourceAmounts Before = ReadResources(Test, Manager);
+				TStrongObjectPtr<UPlacementTransactionProbe> Probe(NewObject<UPlacementTransactionProbe>());
+				Probe->Test = &Test;
+				Probe->Placement = Placement;
+				Probe->BuildingID = Expected.BuildingID;
+				Probe->bCancelDuringSpend = Scenario == 1;
+				FScopedProbeBinding WalletBinding(Test, Manager, TEXT("OnFactionResourcesChanged"), Probe.Get(), TEXT("OnResourcesChanged"));
+				FScopedProbeBinding PlacedBinding(Test, Placement, TEXT("OnBuildingPlaced"), Probe.Get(), TEXT("OnPlaced"));
+				if (!WalletBinding.bValid || !PlacedBinding.bValid) { Test.PopContext(); return; }
+				Test.TestTrue(TEXT("Outer placement command succeeds"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
+				Test.TestEqual(TEXT("Exactly one wallet event (no duplicate charge or compensating refund)"), Probe->WalletNotifications, 1);
+				Test.TestEqual(TEXT("Exactly one building-placed event"), Probe->PlacedNotifications, 1);
+				const FFactionResourceAmounts After = ReadResources(Test, Manager);
+				Test.TestEqual(TEXT("Gold charged once"), Before.Gold - After.Gold, Expected.Cost.Gold);
+				Test.TestEqual(TEXT("Food charged once"), Before.Food - After.Food, Expected.Cost.Food);
+				Test.TestEqual(TEXT("Iron charged once"), Before.Iron - After.Iron, Expected.Cost.Iron);
+				Test.TestEqual(TEXT("Wood charged once"), Before.Wood - After.Wood, Expected.Cost.Wood);
+				Test.TestEqual(TEXT("Stone charged once"), Before.Stone - After.Stone, Expected.Cost.Stone);
+				Test.TestEqual(TEXT("Population charged once"), Before.Population - After.Population, Expected.Cost.Population);
+				Test.TestFalse(TEXT("No preview remains after event-issued restart attempt"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+				TArray<AActor*> Created;
+				for (TActorIterator<AActor> It(World, BuildingClass); It; ++It)
+				{
+					if (!BeforeActors.Contains(*It)) Created.Add(*It);
+				}
+				if (Test.TestEqual(TEXT("Exactly one actual building was created"), Created.Num(), 1))
+				{
+					AActor* Building = Created[0];
+					FCall Data(Test, Building, TEXT("GetBuildingData"), 1);
+					Data.Execute();
+					const FBuildingData Actual = Data.ReadStruct<FBuildingData>();
+					Test.TestEqual(TEXT("Factory retains the authored ID"), Actual.BuildingID, Expected.BuildingID);
+					Test.TestEqual(TEXT("Factory receives changed display name"), Actual.DisplayName.ToString(), Expected.DisplayName.ToString());
+					Test.TestEqual(TEXT("Factory receives changed hit points"), Actual.MaxHealth, Expected.MaxHealth);
+					Test.TestEqual(TEXT("Factory receives changed construction duration"), Actual.ConstructionTime, Expected.ConstructionTime);
+					Building->Tick(Expected.ConstructionTime - 0.1f);
+					Test.TestFalse(TEXT("Building stays incomplete before the edited duration"), ReadBool(Test, Building, TEXT("IsComplete")));
+					Building->Tick(0.2f);
+					Test.TestTrue(TEXT("Building completes after the edited duration"), ReadBool(Test, Building, TEXT("IsComplete")));
+					FCall Select(Test, Controller, TEXT("SelectBuilding"), 1);
+					Select.SetObject(TEXT("Building"), Building);
+					Select.Execute();
+					UTextBlock* Selection = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("SelectionText")));
+					Test.TestTrue(TEXT("Runtime selection UI displays the changed authored name"),
+						Selection && Selection->GetText().ToString().Contains(Expected.DisplayName.ToString()));
+				}
+				Test.PopContext();
+			}
+
+			// A rejection must not consume the preview, charge any currency, or leave a
+			// deferred actor behind. The same command becomes retryable after funding.
+			AddGold(Test, Manager, -ReadResources(Test, Manager).Gold);
+			FCall Start(Test, Placement, TEXT("StartPlacement"), 1);
+			Start.SetName(TEXT("BuildingID"), Expected.BuildingID);
+			Start.Execute();
+			FCall Move(Test, Placement, TEXT("UpdatePreview"), 1);
+			Move.SetVector(TEXT("WorldLocation"), FVector(55000.0, 50000.0, 300.0));
+			Move.Execute();
+			int32 BeforeCount = 0;
+			for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) ++BeforeCount;
+			const FFactionResourceAmounts BeforeRejection = ReadResources(Test, Manager);
+			Test.AddExpectedMessage(TEXT("Cannot confirm placement: resource transaction failed"),
+				ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+			Test.TestFalse(TEXT("Unfunded placement is rejected"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
+			FCall Failure(Test, Placement, TEXT("GetLastTransactionFailure"), 1);
+			Failure.Execute();
+			Test.TestEqual(TEXT("Placement reports the canonical insufficient-gold failure"),
+				Failure.ReadEnum<EResourceTransactionFailure>(), EResourceTransactionFailure::InsufficientGold);
+			const FFactionResourceAmounts AfterRejection = ReadResources(Test, Manager);
+			Test.TestTrue(TEXT("Rejected placement preserves every wallet field"),
+				FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&BeforeRejection, &AfterRejection, 0));
+			int32 AfterCount = 0;
+			for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) ++AfterCount;
+			Test.TestEqual(TEXT("Rejected deferred spawn leaves no extra building"), AfterCount, BeforeCount);
+			Test.TestTrue(TEXT("Rejected preview remains retryable"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+			AddGold(Test, Manager, Expected.Cost.Gold);
+			Test.TestTrue(TEXT("Original preview succeeds after funding"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
+			Test.TestEqual(TEXT("Retry deducts exactly its newly funded gold"), ReadResources(Test, Manager).Gold, 0);
+			Test.TestFalse(TEXT("Successful retry consumes the preview"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+		}
+	};
+
+	class FRestoreDefinition : public IAutomationLatentCommand
+	{
+	public:
+		FRestoreDefinition(FAutomationTestBase* InTest, TSharedRef<FScopedBuildingDefinition> InDefinition)
+			: Test(*InTest), Definition(InDefinition) {}
+		virtual bool Update() override
+		{
+			Definition->Restore();
+			Test.TestTrue(TEXT("Authored definition restored after PIE"), FBuildingData::StaticStruct()->CompareScriptStruct(
+				&Definition->Asset->Definition, &Definition->Original, 0));
+			Test.TestEqual(TEXT("Original package dirty state preserved; fixture never saves assets"),
+				Definition->Asset->GetPackage()->IsDirty(), Definition->bWasDirty);
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		TSharedRef<FScopedBuildingDefinition> Definition;
+	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDefinitionPlacementIntegrationTest,
+	"RomanEmpireGame.Content.DefinitionPropagationAndAtomicPlacementPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FDefinitionPlacementIntegrationTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	if (!TestNotNull(TEXT("Definition integration requires an editor"), GEditor) ||
+		!TestNull(TEXT("Definition test owns a new PIE session"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loads"), EditorWorld && EditorWorld->GetName() == TEXT("L_Testbed"))) return false;
+	URomanBuildingDefinition* Asset = LoadObject<URomanBuildingDefinition>(nullptr,
+		TEXT("/Game/Data/Buildings/PDA_Building_Barracks.PDA_Building_Barracks"));
+	if (!TestNotNull(TEXT("Authored Barracks definition loads"), Asset)) return false;
+	const TSharedRef<RomanEmpireUITests::FScopedBuildingDefinition> Definition = MakeShared<RomanEmpireUITests::FScopedBuildingDefinition>(Asset);
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FExerciseDefinitionPlacement(this, Definition));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FWaitForOwnedPIEToEnd(this));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FRestoreDefinition(this, Definition));
 	return true;
 }
 

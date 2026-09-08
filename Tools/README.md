@@ -22,3 +22,9 @@ The UI test checks synchronous canonical state updates, selection/possession/dea
 ## Enhanced Input integration
 
 M2.6 adds configuration/negative-contract tests, authored-default/modifier checks, and `RomanEmpireGame.Input.PhysicalKeysAndModeLifecyclePIE`. The latter owns a fresh PIE session, injects simulated physical keys into the real PlayerController/Enhanced PlayerInput stack, and verifies mode isolation, command guards, held-key transitions and block cleanup. It preserves unrelated mapping contexts and does not save its transient world fixtures. See `INPUT_CONTROLS.md` for defaults and explicit coverage limits.
+
+## Definition propagation and placement transactions
+
+`RomanEmpireGame.Content.DefinitionPropagationAndAtomicPlacementPIE` temporarily edits the loaded authored Barracks definition before normal PIE startup, proves the change reaches the build menu, factory, construction timing and selection UI, then restores the complete definition and dirty state without saving assets. Signature-checked Editor-only observers attempt recursive placement from real wallet/placed events; assertions cover exactly one building and charge in all currencies, cancellation/restart during notification, insufficient funds and retry. The mutation-control failure and final passing report are recorded in `M2_EXIT_REVIEW.md`.
+
+For an Editor-hosted `-game` diagnostic, use the process-only flag `-DisablePlugins=ModelContextProtocol,EditorToolset,AutomationTestToolset,ToolsetRegistry`. The UE 5.8 editor toolsets' Python startup otherwise expects editor-only reflected classes that are absent in this game host. Keep normal Editor tooling enabled in the project. This fallback never replaces an actual packaged-player launch gate.
