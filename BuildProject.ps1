@@ -13,11 +13,25 @@ param(
 
     [string]$ArchiveDirectory,
 
-    [switch]$UseBuildAcceleration
+    [switch]$UseBuildAcceleration,
+
+    # Process-only opt-in when the optional engine Fab browser cannot load on this host.
+    [switch]$DisableFab
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($DisableFab -and $Action -notin @('Test', 'Cook', 'Package')) {
+    throw '-DisableFab applies only to Test, Cook, and Package editor processes.'
+}
+$editorStartupArguments = @()
+$cookerStartupArguments = @()
+if ($DisableFab) {
+    $editorStartupArguments = @('-DisablePlugins=Fab')
+    $cookerStartupArguments = @('-AdditionalCookerOptions=-DisablePlugins=Fab')
+    Write-Host 'Fab disabled for this automation process only; project, engine and Windows security settings are unchanged.'
+}
 
 $projectRoot = $PSScriptRoot
 $projectFile = Join-Path $projectRoot 'RomanEmpireGame.uproject'
@@ -256,14 +270,22 @@ function Assert-AutomationReportPassed {
 
     $failed = [int]$failedProperty.Value
     $succeeded = [int]$succeededProperty.Value
+    $warningProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq 'succeededWithWarnings' } | Select-Object -First 1
+    $succeededWithWarnings = if ($warningProperty) { [int]$warningProperty.Value } else { 0 }
+    foreach ($unfinishedState in @('notRun', 'inProcess')) {
+        $unfinishedProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq $unfinishedState } | Select-Object -First 1
+        if (-not $unfinishedProperty -or [int]$unfinishedProperty.Value -ne 0) {
+            throw "Automation report must contain zero $unfinishedState tests. Inspect $reportPath"
+        }
+    }
     if ($failed -gt 0) {
         throw "Automation reported $failed failed test(s). Inspect $reportPath"
     }
-    if ($succeeded -lt 1) {
+    if (($succeeded + $succeededWithWarnings) -lt 1) {
         throw "Automation did not execute any successful RomanEmpireGame tests. Inspect $reportPath"
     }
 
-    Write-Host "Automation report passed: $succeeded succeeded, $failed failed." -ForegroundColor Green
+    Write-Host "Automation report passed: $($succeeded + $succeededWithWarnings) succeeded ($succeededWithWarnings with warnings), $failed failed." -ForegroundColor Green
 }
 
 $repositoryValidator = Join-Path $projectRoot 'Tools\validate_repository.ps1'
@@ -348,13 +370,13 @@ switch ($Action) {
         $runStamp = Get-Date -Format 'yyyyMMdd_HHmmss_fff'
         $reportDirectory = Join-Path $projectRoot "Artifacts\Automation\$runStamp"
         New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
-        Invoke-Checked -FilePath $editorCommand -Arguments @(
+        Invoke-Checked -FilePath $editorCommand -Arguments (@(
             $projectFile,
             '-unattended', '-nop4', '-NullRHI',
             '-ExecCmds=Automation RunTest RomanEmpireGame;Quit',
             "-ReportExportPath=$reportDirectory",
             '-stdout', '-FullStdOutLogOutput', '-log'
-        )
+        ) + $editorStartupArguments)
         Assert-AutomationReportPassed -ReportDirectory $reportDirectory
     }
     'Cook' {
@@ -366,7 +388,7 @@ switch ($Action) {
             '-platform=Win64',
             "-clientconfig=$Configuration",
             '-utf8output'
-        ) + $uatBuildArguments)
+        ) + $uatBuildArguments + $cookerStartupArguments)
     }
     'Package' {
         Assert-PackagingInputs
@@ -384,6 +406,6 @@ switch ($Action) {
             "-clientconfig=$Configuration",
             "-archivedirectory=$resolvedArchiveDirectory",
             '-utf8output'
-        ) + $uatBuildArguments)
+        ) + $uatBuildArguments + $cookerStartupArguments)
     }
 }

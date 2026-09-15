@@ -10,6 +10,7 @@
 #include "RomanEmpirePlayerController.generated.h"
 
 class ARomanEmpireGameMode;
+class ARomanEmpireGameState;
 class UInputMappingContext;
 class URomanInputConfig;
 class AUnitBase;
@@ -219,6 +220,9 @@ private:
 	// Cache game mode
 	UPROPERTY()
 	TObjectPtr<ARomanEmpireGameMode> GameMode;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ARomanEmpireGameState> PublicGameState;
 
 	bool LoadInputConfiguration();
 	void ApplyInputContexts();

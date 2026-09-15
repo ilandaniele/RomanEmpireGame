@@ -94,7 +94,7 @@ bool FRequiredContentPathValidationTest::RunTest(const FString& Parameters)
 	TestClassPath(
 		TEXT("GameMode explicitly selects its game state"),
 		GameModeDefaults->GameStateClass.Get(),
-		TEXT("/Script/Engine.GameStateBase"));
+		TEXT("/Script/RomanEmpireGame.RomanEmpireGameState"));
 	TestClassPath(
 		TEXT("GameMode explicitly selects its HUD"),
 		GameModeDefaults->HUDClass.Get(),

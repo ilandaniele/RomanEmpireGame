@@ -266,7 +266,7 @@ Assert-True -Condition ($gameModeSource -notmatch '\b(?:GetPlayerGold|SubtractGo
 foreach ($assignment in @(
     'DefaultPawnClass\s*=\s*ASeamlessZoomCamera::StaticClass\(\)',
     'PlayerControllerClass\s*=\s*ARomanEmpirePlayerController::StaticClass\(\)',
-    'GameStateClass\s*=\s*AGameStateBase::StaticClass\(\)',
+    'GameStateClass\s*=\s*ARomanEmpireGameState::StaticClass\(\)',
     'HUDClass\s*=\s*ARomanEmpireHUD::StaticClass\(\)'
 )) {
     Assert-True -Condition ($gameModeSource -match $assignment) `
@@ -298,6 +298,9 @@ Assert-True -Condition ($hudSource -match 'bShowDebugOverlay\s*=\s*false') `
 $mainWidgetSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'UI\RomanEmpireMainWidget.cpp')
 Assert-True -Condition ($mainWidgetSource -notmatch 'NativeTick|GetAllActorsOfClass|TrySpendFactionResources') `
     -Message 'Production UMG must observe canonical events and issue commands without polling or spending locally.'
+Assert-True -Condition ($mainWidgetSource -match 'GetGameState<ARomanEmpireGameState>' -and
+    $mainWidgetSource -notmatch 'GetGameMode|GetFactionManager|GetCampaignManager|GetWorldMapManager') `
+    -Message 'Production UMG must consume the public GameState read/event contract instead of resolving private managers.'
 foreach ($eventName in @('OnSelectionChanged', 'OnPossessedUnitChanged', 'OnFactionResourcesChanged', 'OnGameplayModeChanged', 'OnTurnProcessed', 'OnProductionChanged', 'OnCampaignObjectivesChanged', 'OnVictory')) {
     Assert-True -Condition ($mainWidgetSource -match ([regex]::Escape($eventName) + '\.AddUniqueDynamic')) `
         -Message "UMG is missing a canonical event binding: $eventName"
@@ -321,7 +324,7 @@ Assert-True -Condition ($placementIntegrationTests -match 'RomanEmpireGame\.Cont
 $barracksSource = Read-Utf8 -Path (Join-Path $runtimeRoot 'Building\Barracks.cpp')
 $trainingSpendCount = [regex]::Matches($barracksSource, '\bTrySpendFactionResources\s*\(').Count
 Assert-True -Condition ($trainingSpendCount -eq 1) `
-    -Message "Barracks training acceptance must perform exactly one canonical spend call; found $trainingSpendCount."
+    -Message "Barracks training acceptance must contain one canonical spend call site; found $trainingSpendCount. Live PIE checks execution cost."
 
 $runtimeHeaderText = ($runtimeSource | Where-Object { $_.Extension -eq '.h' } | ForEach-Object {
     Read-Utf8 -Path $_.FullName

@@ -14,15 +14,12 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Content/RomanContentRegistry.h"
-#include "Core/RomanEmpireGameMode.h"
+#include "Core/RomanEmpireGameState.h"
+#include "Engine/World.h"
 #include "Core/RomanEmpirePlayerController.h"
-#include "Faction/FactionManager.h"
-#include "Kismet/GameplayStatics.h"
 #include "RomanEmpireGame.h"
 #include "UI/BuildingMenuWidget.h"
 #include "Units/UnitBase.h"
-#include "World/CampaignManager.h"
-#include "World/WorldMapManager.h"
 
 namespace
 {
@@ -241,30 +238,18 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 
 void URomanEmpireMainWidget::BindCanonicalEvents()
 {
-	if (bCanonicalEventsBound)
-	{
-		return;
-	}
-
+	if (bCanonicalEventsBound) return;
 	CachedController = GetOwningPlayer<ARomanEmpirePlayerController>();
-	CachedGameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
-	if (CachedGameMode)
+	CachedGameState = GetWorld() ? GetWorld()->GetGameState<ARomanEmpireGameState>() : nullptr;
+	if (CachedGameState)
 	{
-		CachedGameMode->OnGameplayInitialized.AddUniqueDynamic(
+		CachedGameState->OnGameplayInitialized.AddUniqueDynamic(
 			this, &URomanEmpireMainWidget::HandleGameplayInitialized);
 	}
-	if (!CachedGameMode || !CachedGameMode->IsGameplayInitialized())
+	if (!CachedGameState || !CachedGameState->IsGameplayInitialized()) return;
+	if (!CachedController)
 	{
-		return;
-	}
-	CachedFactionManager = CachedGameMode ? CachedGameMode->GetFactionManager() : nullptr;
-	CachedWorldMapManager = CachedGameMode ? CachedGameMode->GetWorldMapManager() : nullptr;
-	CachedCampaignManager = CachedGameMode ? CachedGameMode->GetCampaignManager() : nullptr;
-
-	if (!CachedController || !CachedGameMode || !CachedFactionManager ||
-		!CachedWorldMapManager || !CachedCampaignManager)
-	{
-		UE_LOG(LogRomanEmpire, Error, TEXT("UMG root could not resolve every canonical gameplay authority"));
+		UE_LOG(LogRomanEmpire, Error, TEXT("UMG root could not resolve its owning controller"));
 		return;
 	}
 
@@ -272,24 +257,23 @@ void URomanEmpireMainWidget::BindCanonicalEvents()
 		this, &URomanEmpireMainWidget::HandleSelectionChanged);
 	CachedController->OnPossessedUnitChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandlePossessedUnitChanged);
-	CachedFactionManager->OnFactionResourcesChanged.AddUniqueDynamic(
+	CachedGameState->OnFactionResourcesChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleResourcesChanged);
-	CachedFactionManager->OnPlayerFactionChanged.AddUniqueDynamic(
+	CachedGameState->OnPlayerFactionChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandlePlayerFactionChanged);
-	CachedGameMode->OnGameplayModeChanged.AddUniqueDynamic(
+	CachedGameState->OnGameplayModeChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleGameplayModeChanged);
-	CachedCampaignManager->OnTurnStepStarted.AddUniqueDynamic(
+	CachedGameState->OnTurnStepStarted.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleTurnStepStarted);
-	CachedCampaignManager->OnTurnProcessed.AddUniqueDynamic(
+	CachedGameState->OnTurnProcessed.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleTurnProcessed);
-	CachedCampaignManager->OnCampaignStarted.AddUniqueDynamic(
+	CachedGameState->OnCampaignStarted.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleCampaignStarted);
-	CachedCampaignManager->OnCampaignObjectivesChanged.AddUniqueDynamic(
+	CachedGameState->OnCampaignObjectivesChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleObjectivesChanged);
-	CachedCampaignManager->OnVictory.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleVictory);
-	CachedCampaignManager->OnDefeat.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
+	CachedGameState->OnVictory.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleVictory);
+	CachedGameState->OnDefeat.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	bCanonicalEventsBound = true;
-
 	BindSelectionEvents(CachedController->GetSelectedUnits(), CachedController->GetSelectedBuilding());
 }
 
@@ -303,34 +287,30 @@ void URomanEmpireMainWidget::UnbindCanonicalEvents()
 		CachedController->OnPossessedUnitChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandlePossessedUnitChanged);
 	}
-	if (CachedFactionManager)
+	if (CachedGameState)
 	{
-		CachedFactionManager->OnFactionResourcesChanged.RemoveDynamic(
-			this, &URomanEmpireMainWidget::HandleResourcesChanged);
-		CachedFactionManager->OnPlayerFactionChanged.RemoveDynamic(
-			this, &URomanEmpireMainWidget::HandlePlayerFactionChanged);
-	}
-	if (CachedGameMode)
-	{
-		CachedGameMode->OnGameplayInitialized.RemoveDynamic(
+		CachedGameState->OnGameplayInitialized.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleGameplayInitialized);
-		CachedGameMode->OnGameplayModeChanged.RemoveDynamic(
+		CachedGameState->OnFactionResourcesChanged.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandleResourcesChanged);
+		CachedGameState->OnPlayerFactionChanged.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandlePlayerFactionChanged);
+		CachedGameState->OnGameplayModeChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleGameplayModeChanged);
-	}
-	if (CachedCampaignManager)
-	{
-		CachedCampaignManager->OnTurnStepStarted.RemoveDynamic(
+		CachedGameState->OnTurnStepStarted.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleTurnStepStarted);
-		CachedCampaignManager->OnTurnProcessed.RemoveDynamic(
+		CachedGameState->OnTurnProcessed.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleTurnProcessed);
-		CachedCampaignManager->OnCampaignStarted.RemoveDynamic(
+		CachedGameState->OnCampaignStarted.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleCampaignStarted);
-		CachedCampaignManager->OnCampaignObjectivesChanged.RemoveDynamic(
+		CachedGameState->OnCampaignObjectivesChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleObjectivesChanged);
-		CachedCampaignManager->OnVictory.RemoveDynamic(this, &URomanEmpireMainWidget::HandleVictory);
-		CachedCampaignManager->OnDefeat.RemoveDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
+		CachedGameState->OnVictory.RemoveDynamic(this, &URomanEmpireMainWidget::HandleVictory);
+		CachedGameState->OnDefeat.RemoveDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	}
 	bCanonicalEventsBound = false;
+	CachedGameState = nullptr;
+	CachedController = nullptr;
 }
 
 void URomanEmpireMainWidget::BindSelectionEvents(
@@ -339,7 +319,7 @@ void URomanEmpireMainWidget::BindSelectionEvents(
 {
 	UnbindSelectionEvents();
 	ObservedUnit = Units.IsEmpty() ? nullptr : Units[0];
-	if (CachedGameMode && CachedGameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed)
+	if (CachedGameState && CachedGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed)
 	{
 		ObservedUnit = CachedController ? Cast<AUnitBase>(CachedController->GetPawn()) : nullptr;
 	}
@@ -385,14 +365,14 @@ void URomanEmpireMainWidget::UnbindSelectionEvents()
 
 void URomanEmpireMainWidget::RefreshFromCanonicalState()
 {
-	if (CachedFactionManager)
+	if (CachedGameState)
 	{
-		UpdateResourceDisplay(CachedFactionManager->GetFactionResources(CachedFactionManager->GetPlayerFaction()));
+		UpdateResourceDisplay(CachedGameState->GetFactionResources(CachedGameState->GetPlayerFaction()));
 	}
 	RefreshModeAndTurn();
-	if (CachedCampaignManager)
+	if (CachedGameState)
 	{
-		const FCampaignObjectiveState State = CachedCampaignManager->GetObjectiveState();
+		const FCampaignObjectiveState State = CachedGameState->GetObjectiveState();
 		RefreshObjectives(State);
 		RefreshOutcome(State.Outcome);
 	}
@@ -422,10 +402,10 @@ void URomanEmpireMainWidget::RefreshModeAndTurn()
 	{
 		return;
 	}
-	const EGameplayMode Mode = CachedGameMode
-		? CachedGameMode->GetCurrentGameplayMode()
+	const EGameplayMode Mode = CachedGameState
+		? CachedGameState->GetCurrentGameplayMode()
 		: EGameplayMode::Tactical;
-	const int32 Turn = CachedCampaignManager ? CachedCampaignManager->GetCurrentTurn() : 0;
+	const int32 Turn = CachedGameState ? CachedGameState->GetCurrentTurn() : 0;
 	PhaseText->SetText(FText::FromString(FString::Printf(
 		TEXT("%s   |   Turn %d"),
 		RomanEmpireGameplay::GetGameplayModeName(Mode),
@@ -434,8 +414,8 @@ void URomanEmpireMainWidget::RefreshModeAndTurn()
 
 void URomanEmpireMainWidget::RefreshCommands()
 {
-	const EGameplayMode Mode = CachedGameMode
-		? CachedGameMode->GetCurrentGameplayMode() : EGameplayMode::Tactical;
+	const EGameplayMode Mode = CachedGameState
+		? CachedGameState->GetCurrentGameplayMode() : EGameplayMode::Tactical;
 	const bool bCanBuild = CachedController && CachedController->CanIssueTacticalCommands();
 	if (BuildMenuButton)
 	{
@@ -488,8 +468,8 @@ void URomanEmpireMainWidget::RefreshSelection()
 	{
 		return;
 	}
-	const bool bPossessed = CachedGameMode &&
-		CachedGameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed;
+	const bool bPossessed = CachedGameState &&
+		CachedGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed;
 	if (CrosshairText)
 	{
 		CrosshairText->SetVisibility(bPossessed ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
@@ -581,14 +561,14 @@ void URomanEmpireMainWidget::RefreshSelection()
 
 	const bool bCanTrain = Building->IsComplete() && CachedController &&
 		CachedController->CanIssueTacticalCommands() &&
-		CachedFactionManager && Building->GetOwnerFaction() == CachedFactionManager->GetPlayerFaction() &&
+		CachedGameState && Building->GetOwnerFaction() == CachedGameState->GetPlayerFaction() &&
 		!Data.TrainableUnits.IsEmpty();
 	TrainButton->SetVisibility(bCanTrain ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	if (bCanTrain && TrainButtonText)
 	{
 		const URomanUnitDefinition* Unit = Registry ? Registry->FindUnit(Data.TrainableUnits[0]) : nullptr;
 		// Use the same atomic spending rules on a local query copy; this never mutates a wallet.
-		FFactionResourceAmounts Available = CachedFactionManager->GetFactionResources(Building->GetOwnerFaction());
+		FFactionResourceAmounts Available = CachedGameState->GetFactionResources(Building->GetOwnerFaction());
 		const bool bAffordable = Unit &&
 			RomanEmpireEconomy::TrySpendResources(Available, Unit->Definition.TrainingCost).WasSuccessful();
 		TrainButton->SetIsEnabled(bAffordable);
@@ -608,23 +588,23 @@ void URomanEmpireMainWidget::RefreshDiagnostic()
 	}
 
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
-	const EFactionID PlayerFaction = CachedFactionManager
-		? CachedFactionManager->GetPlayerFaction()
+	const EFactionID PlayerFaction = CachedGameState
+		? CachedGameState->GetPlayerFaction()
 		: EFactionID::None;
-	const FFactionResourceAmounts Resources = CachedFactionManager
-		? CachedFactionManager->GetFactionResources(PlayerFaction)
+	const FFactionResourceAmounts Resources = CachedGameState
+		? CachedGameState->GetFactionResources(PlayerFaction)
 		: FFactionResourceAmounts();
-	const int32 TerritoryCount = CachedWorldMapManager
-		? CachedWorldMapManager->GetFactionTerritoryCount(PlayerFaction)
+	const int32 TerritoryCount = CachedGameState
+		? CachedGameState->GetFactionTerritoryCount(PlayerFaction)
 		: 0;
-	const EGameplayMode Mode = CachedGameMode
-		? CachedGameMode->GetCurrentGameplayMode()
+	const EGameplayMode Mode = CachedGameState
+		? CachedGameState->GetCurrentGameplayMode()
 		: EGameplayMode::Tactical;
 
 	DiagnosticText->SetText(FText::FromString(FString::Printf(
 		TEXT("CANONICAL STATE\nMode=%s  Turn=%d  PlayerTerritories=%d  Gold=%d\nDefinitions F/U/B/T=%d/%d/%d/%d"),
 		RomanEmpireGameplay::GetGameplayModeName(Mode),
-		CachedCampaignManager ? CachedCampaignManager->GetCurrentTurn() : 0,
+		CachedGameState ? CachedGameState->GetCurrentTurn() : 0,
 		TerritoryCount,
 		Resources.Gold,
 		Registry ? Registry->GetAllFactions().Num() : 0,
@@ -649,8 +629,8 @@ void URomanEmpireMainWidget::RefreshOutcome(ECampaignOutcome Outcome)
 	if (Outcome == ECampaignOutcome::Victory)
 	{
 		OutcomeText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.85f, 0.1f)));
-		const TCHAR* Condition = CachedCampaignManager &&
-			CachedCampaignManager->GetResolvedVictoryCondition() == EVictoryCondition::Economic
+		const TCHAR* Condition = CachedGameState &&
+			CachedGameState->GetResolvedVictoryCondition() == EVictoryCondition::Economic
 			? TEXT("Economic")
 			: TEXT("Conquest");
 		OutcomeText->SetText(FText::FromString(FString::Printf(TEXT("VICTORIA\n%s victory"), Condition)));
@@ -728,9 +708,10 @@ void URomanEmpireMainWidget::HandleResourcesChanged(
 	EFactionID FactionID,
 	FFactionResourceAmounts NewBalance)
 {
-	if (CachedFactionManager && FactionID == CachedFactionManager->GetPlayerFaction())
+	(void)NewBalance;
+	if (CachedGameState && FactionID == CachedGameState->GetPlayerFaction())
 	{
-		UpdateResourceDisplay(NewBalance);
+		UpdateResourceDisplay(CachedGameState->GetFactionResources(FactionID));
 		RefreshSelection();
 		RefreshDiagnostic();
 	}
@@ -819,8 +800,13 @@ void URomanEmpireMainWidget::HandlePossessedUnitChanged(AUnitBase* PreviousUnit,
 
 void URomanEmpireMainWidget::HandleObjectivesChanged(FCampaignObjectiveState State)
 {
-	RefreshObjectives(State);
-	RefreshOutcome(State.Outcome);
+	(void)State;
+	if (!CachedGameState) return;
+	// Another observer can commit a nested transaction before this callback runs.
+	// The notification is an invalidation signal, not a newer-than-current snapshot.
+	const FCampaignObjectiveState CurrentState = CachedGameState->GetObjectiveState();
+	RefreshObjectives(CurrentState);
+	RefreshOutcome(CurrentState.Outcome);
 	RefreshSelection();
 	RefreshDiagnostic();
 	RefreshCommands();

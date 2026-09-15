@@ -13,12 +13,9 @@
 
 class ABuildingBase;
 class ABarracks;
-class ACampaignManager;
-class AFactionManager;
-class ARomanEmpireGameMode;
+class ARomanEmpireGameState;
 class ARomanEmpirePlayerController;
 class AUnitBase;
-class AWorldMapManager;
 class UBorder;
 class UBuildingMenuWidget;
 class UButton;
@@ -123,16 +120,7 @@ private:
 	TObjectPtr<ARomanEmpirePlayerController> CachedController;
 
 	UPROPERTY(Transient)
-	TObjectPtr<ARomanEmpireGameMode> CachedGameMode;
-
-	UPROPERTY(Transient)
-	TObjectPtr<AFactionManager> CachedFactionManager;
-
-	UPROPERTY(Transient)
-	TObjectPtr<AWorldMapManager> CachedWorldMapManager;
-
-	UPROPERTY(Transient)
-	TObjectPtr<ACampaignManager> CachedCampaignManager;
+	TObjectPtr<ARomanEmpireGameState> CachedGameState;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AUnitBase> ObservedUnit;

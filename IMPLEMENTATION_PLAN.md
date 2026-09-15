@@ -1,6 +1,6 @@
 # Roman Empire Game Implementation Plan
 
-Status: implementation active; M0 and M1 complete, M2 canonical-state work active
+Status: implementation active; M0–M2 complete, M3.1 unit foundation next
 Audit baseline: commit `89d8d66e5051d303dea9c965317cdb961d8a52f6`
 Plan date: 2026-09-03
 
@@ -98,7 +98,7 @@ Campaign model <---- resolution result ---- squads / units / buildings
 | Domain | Authoritative owner | Consumers |
 |---|---|---|
 | Session rules and win/loss orchestration | `ARomanEmpireGameMode` | GameState, campaign/tactical coordinators |
-| Public current phase, turn, resources, and match state | `ARomanEmpireGameState` | UI, controller, tests |
+| Public current phase, turn, resources, and match state | `ARomanEmpireGameState` read/event projection; no mutable copies | UI, controller, tests |
 | Campaign territories, diplomacy, armies, progression | Campaign model/subsystem | GameMode, save system, strategic UI |
 | Input and player intent | `ARomanEmpirePlayerController` | Command/selection/possession systems |
 | Tactical unit behavior | Squad/AI controller plus focused Actor components | GameMode, UI, battle resolver |
@@ -427,13 +427,21 @@ Evidence and exit gate:
 - Searches find no duplicate resource wallet, turn counter, or territory-ownership store.
 - Changing one data asset updates the runtime and UI without changing C++ constants.
 
-Aggregate exit review update (2026-09-08; M2 remains open):
+Initial aggregate exit review (2026-09-08; historical gaps, superseded by the follow-up below):
 
 - The new `RomanEmpireGame.Content.DefinitionPropagationAndAtomicPlacementPIE` test proves a real loaded Barracks definition change reaches the normal registry, build menu, placement factory, construction duration and selected-building UI. The fixture restores the definition/dirty state without saving; the asset's disk hash matches its committed LFS payload. This is startup/spawn propagation, not live hot-reload of existing actors.
 - The audit found that a single placement spend call did not ensure exactly-once execution: synchronous wallet observers could recursively confirm. Placement now guards confirmation/start/transform reentry, initializes the captured definition before spending, and publishes only after clearing consumed preview state. Tests cover all six currencies, event/actor counts, cancel/restart observers, insufficient funds and retry.
 - The regression is mutation-proven: temporarily removing the confirmation guard produced two buildings and 74 gold spent instead of 37. After restoring the guard, the final suite passed 14/14 (`Artifacts/Automation/20260908_151420_304`), with strict non-unity/no-PCH compilation passing as well. Full evidence and limits are in `M2_EXIT_REVIEW.md`.
-- **Remaining architecture requirement:** the responsibility map still calls for `ARomanEmpireGameState` as the public phase/turn/resources/match contract, but the runtime currently instantiates `AGameStateBase`. Implement that public read contract and consumer/test integration without duplicating the canonical managers' mutable state, then repeat the final M2 audit. Do not remove this requirement or begin M3 on the assumption that the existing base GameState fulfills it.
+- **Architecture gap identified on 2026-09-08:** the responsibility map required `ARomanEmpireGameState`, while that revision instantiated `AGameStateBase`. The follow-up implements the required contract and consumer/test integration instead of dropping the requirement.
 - Shipping and Development BuildCookRun also pass; `Artifacts/Packages/M2_Exit` contains 559 archived packages and cook reports 0 errors/warnings. The new standalone player is rejected before startup by Windows Code Integrity (3033/3077, 2026-09-08); no security policy was changed. Its hash and the pending standalone launch gate are recorded in `M2_EXIT_REVIEW.md`. The older M2.6 smoke does not certify this new binary.
+
+Final aggregate follow-up (2026-09-09–15):
+
+- The explicitly assigned public `ARomanEmpireGameState` delegates all reads to canonical owners, relays their events once, and releases every subscription in EndPlay. UMG and controller global-state reads/eligibility use it; commands and actor-specific events retain their proper owners. No replicated multiplayer state or duplicate mutable store was introduced.
+- Native tests verify the nine pure/const queries, safe defaults, all factions/resources/objectives against owners, unique relays and complete teardown. Live Slate TRAIN assertions now prove the exact PDA cost across all six currencies, active/queued acceptance and no-charge promotion or rejection.
+- A new real nested-objective transaction test exposed stale UMG snapshots. UMG now re-queries GameState. Restoring the old callback deliberately failed with 1117 displayed versus 1146 canonical gold; restoring the fix passed all 16 tests, with zero warnings/failures/pending (`Artifacts/Automation/20260909_164333_175`).
+- Strict IWYU and Shipping compilation pass for this correction. After an external Fab update was rejected by Windows Code Integrity, an explicit process-only `-DisableFab` option allowed Test/Cook/Package to omit the unused Editor browser without changing project/engine/security settings. The final suite again passed 16/16 with no warnings (`Artifacts/Automation/20260915_131817_133`); Development packaging produced 559 cooked packages with zero errors/warnings in `Artifacts/Packages/M2_Final`.
+- The actual final player launched, rendered the inspected `Artifacts/M2_Final-PackagedUMG.png` at 1920×1080 and exited 0, with default map/GameState/UMG/input ready and no failure signatures. Hash, commands, logs, historical failures and scope limits are in `M2_EXIT_REVIEW.md`. M2 is closed on 2026-09-15; proceed to M3.1. The full M3–M8 goal remains active.
 
 Estimated effort: 1–2 focused weeks.
 
@@ -447,6 +455,15 @@ Goal: deliver a complete, deterministic command-and-capture encounter.
 - Define unit lifecycle: spawn, initialize definition/faction, idle, commanded, attacking, routed/dead, cleanup.
 - Move health/combat/selection/order responsibilities into focused components or clearly bounded classes.
 - Use skeletal placeholders and a minimal Animation Blueprint when animation work begins; do not expand the procedural limb system.
+
+Execution preparation (source audit 2026-09-15):
+
+- `AUnitBase` still clears fourteen constructor-created component references. Preserve them and test their identity/attachment and GC lifetime. Selection must control both visibility and hidden-in-game state; camera tests must verify actual component activation, not only controller mode.
+- Make initialization and death explicit lifecycle boundaries. Preserve deferred initialization from GameMode/Barracks; reject partial or repeated initialization. Dead/uninitialized units must reject new actions while cleanup operations remain legal.
+- Commit death and cancel orders/blocking/movement/collision before notifying observers; prevent repeated death and accidental resurrection through the health setter. Replace global-altitude corpse disposal with bounded time-based cleanup and safe EndPlay teardown.
+- Keep health/combat/selection/order ownership in focused components or clearly bounded classes without duplicating fields. M3.1 is not complete merely when the null assignments are removed.
+- Add actor-level tests for valid/invalid initialization, preserved components, visible selection, camera activation, reentrant death observers, rejected post-death commands and cleanup at different altitudes; keep existing UMG/input integration green. Follow with IWYU, Shipping and rendered selection/possession checks.
+- Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-module-build-system`; `unreal-packaging` for the actual-player gate. Navigation, formation commands, validated combat windows, faction registries and new animation/art remain their later M3 packages. Do not expand the procedural-limb presentation while repairing its existing references.
 
 #### M3.2 Selection and ownership
 

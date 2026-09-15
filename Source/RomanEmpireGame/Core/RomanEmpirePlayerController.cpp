@@ -2,10 +2,9 @@
 
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireGameMode.h"
+#include "Core/RomanEmpireGameState.h"
 #include "RomanEmpireGame.h"
 #include "Content/RomanContentRegistry.h"
-#include "Faction/FactionManager.h"
-#include "World/CampaignManager.h"
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
@@ -76,13 +75,14 @@ void ARomanEmpirePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Cache game mode
+	// Keep commands on the rules object; public reads/events come from GameState.
 	GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
-	if (GameMode)
+	PublicGameState = GetWorld() ? GetWorld()->GetGameState<ARomanEmpireGameState>() : nullptr;
+	if (PublicGameState)
 	{
-		GameMode->OnGameplayInitialized.AddUniqueDynamic(
+		PublicGameState->OnGameplayInitialized.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
-		GameMode->OnGameplayModeChanged.AddUniqueDynamic(
+		PublicGameState->OnGameplayModeChanged.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
 	}
 	ApplyInputContexts();
@@ -131,11 +131,11 @@ void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayRea
 {
 	CancelTransientInput();
 	RemoveOwnedInputContexts();
-	if (GameMode)
+	if (PublicGameState)
 	{
-		GameMode->OnGameplayInitialized.RemoveDynamic(
+		PublicGameState->OnGameplayInitialized.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
-		GameMode->OnGameplayModeChanged.RemoveDynamic(
+		PublicGameState->OnGameplayModeChanged.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
 	}
 	if (MainWidget)
@@ -210,7 +210,7 @@ void ARomanEmpirePlayerController::RemoveOwnedInputContexts()
 
 void ARomanEmpirePlayerController::ApplyInputContexts()
 {
-	if (!GameMode || !GameMode->IsGameplayInitialized() || !InputConfiguration || !IsLocalController())
+	if (!PublicGameState || !PublicGameState->IsGameplayInitialized() || !InputConfiguration || !IsLocalController())
 	{
 		return;
 	}
@@ -220,7 +220,7 @@ void ARomanEmpirePlayerController::ApplyInputContexts()
 	{
 		return;
 	}
-	UInputMappingContext* Desired = InputConfiguration->GetContextForMode(GameMode->GetCurrentGameplayMode());
+	UInputMappingContext* Desired = InputConfiguration->GetContextForMode(PublicGameState->GetCurrentGameplayMode());
 	if (Desired == ActiveGameplayContext && HasActiveModeContext())
 	{
 		return;
@@ -244,37 +244,34 @@ bool ARomanEmpirePlayerController::HasActiveModeContext() const
 {
 	const UEnhancedInputLocalPlayerSubsystem* Subsystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-	return IsLocalController() && GameMode && GameMode->IsGameplayInitialized() && InputConfiguration &&
-		ActiveGameplayContext && ActiveGameplayContext == InputConfiguration->GetContextForMode(GameMode->GetCurrentGameplayMode()) &&
+	return IsLocalController() && PublicGameState && PublicGameState->IsGameplayInitialized() && InputConfiguration &&
+		ActiveGameplayContext && ActiveGameplayContext == InputConfiguration->GetContextForMode(PublicGameState->GetCurrentGameplayMode()) &&
 		Subsystem && Subsystem->HasMappingContext(ActiveGameplayContext) &&
 		Subsystem->HasMappingContext(InputConfiguration->SharedContext);
 }
 
 bool ARomanEmpirePlayerController::CanIssueTacticalCommands() const
 {
-	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
-	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() == EGameplayMode::Tactical &&
-		Campaign && Campaign->IsCampaignActive();
+	return HasActiveModeContext() && PublicGameState->GetCurrentGameplayMode() == EGameplayMode::Tactical &&
+		PublicGameState && PublicGameState->IsCampaignActive();
 }
 
 bool ARomanEmpirePlayerController::CanEndTurn() const
 {
-	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
-	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
-		Campaign && Campaign->IsCampaignActive();
+	return HasActiveModeContext() && PublicGameState->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
+		PublicGameState && PublicGameState->IsCampaignActive();
 }
 
 bool ARomanEmpirePlayerController::CanControlCamera() const
 {
-	return HasActiveModeContext() && GameMode->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
+	return HasActiveModeContext() && PublicGameState->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
 		Cast<ASeamlessZoomCamera>(GetPawn()) != nullptr;
 }
 
 bool ARomanEmpirePlayerController::CanControlSoldier() const
 {
-	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
 	return HasActiveModeContext() && IsInFirstPersonMode() && IsValid(PossessedUnit) &&
-		PossessedUnit->IsAlive() && GetPawn() == PossessedUnit && Campaign && Campaign->IsCampaignActive();
+		PossessedUnit->IsAlive() && GetPawn() == PossessedUnit && PublicGameState && PublicGameState->IsCampaignActive();
 }
 
 void ARomanEmpirePlayerController::HandleGameplayInitialized()
@@ -604,10 +601,9 @@ void ARomanEmpirePlayerController::CancelBuildingPlacement()
 
 void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess)
 {
-	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	if (!CanIssueTacticalCommands() || !IsValid(UnitToPossess) || !UnitToPossess->IsAlive() || !FactionManager ||
-		UnitToPossess->GetOwnerFaction() != FactionManager->GetPlayerFaction() ||
-		GameMode->GetCurrentGameplayMode() != EGameplayMode::Tactical)
+	if (!CanIssueTacticalCommands() || !IsValid(UnitToPossess) || !UnitToPossess->IsAlive() || !PublicGameState ||
+		UnitToPossess->GetOwnerFaction() != PublicGameState->GetPlayerFaction() ||
+		PublicGameState->GetCurrentGameplayMode() != EGameplayMode::Tactical)
 	{
 		UE_LOG(LogRomanEmpire, Verbose, TEXT("Possession request requires a living player unit in tactical mode"));
 		return;
@@ -684,7 +680,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 
-	if (GameMode && GameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed)
+	if (GameMode && PublicGameState && PublicGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed)
 	{
 		const EZoomLevel ZoomLevel = CachedCameraPawn
 			? CachedCameraPawn->GetZoomLevelEnum()
@@ -717,8 +713,8 @@ float ARomanEmpirePlayerController::GetCurrentZoom() const
 
 bool ARomanEmpirePlayerController::IsInFirstPersonMode() const
 {
-	return GameMode
-		? GameMode->GetCurrentGameplayMode() == EGameplayMode::Possessed
+	return PublicGameState
+		? PublicGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed
 		: PossessedUnit != nullptr;
 }
 
@@ -757,12 +753,11 @@ void ARomanEmpirePlayerController::OnSelectReleased()
 
 void ARomanEmpirePlayerController::OnCommandPressed()
 {
-	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	if (!CanIssueTacticalCommands() || !FactionManager || (MainWidget && MainWidget->IsBuildingMenuVisible()))
+	if (!CanIssueTacticalCommands() || !PublicGameState || (MainWidget && MainWidget->IsBuildingMenuVisible()))
 	{
 		return;
 	}
-	const EFactionID PlayerFaction = FactionManager->GetPlayerFaction();
+	const EFactionID PlayerFaction = PublicGameState->GetPlayerFaction();
 	if (CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement)
 	{
 		CancelBuildingPlacement();
@@ -1114,11 +1109,9 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 bool ARomanEmpirePlayerController::OnTrainButtonClicked()
 {
 	ABarracks* Barracks = Cast<ABarracks>(SelectedBuilding);
-	const AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
-	const ACampaignManager* Campaign = GameMode ? GameMode->GetCampaignManager() : nullptr;
-	if (!IsValid(Barracks) || !FactionManager || !Campaign || !Campaign->IsCampaignActive() ||
+	if (!IsValid(Barracks) || !PublicGameState || !PublicGameState->IsCampaignActive() ||
 		!CanIssueTacticalCommands() ||
-		Barracks->GetOwnerFaction() != FactionManager->GetPlayerFaction())
+		Barracks->GetOwnerFaction() != PublicGameState->GetPlayerFaction())
 	{
 		return false;
 	}

@@ -2,7 +2,7 @@
 
 Roman Empire Game is an Unreal Engine 5.8 single-player Windows project combining a campaign layer, real-time tactical command, settlement development, and explicit first-person possession of a soldier.
 
-M1 is complete and clean-clone proven on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The approved baseline is commit `0b74ad1566306d7487629812de68bc6abd7f0594`; M2 canonical-state work is now active.
+M1 is complete and clean-clone proven on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The approved M1 baseline is commit `0b74ad1566306d7487629812de68bc6abd7f0594`; M2's canonical-state exit gates are now complete, with M3.1 unit foundation next.
 
 ## Product target
 
@@ -80,7 +80,7 @@ Remote Control and Automation Driver are disabled in normal project defaults. Ep
 
 ## Current implementation status
 
-M1 and M2.1–M2.6 implementation packages are complete: canonical resources/turns/territories/diplomacy, authored Primary Data Assets, event-driven UMG, and committed mode-specific Enhanced Input. Fourteen automation tests now include explicit definition-change/runtime/UI propagation and reentrant placement protection. The aggregate M2 audit found that the planned public GameState contract is still missing; M2 remains open before M3 tactical gameplay. See [M2_EXIT_REVIEW.md](M2_EXIT_REVIEW.md) for current findings and evidence, [INPUT_CONTROLS.md](INPUT_CONTROLS.md) for defaults, and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the complete remaining scope. The game still uses placeholder art and is not a finished vertical slice.
+M1 and M2 are complete: canonical resources/turns/territories/diplomacy, Primary Data Assets, public GameState, event-driven UMG, and mode-specific Enhanced Input. Sixteen tests cover definition propagation, exact transaction costs, nested notifications and lifecycle cleanup. Strict builds, Shipping and an actual rendered Development player pass. On this workstation, automation currently requires the explicit `-DisableFab` option because Windows rejects the updated optional Fab Editor DLL; security and plugin defaults remain unchanged. M3.1 unit foundation is next. See [M2_EXIT_REVIEW.md](M2_EXIT_REVIEW.md) for evidence and limits, [INPUT_CONTROLS.md](INPUT_CONTROLS.md) for defaults, and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for remaining work. The game still uses placeholder art and is not a finished vertical slice.
 
 ### M1 baseline evidence
 

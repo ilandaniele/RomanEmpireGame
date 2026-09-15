@@ -16,7 +16,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
-#include "GameFramework/GameStateBase.h"
+#include "Core/RomanEmpireGameState.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -34,7 +34,7 @@ ARomanEmpireGameMode::ARomanEmpireGameMode()
 
 	DefaultPawnClass = ASeamlessZoomCamera::StaticClass();
 	PlayerControllerClass = ARomanEmpirePlayerController::StaticClass();
-	GameStateClass = AGameStateBase::StaticClass();
+	GameStateClass = ARomanEmpireGameState::StaticClass();
 	HUDClass = ARomanEmpireHUD::StaticClass();
 }
 

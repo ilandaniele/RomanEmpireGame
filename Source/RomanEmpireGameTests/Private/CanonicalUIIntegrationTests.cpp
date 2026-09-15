@@ -13,6 +13,7 @@
 #include "Components/ActorComponent.h"
 #include "Content/RomanContentRegistry.h"
 #include "Core/GameplayMode.h"
+#include "Core/RomanEmpireGameState.h"
 #include "Editor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -240,10 +241,10 @@ namespace RomanEmpireUITests
 		return Call.Execute() && Call.ReadBool();
 	}
 
-	FFactionResourceAmounts ReadResources(FAutomationTestBase& Test, UObject* Manager)
+	FFactionResourceAmounts ReadResources(FAutomationTestBase& Test, UObject* Manager, EFactionID Faction = EFactionID::Rome)
 	{
 		FCall Call(Test, Manager, TEXT("GetFactionResources"), 2);
-		Call.SetEnum(TEXT("FactionID"), EFactionID::Rome);
+		Call.SetEnum(TEXT("FactionID"), Faction);
 		Call.Execute();
 		return Call.ReadStruct<FFactionResourceAmounts>();
 	}
@@ -373,6 +374,7 @@ namespace RomanEmpireUITests
 				CheckBindings(0);
 				const FString DetachedText = ResourceText->GetText().ToString();
 				AddGold(Test, FactionManager, 19);
+				CheckGameStateProjection();
 				Test.TestEqual(TEXT("Detached UMG does not receive wallet events"), ResourceText->GetText().ToString(), DetachedText);
 				Root->AddToViewport();
 				Stage = 2;
@@ -380,13 +382,17 @@ namespace RomanEmpireUITests
 			}
 			Test.TestTrue(TEXT("The same root reattaches to the viewport"), Root->IsInViewport());
 			CheckBindings(1);
+			CheckGameStateProjection();
 			Test.TestEqual(TEXT("Reattached root catches up from the authoritative wallet"),
 				ResourceText->GetText().ToString(), ResourceLabel(ReadResources(Test, FactionManager)));
+			const FFactionResourceAmounts BeforeQueuedOrder = ReadResources(Test, FactionManager);
 			ClickThroughSlate(Test, Root, TrainButton);
+			CheckTrainingCharge(TEXT("Queued Slate TRAIN after reattachment"), BeforeQueuedOrder, TrainingCost);
 			Test.TestEqual(TEXT("One click after reattachment adds exactly one pending order"),
 				ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), 1);
 			Test.TestTrue(TEXT("Production event refreshes pending orders in UMG"),
 				ProductionText->GetText().ToString().Contains(TEXT("1 pending")));
+			if (!ExerciseTrainingTransactions()) return true;
 			Test.TestTrue(TEXT("Selected production actor can be destroyed in the live world"), Producer->Destroy());
 			Test.TestNull(TEXT("Destroyed building is removed from canonical selection"),
 				ReadObject(Test, Controller, TEXT("GetSelectedBuilding")));
@@ -398,6 +404,7 @@ namespace RomanEmpireUITests
 			ObjectiveCall.Execute();
 			const FCampaignObjectiveState Before = ObjectiveCall.ReadStruct<FCampaignObjectiveState>();
 			AddGold(Test, FactionManager, Before.RequiredGold + 1000);
+			CheckGameStateProjection();
 			FIntProperty* MaxTurnsProperty = FindFProperty<FIntProperty>(CampaignManager->GetClass(), TEXT("MaxTurns"));
 			if (!Test.TestNotNull(TEXT("Campaign exposes the authored integer turn limit"), MaxTurnsProperty)) return true;
 			MaxTurnsProperty->SetPropertyValue_InContainer(CampaignManager,
@@ -411,6 +418,18 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("UMG displays the campaign-owned economic victory"),
 				OutcomeText->GetText().ToString().Contains(TEXT("Economic victory")));
 			Test.TestTrue(TEXT("Victory panel is visible"), Root->GetWidgetFromName(TEXT("OutcomePanel"))->IsVisible());
+			CheckGameStateProjection();
+			Test.TestTrue(TEXT("Owned GameState can end independently of its authorities"), GameState->Destroy());
+			CheckRelayContract(0);
+			Test.TestFalse(TEXT("Ended GameState is not gameplay-ready"), GameState->IsGameplayInitialized());
+			Test.TestEqual(TEXT("Ended GameState does not retain a copied turn"), GameState->GetCurrentTurn(), 0);
+			const FFactionResourceAmounts EmptyWallet;
+			const FFactionResourceAmounts EndedWallet = GameState->GetFactionResources(EFactionID::Rome);
+			Test.TestTrue(TEXT("Ended GameState does not retain a copied wallet"),
+				FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&EndedWallet, &EmptyWallet, 0));
+			const FString EndedText = ResourceText->GetText().ToString();
+			AddGold(Test, FactionManager, 5);
+			Test.TestEqual(TEXT("Detached state relay forwards no later authority event"), ResourceText->GetText().ToString(), EndedText);
 			return true;
 		}
 
@@ -420,8 +439,10 @@ namespace RomanEmpireUITests
 		int32 Stage = 0;
 		TWeakObjectPtr<UWorld> PlayWorld;
 		APlayerController* Controller = nullptr;
+		ARomanEmpireGameState* GameState = nullptr;
 		UObject* FactionManager = nullptr;
 		UObject* CampaignManager = nullptr;
+		UObject* WorldMapManager = nullptr;
 		AActor* Producer = nullptr;
 		UUserWidget* Root = nullptr;
 		UTextBlock* ResourceText = nullptr;
@@ -429,13 +450,105 @@ namespace RomanEmpireUITests
 		UTextBlock* ProductionText = nullptr;
 		UTextBlock* OutcomeText = nullptr;
 		UButton* TrainButton = nullptr;
+		FName TrainingUnitID;
+		FFactionResourceAmounts TrainingCost;
+		float TrainingDuration = 0.0f;
+
+		void CheckTrainingCharge(const TCHAR* Context, const FFactionResourceAmounts& Before,
+			const FFactionResourceAmounts& ExpectedCost)
+		{
+			const FFactionResourceAmounts After = ReadResources(Test, FactionManager);
+			const TPair<const TCHAR*, int32 FFactionResourceAmounts::*> Fields[] = {
+				{ TEXT("Gold"), &FFactionResourceAmounts::Gold }, { TEXT("Food"), &FFactionResourceAmounts::Food },
+				{ TEXT("Iron"), &FFactionResourceAmounts::Iron }, { TEXT("Wood"), &FFactionResourceAmounts::Wood },
+				{ TEXT("Stone"), &FFactionResourceAmounts::Stone }, { TEXT("Population"), &FFactionResourceAmounts::Population }
+			};
+			for (const auto& Field : Fields)
+			{
+				Test.TestEqual(*FString::Printf(TEXT("%s charges exactly the defined %s amount"), Context, Field.Key),
+					Before.*(Field.Value) - After.*(Field.Value), ExpectedCost.*(Field.Value));
+			}
+			Test.TestEqual(TEXT("Training transaction leaves UMG on the canonical wallet"),
+				ResourceText->GetText().ToString(), ResourceLabel(After));
+		}
+
+		bool ExerciseTrainingTransactions()
+		{
+			const FFactionResourceAmounts NoCharge;
+			const FFactionResourceAmounts BeforeCompletion = ReadResources(Test, FactionManager);
+			Producer->Tick(TrainingDuration + 0.1f);
+			Test.TestTrue(TEXT("Completion promotes the prepaid queued order"), ReadBool(Test, Producer, TEXT("IsTraining")));
+			Test.TestEqual(TEXT("Promotion consumes one pending order"), ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), 0);
+			CheckTrainingCharge(TEXT("Completion and queue promotion"), BeforeCompletion, NoCharge);
+
+			const int32 GoldBeforeDrain = ReadResources(Test, FactionManager).Gold;
+			AddGold(Test, FactionManager, -GoldBeforeDrain);
+			const FFactionResourceAmounts BeforeRejectedOrder = ReadResources(Test, FactionManager);
+			Test.AddExpectedMessage(TEXT("Cannot train unit: resource transaction failed"),
+				ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+			FCall Rejected(Test, Producer, TEXT("TrainUnit"), 2);
+			Rejected.SetName(TEXT("UnitID"), TrainingUnitID);
+			Rejected.Execute();
+			Test.TestFalse(TEXT("Unfunded training is rejected by the real producer"), Rejected.ReadBool());
+			CheckTrainingCharge(TEXT("Insufficient-funds rejection"), BeforeRejectedOrder, NoCharge);
+			Test.TestEqual(TEXT("Unfunded order never enters the queue"), ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), 0);
+			AddGold(Test, FactionManager, GoldBeforeDrain);
+
+			const FIntProperty* QueueCapacity = FindFProperty<FIntProperty>(Producer->GetClass(), TEXT("MaxQueueSize"));
+			if (!Test.TestNotNull(TEXT("Producer exposes its authored queue capacity"), QueueCapacity)) return false;
+			const int32 Capacity = QueueCapacity->GetPropertyValue_InContainer(Producer);
+			if (!Test.TestTrue(TEXT("Queue fixture has a bounded positive capacity"), Capacity > 0 && Capacity <= 16)) return false;
+			FFactionResourceDelta Funding;
+			Funding.Gold = TrainingCost.Gold * (Capacity + 1);
+			Funding.Food = TrainingCost.Food * (Capacity + 1);
+			Funding.Iron = TrainingCost.Iron * (Capacity + 1);
+			Funding.Wood = TrainingCost.Wood * (Capacity + 1);
+			Funding.Stone = TrainingCost.Stone * (Capacity + 1);
+			Funding.Population = TrainingCost.Population * (Capacity + 1);
+			FCall Fund(Test, FactionManager, TEXT("ApplyFactionResourceDelta"), 3);
+			Fund.SetEnum(TEXT("FactionID"), EFactionID::Rome);
+			Fund.SetStruct(TEXT("Delta"), Funding);
+			Fund.Execute();
+			if (!Test.TestTrue(TEXT("Canonical wallet funds the bounded queue fixture"),
+				Fund.ReadStruct<FFactionResourceTransactionResult>().WasSuccessful())) return false;
+			for (int32 Index = 0; Index < Capacity; ++Index)
+			{
+				const FFactionResourceAmounts BeforeOrder = ReadResources(Test, FactionManager);
+				FCall Accepted(Test, Producer, TEXT("TrainUnit"), 2);
+				Accepted.SetName(TEXT("UnitID"), TrainingUnitID);
+				Accepted.Execute();
+				Test.TestTrue(TEXT("Funded order is accepted before queue capacity"), Accepted.ReadBool());
+				CheckTrainingCharge(TEXT("Funded queue order"), BeforeOrder, TrainingCost);
+				Test.TestEqual(TEXT("Each accepted order adds one queue entry"),
+					ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), Index + 1);
+			}
+			const FFactionResourceAmounts BeforeFullQueue = ReadResources(Test, FactionManager);
+			Test.AddExpectedMessage(TEXT("Training queue is full"),
+				ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+			FCall FullQueue(Test, Producer, TEXT("TrainUnit"), 2);
+			FullQueue.SetName(TEXT("UnitID"), TrainingUnitID);
+			FullQueue.Execute();
+			Test.TestFalse(TEXT("Funded order is rejected at queue capacity"), FullQueue.ReadBool());
+			CheckTrainingCharge(TEXT("Full-queue rejection"), BeforeFullQueue, NoCharge);
+			Test.TestEqual(TEXT("Rejected order does not overflow the queue"), ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), Capacity);
+			CheckGameStateProjection();
+			return true;
+		}
 
 		void CheckBindings(int32 Expected)
 		{
-			Test.TestEqual(TEXT("Exactly the expected number of root resource subscriptions exist"),
-				ListenerCount(Test, FactionManager, TEXT("OnFactionResourcesChanged"), Root), Expected);
-			Test.TestEqual(TEXT("Exactly the expected number of root turn subscriptions exist"),
-				ListenerCount(Test, CampaignManager, TEXT("OnTurnProcessed"), Root), Expected);
+			Test.TestEqual(TEXT("Exactly the expected number of root GameState resource subscriptions exist"),
+				ListenerCount(Test, GameState, TEXT("OnFactionResourcesChanged"), Root), Expected);
+			Test.TestEqual(TEXT("Exactly the expected number of root GameState turn subscriptions exist"),
+				ListenerCount(Test, GameState, TEXT("OnTurnProcessed"), Root), Expected);
+			Test.TestEqual(TEXT("Root no longer observes the wallet authority directly"),
+				ListenerCount(Test, FactionManager, TEXT("OnFactionResourcesChanged"), Root), 0);
+			Test.TestEqual(TEXT("Root no longer observes the turn authority directly"),
+				ListenerCount(Test, CampaignManager, TEXT("OnTurnProcessed"), Root), 0);
+			Test.TestEqual(TEXT("GameState owns one wallet relay independent of UMG attachment"),
+				ListenerCount(Test, FactionManager, TEXT("OnFactionResourcesChanged"), GameState), 1);
+			Test.TestEqual(TEXT("GameState owns one turn relay independent of UMG attachment"),
+				ListenerCount(Test, CampaignManager, TEXT("OnTurnProcessed"), GameState), 1);
 			Test.TestEqual(TEXT("Exactly the expected number of root selection subscriptions exist"),
 				ListenerCount(Test, Controller, TEXT("OnSelectionChanged"), Root), Expected);
 			Test.TestEqual(TEXT("Exactly the expected number of root production subscriptions exist"),
@@ -452,6 +565,74 @@ namespace RomanEmpireUITests
 			Test.TestEqual(TEXT("Only one canonical turn advances"), CurrentTurn, PreviousTurn + 1);
 			Test.TestEqual(TEXT("UMG settles on the canonical mode and turn after the complete pipeline"),
 				PhaseText->GetText().ToString(), FString::Printf(TEXT("Tactical   |   Turn %d"), CurrentTurn));
+			CheckGameStateProjection();
+		}
+
+		void CheckGameStateProjection()
+		{
+			// Query the exported native contract directly; compare against each owner
+			// after mutations, without ticking a UI or refreshing a copied snapshot.
+			AGameModeBase* GameMode = PlayWorld->GetAuthGameMode();
+			Test.TestTrue(TEXT("Public GameState is initialized during normal PIE gameplay"), GameState->IsGameplayInitialized());
+			Test.TestEqual(TEXT("GameState readiness delegates to GameMode"),
+				GameState->IsGameplayInitialized(), ReadBool(Test, GameMode, TEXT("IsGameplayInitialized")));
+			FCall Mode(Test, GameMode, TEXT("GetCurrentGameplayMode"), 1);
+			Mode.Execute();
+			Test.TestEqual(TEXT("GameState exposes the canonical gameplay mode"),
+				GameState->GetCurrentGameplayMode(), Mode.ReadEnum<EGameplayMode>());
+			Test.TestEqual(TEXT("GameState exposes the sole campaign turn"),
+				GameState->GetCurrentTurn(), ReadInt(Test, CampaignManager, TEXT("GetCurrentTurn")));
+			FCall PlayerFaction(Test, FactionManager, TEXT("GetPlayerFaction"), 1);
+			PlayerFaction.Execute();
+			Test.TestEqual(TEXT("GameState exposes the canonical player faction"),
+				GameState->GetPlayerFaction(), PlayerFaction.ReadEnum<EFactionID>());
+			for (EFactionID Faction : { EFactionID::None, EFactionID::Rome, EFactionID::Carthage,
+				EFactionID::Gaul, EFactionID::Greece, EFactionID::Egypt, EFactionID::Britannia })
+			{
+				const FFactionResourceAmounts Expected = ReadResources(Test, FactionManager, Faction);
+				const FFactionResourceAmounts Actual = GameState->GetFactionResources(Faction);
+				Test.TestTrue(TEXT("GameState projects every faction wallet field from its authority"),
+					FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&Actual, &Expected, 0));
+				FCall Territories(Test, WorldMapManager, TEXT("GetFactionTerritoryCount"), 2);
+				Territories.SetEnum(TEXT("FactionID"), Faction);
+				Territories.Execute();
+				Test.TestEqual(TEXT("GameState projects the WorldMapManager territory count"),
+					GameState->GetFactionTerritoryCount(Faction), Territories.ReadInt());
+			}
+			FCall Objectives(Test, CampaignManager, TEXT("GetObjectiveState"), 1);
+			Objectives.Execute();
+			const FCampaignObjectiveState ExpectedObjectives = Objectives.ReadStruct<FCampaignObjectiveState>();
+			const FCampaignObjectiveState ActualObjectives = GameState->GetObjectiveState();
+			Test.TestTrue(TEXT("GameState projects all objective progress, thresholds, and terminal outcome"),
+				FCampaignObjectiveState::StaticStruct()->CompareScriptStruct(&ActualObjectives, &ExpectedObjectives, 0));
+			Test.TestEqual(TEXT("GameState exposes the canonical campaign-active status"),
+				GameState->IsCampaignActive(), ReadBool(Test, CampaignManager, TEXT("IsCampaignActive")));
+		}
+
+		void CheckRelayContract(int32 ExpectedListeners = 1)
+		{
+			const TPair<UObject*, FName> Relays[] = {
+				{ PlayWorld->GetAuthGameMode(), TEXT("OnGameplayInitialized") },
+				{ PlayWorld->GetAuthGameMode(), TEXT("OnGameplayModeChanged") },
+				{ FactionManager, TEXT("OnFactionResourcesChanged") },
+				{ FactionManager, TEXT("OnPlayerFactionChanged") },
+				{ CampaignManager, TEXT("OnTurnStepStarted") },
+				{ CampaignManager, TEXT("OnTurnProcessed") },
+				{ CampaignManager, TEXT("OnCampaignStarted") },
+				{ CampaignManager, TEXT("OnCampaignObjectivesChanged") },
+				{ CampaignManager, TEXT("OnVictory") },
+				{ CampaignManager, TEXT("OnDefeat") }
+			};
+			for (const TPair<UObject*, FName>& Relay : Relays)
+			{
+				Test.TestEqual(*FString::Printf(TEXT("GameState owns the expected number of %s relay subscriptions"), *Relay.Value.ToString()),
+					ListenerCount(Test, Relay.Key, Relay.Value, GameState), ExpectedListeners);
+				FMulticastDelegateProperty* Source = FindFProperty<FMulticastDelegateProperty>(Relay.Key->GetClass(), Relay.Value);
+				FMulticastDelegateProperty* Exposed = FindFProperty<FMulticastDelegateProperty>(GameState->GetClass(), Relay.Value);
+				Test.TestTrue(*FString::Printf(TEXT("GameState relay %s preserves its authority's event signature"), *Relay.Value.ToString()),
+					Source && Exposed && Source->SignatureFunction && Exposed->SignatureFunction &&
+					Source->SignatureFunction->IsSignatureCompatibleWith(Exposed->SignatureFunction));
+			}
 		}
 
 		bool ExerciseUnitSelectionAndPossession(UWorld* World, UTextBlock* SelectionText)
@@ -500,6 +681,7 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("Possession changes the authoritative controller mode"), ReadBool(Test, Controller, TEXT("IsInFirstPersonMode")));
 			Test.TestTrue(TEXT("Possession events display crosshair and soldier vitals"), Crosshair->IsVisible() && PossessionText->IsVisible());
 			Test.TestTrue(TEXT("Possession UI reads the same damaged health"), PossessionText->GetText().ToString().Contains(HealthLabel));
+			CheckGameStateProjection();
 
 			FCall KillCall(Test, Soldier, TEXT("SetCurrentHealth"), 1);
 			KillCall.SetInt(TEXT("NewHealth"), 0);
@@ -514,6 +696,7 @@ namespace RomanEmpireUITests
 			Test.TestEqual(TEXT("Death event collapses soldier vitals"), PossessionText->GetVisibility(), ESlateVisibility::Collapsed);
 			Test.TestEqual(TEXT("Death leaves no stale unit selection panel"),
 				Root->GetWidgetFromName(TEXT("SelectionPanel"))->GetVisibility(), ESlateVisibility::Collapsed);
+			CheckGameStateProjection();
 			return true;
 		}
 
@@ -536,14 +719,20 @@ namespace RomanEmpireUITests
 				Root->GetWidgetFromName(TEXT("BuildingMenu")) && Root->GetWidgetFromName(TEXT("OutcomePanel")))) return false;
 
 			AGameModeBase* GameMode = World->GetAuthGameMode();
+			GameState = World->GetGameState<ARomanEmpireGameState>();
 			FactionManager = ReadObject(Test, GameMode, TEXT("GetFactionManager"));
 			CampaignManager = ReadObject(Test, GameMode, TEXT("GetCampaignManager"));
-			if (!Test.TestTrue(TEXT("Normal startup supplies the canonical managers"), FactionManager && CampaignManager)) return false;
+			WorldMapManager = ReadObject(Test, GameMode, TEXT("GetWorldMapManager"));
+			if (!Test.TestTrue(TEXT("Normal startup supplies the public GameState and canonical managers"),
+				GameState && FactionManager && CampaignManager && WorldMapManager)) return false;
+			CheckRelayContract();
 			FCall ModeCall(Test, GameMode, TEXT("SetGameplayMode"), 1);
 			ModeCall.SetEnum(TEXT("NewMode"), EGameplayMode::Tactical);
 			ModeCall.Execute();
+			CheckGameStateProjection();
 			Test.TestEqual(TEXT("Startup UI reads the real wallet"), ResourceText->GetText().ToString(), ResourceLabel(ReadResources(Test, FactionManager)));
 			AddGold(Test, FactionManager, 137);
+			CheckGameStateProjection();
 			const FFactionResourceAmounts AfterDelta = ReadResources(Test, FactionManager);
 			Test.TestEqual(TEXT("Resource event updates visible text synchronously without a UI tick"),
 				ResourceText->GetText().ToString(), ResourceLabel(AfterDelta));
@@ -567,6 +756,15 @@ namespace RomanEmpireUITests
 			FCall DataCall(Test, Producer, TEXT("GetBuildingData"), 1);
 			DataCall.Execute();
 			const FBuildingData Data = DataCall.ReadStruct<FBuildingData>();
+			if (!Test.TestFalse(TEXT("The selected producer defines trainable stable IDs"), Data.TrainableUnits.IsEmpty())) return false;
+			TrainingUnitID = Data.TrainableUnits[0];
+			const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(World);
+			const URomanUnitDefinition* UnitDefinition = Registry ? Registry->FindUnit(TrainingUnitID) : nullptr;
+			if (!Test.TestNotNull(TEXT("TRAIN uses the canonical unit definition"), UnitDefinition)) return false;
+			TrainingCost = UnitDefinition->Definition.TrainingCost;
+			TrainingDuration = UnitDefinition->Definition.TrainingTime;
+			if (!Test.TestTrue(TEXT("Training fixture has a positive gold cost and duration"),
+				TrainingCost.Gold > 0 && TrainingDuration > 0.0f)) return false;
 			FCall(Test, Producer, TEXT("StartConstruction"), 0).Execute();
 			Producer->Tick(Data.ConstructionTime + 0.1f);
 			Test.TestTrue(TEXT("Construction completes through the building simulation"), ReadBool(Test, Producer, TEXT("IsComplete")));
@@ -578,13 +776,16 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("Selection event shows the selected building's display name"), SelectionText->GetText().ToString().Contains(Data.DisplayName.ToString()));
 			Test.TestTrue(TEXT("The selected completed producer exposes its UMG training button"), TrainButton->IsVisible());
 			CheckBindings(1);
+			const FFactionResourceAmounts BeforeActiveOrder = ReadResources(Test, FactionManager);
 			ClickThroughSlate(Test, Root, TrainButton);
+			CheckTrainingCharge(TEXT("Initial Slate TRAIN"), BeforeActiveOrder, TrainingCost);
 			Test.TestTrue(TEXT("UMG click starts training on the selected producer"), ReadBool(Test, Producer, TEXT("IsTraining")));
 			Test.TestFalse(TEXT("UMG click leaves the other producer idle"), ReadBool(Test, OtherProducer, TEXT("IsTraining")));
 			Test.TestEqual(TEXT("One initial click accepts exactly one order"), ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), 0);
 			Test.TestEqual(TEXT("The UMG click preserves the canonical building selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Producer));
 			Test.TestTrue(TEXT("Production event refreshes active training in UMG"), ProductionText->GetText().ToString().Contains(TEXT("active")));
 			Test.TestEqual(TEXT("Training cost is reflected from the updated canonical wallet"), ResourceText->GetText().ToString(), ResourceLabel(ReadResources(Test, FactionManager)));
+			CheckGameStateProjection();
 			return true;
 		}
 	};
