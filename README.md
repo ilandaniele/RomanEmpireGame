@@ -2,7 +2,7 @@
 
 Roman Empire Game is an Unreal Engine 5.8 single-player Windows project combining a campaign layer, real-time tactical command, settlement development, and explicit first-person possession of a soldier.
 
-M1 is complete and clean-clone proven on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The approved M1 baseline is commit `0b74ad1566306d7487629812de68bc6abd7f0594`; M2's canonical-state exit gates are now complete, with M3.1 unit foundation next.
+M1 is complete and clean-clone proven on the audited workstation: the project validates, generates VS Code metadata, builds Editor/Game/Shipping targets, passes native automation and IWYU checks, runs the deterministic test map in PIE, and produces a smoke-tested Windows Development package. The approved M1 baseline is commit `0b74ad1566306d7487629812de68bc6abd7f0594`; M2's canonical-state exit gates are complete. M3.1 unit foundation is in progress; [its review](M3_UNIT_FOUNDATION_REVIEW.md) separates verified changes from remaining work.
 
 ## Product target
 

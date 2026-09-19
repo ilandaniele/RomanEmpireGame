@@ -37,6 +37,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void StopSpecialActions() override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Legionary")
 	bool bInTestudo;

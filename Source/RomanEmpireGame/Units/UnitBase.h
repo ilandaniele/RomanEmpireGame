@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Units/UnitTypes.h"
+#include "Units/UnitVitalState.h"
 #include "Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
@@ -14,6 +15,7 @@ class UStaticMeshComponent;
 class UCameraComponent;
 class USpringArmComponent;
 class UDecalComponent;
+class UMaterialInstanceDynamic;
 
 /**
  * Base class for all military units in the game
@@ -28,6 +30,7 @@ public:
 	AUnitBase();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -42,7 +45,17 @@ public:
 	FName GetUnitDefinitionID() const { return UnitDefinitionID; }
 
 	/** Fully applies immutable content and ownership before a deferred spawn becomes observable. */
+	UFUNCTION(BlueprintCallable, Category = "Unit")
 	bool InitializeUnit(FName DefinitionID, EFactionID NewOwner);
+
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	bool IsInitialized() const { return IsAlive() || GetLifeState() == EUnitLifeState::Dead; }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	EUnitLifeState GetLifeState() const { return Vitals.GetLifeState(); }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	bool CanAcceptCommands() const;
 
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -71,6 +84,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Unit|Commands")
 	void CommandHold();
 
+	UFUNCTION(BlueprintPure, Category = "Unit|Commands")
+	bool HasMoveCommand() const { return bHasMoveCommand; }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|Commands")
+	AActor* GetAttackTarget() const { return AttackTarget.Get(); }
+
 	// FPS Mode input
 	UFUNCTION(BlueprintCallable, Category = "Unit|FPS")
 	void MoveInput(const FVector2D& InputVector);
@@ -98,19 +117,19 @@ public:
 	void TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRanged);
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	float GetHealthPercent() const { return UnitData.BaseStats.MaxHealth > 0 ? (float)CurrentHealth / (float)UnitData.BaseStats.MaxHealth : 0.0f; }
+	float GetHealthPercent() const { return Vitals.GetHealthPercent(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	int32 GetCurrentHealth() const { return CurrentHealth; }
+	int32 GetCurrentHealth() const { return Vitals.GetHealth(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	int32 GetMaxHealth() const { return UnitData.BaseStats.MaxHealth; }
+	int32 GetMaxHealth() const { return Vitals.GetMaxHealth(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
-	int32 GetCurrentMorale() const { return CurrentMorale; }
+	int32 GetCurrentMorale() const { return Vitals.GetMorale(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Health")
-	bool IsAlive() const { return CurrentHealth > 0; }
+	bool IsAlive() const { return Vitals.IsAlive(); }
 
 	// Accessors used by HUD
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -126,8 +145,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
 	float GetStaminaPercent() const
 	{
-		return UnitData.BaseStats.Stamina > 0.0f ? CurrentStamina / UnitData.BaseStats.Stamina : 0.0f;
+		return Vitals.GetStaminaPercent();
 	}
+
+	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
+	float GetCurrentStamina() const { return Vitals.GetStamina(); }
 
 	// State
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -164,15 +186,6 @@ protected:
 	EFactionID OwnerFaction;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	int32 CurrentHealth;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	float CurrentStamina;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	int32 CurrentMorale;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
 	bool bIsSelected;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
@@ -195,63 +208,66 @@ protected:
 	bool bHasMoveCommand;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|AI")
-	AActor* AttackTarget;
+	TWeakObjectPtr<AActor> AttackTarget;
 
 	// Visual mesh (placeholder geometry)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* VisualMesh;
+	TObjectPtr<UStaticMeshComponent> VisualMesh;
 
 	// Selection indicator
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UDecalComponent* SelectionDecal;
+	TObjectPtr<UDecalComponent> SelectionDecal;
 
 	// Selection ring (visible green disc under selected units)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* SelectionRingMesh;
+	TObjectPtr<UStaticMeshComponent> SelectionRingMesh;
 
 	// Head mesh (sphere on top of body)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* HeadMesh;
+	TObjectPtr<UStaticMeshComponent> HeadMesh;
 
 	// Weapon mesh (sword = thin cube)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* WeaponMesh;
+	TObjectPtr<UStaticMeshComponent> WeaponMesh;
 
 	// Shield mesh (flat cylinder)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* ShieldMesh;
+	TObjectPtr<UStaticMeshComponent> ShieldMesh;
 
 	// FPS Camera
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USpringArmComponent* FPSCameraArm;
+	TObjectPtr<USpringArmComponent> FPSCameraArm;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCameraComponent* FPSCamera;
+	TObjectPtr<UCameraComponent> FPSCamera;
 
 	// Limbs
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* RightArmMesh;
+	TObjectPtr<UStaticMeshComponent> RightArmMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* LeftArmMesh;
+	TObjectPtr<UStaticMeshComponent> LeftArmMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* RightLegMesh;
+	TObjectPtr<UStaticMeshComponent> RightLegMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* LeftLegMesh;
+	TObjectPtr<UStaticMeshComponent> LeftLegMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* RightHandMesh;
+	TObjectPtr<UStaticMeshComponent> RightHandMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* LeftHandMesh;
+	TObjectPtr<UStaticMeshComponent> LeftHandMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* RightFootMesh;
+	TObjectPtr<UStaticMeshComponent> RightFootMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* LeftFootMesh;
+	TObjectPtr<UStaticMeshComponent> LeftFootMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Unit|Lifecycle", meta=(ClampMin="0.01"))
+	float CorpseLifetimeSeconds = 3.0f;
 
 	// Combat
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Combat")
@@ -268,9 +284,20 @@ protected:
 	virtual void UpdateCombatCooldowns(float DeltaSeconds);
 	virtual void UpdateStamina(float DeltaSeconds);
 	virtual void OnDeath();
+	virtual void StopSpecialActions() {}
+	/** Spend only; caller commits its action before publishing OnUnitVitalsChanged. */
+	bool TrySpendUnitStamina(float Amount);
 	float CalculateDamageReduction(float RawDamage, bool bIsRanged) const;
 
 private:
-	bool bUnitInitialized = false;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State", meta=(AllowPrivateAccess="true"))
+	FUnitVitalState Vitals;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> SelectionRingMaterial;
+
+	// Event delivery guard, not a second life/health state.
+	bool bDeathNotified = false;
+	void StopAllActions();
 };
 

@@ -1,0 +1,592 @@
+// Copyright Roman Empire Game. All Rights Reserved.
+#include "UnitLifecycleProbe.h"
+#include "Camera/CameraComponent.h"
+#include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Content/RomanContentRegistry.h"
+#include "Core/RomanEmpireGameState.h"
+#include "Editor.h"
+#include "Engine/World.h"
+#include "Faction/FactionData.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "HAL/PlatformTime.h"
+#include "Materials/MaterialInterface.h"
+#include "Misc/AutomationTest.h"
+#include "Tests/AutomationEditorCommon.h"
+#include "Units/UnitVitalState.h"
+#include "Units/UnitTypes.h"
+#include "UObject/Class.h"
+#include "UObject/GarbageCollection.h"
+#include "UObject/ScriptDelegates.h"
+#include "UObject/StructOnScope.h"
+#include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
+#include <limits>
+
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+namespace RomanEmpireUnitTests
+{
+	// Exercise the real reflected API without leaking runtime-private include paths.
+	struct FCall
+	{
+		FAutomationTestBase& Test;
+		UObject* Target;
+		UFunction* Function;
+		FStructOnScope Params;
+		bool bValid;
+		FCall(FAutomationTestBase& InTest, UObject* InTarget, FName Name, int32 Count)
+			: Test(InTest), Target(InTarget), Function(Target ? Target->FindFunction(Name) : nullptr), Params(Function),
+			bValid(Test.TestTrue(*FString::Printf(TEXT("Function %s has expected parameter count"), *Name.ToString()),
+				IsValid(Target) && Function && Function->NumParms == Count)) {}
+		template<typename P> P* Property(FName Name, bool bReturn = false)
+		{
+			P* Result = bValid ? FindFProperty<P>(Function, Name) : nullptr;
+			bValid = Test.TestTrue(*FString::Printf(TEXT("Parameter %s has expected type and direction"), *Name.ToString()),
+				Result && Result->HasAnyPropertyFlags(CPF_Parm) && Result->HasAnyPropertyFlags(CPF_ReturnParm) == bReturn) && bValid;
+			return bValid ? Result : nullptr;
+		}
+		template<typename P, typename T> void Set(FName Name, T Value)
+		{
+			if (P* Prop = Property<P>(Name)) Prop->SetPropertyValue_InContainer(Params.GetStructMemory(), Value);
+		}
+		template<typename P, typename T> T Read(T Default = T())
+		{
+			P* Prop = Property<P>(TEXT("ReturnValue"), true);
+			return Prop ? Prop->GetPropertyValue_InContainer(Params.GetStructMemory()) : Default;
+		}
+		void Execute() { if (bValid) Target->ProcessEvent(Function, Params.GetStructMemory()); }
+	};
+	bool Bool(FAutomationTestBase& Test, UObject* Unit, FName Name)
+	{
+		FCall Call(Test, Unit, Name, 1); Call.Execute(); return Call.Read<FBoolProperty, bool>();
+	}
+	int32 Int(FAutomationTestBase& Test, UObject* Unit, FName Name)
+	{
+		FCall Call(Test, Unit, Name, 1); Call.Execute(); return Call.Read<FIntProperty, int32>();
+	}
+	float Stamina(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetCurrentStamina"), 1); Call.Execute(); return Call.Read<FFloatProperty, float>();
+	}
+	EUnitLifeState Life(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetLifeState"), 1);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Life query uses the public enum"), Prop && Prop->GetEnum() == StaticEnum<EUnitLifeState>())) return EUnitLifeState::Uninitialized;
+		Call.Execute();
+		return static_cast<EUnitLifeState>(Prop->GetUnderlyingProperty()->GetSignedIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory())));
+	}
+	void Command(FAutomationTestBase& Test, UObject* Unit, FName Name) { FCall Call(Test, Unit, Name, 0); Call.Execute(); }
+	void SetBool(FAutomationTestBase& Test, UObject* Unit, FName Name, FName Param, bool Value)
+	{
+		FCall Call(Test, Unit, Name, 1); Call.Set<FBoolProperty>(Param, Value); Call.Execute();
+	}
+	void Health(FAutomationTestBase& Test, UObject* Unit, int32 Value)
+	{
+		FCall Call(Test, Unit, TEXT("SetCurrentHealth"), 1); Call.Set<FIntProperty>(TEXT("NewHealth"), Value); Call.Execute();
+	}
+	void Damage(FAutomationTestBase& Test, UObject* Unit, float Value)
+	{
+		FCall Call(Test, Unit, TEXT("TakeCombatDamage"), 3);
+		Call.Set<FFloatProperty>(TEXT("Damage"), Value);
+		Call.Set<FBoolProperty>(TEXT("bIsRanged"), false);
+		// DamageSource is initialized to null by FStructOnScope.
+		Call.Property<FObjectPropertyBase>(TEXT("DamageSource"));
+		Call.Execute();
+	}
+	void Move(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("CommandMoveTo"), 1);
+		FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Destination"));
+		if (!Test.TestTrue(TEXT("Move takes FVector"), Prop && Prop->Struct == TBaseStructure<FVector>::Get())) return;
+		const FVector Destination(45000.0, 40000.0, 100.0);
+		Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
+		Call.Execute();
+	}
+	void Attack(FAutomationTestBase& Test, UObject* Unit, AActor* Target)
+	{
+		FCall Call(Test, Unit, TEXT("CommandAttack"), 1);
+		FObjectPropertyBase* Prop = Call.Property<FObjectPropertyBase>(TEXT("Target"));
+		if (Prop) Prop->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Target);
+		Call.Execute();
+	}
+	bool Initialize(FAutomationTestBase& Test, UObject* Unit, FName ID, EFactionID Faction)
+	{
+		FCall Call(Test, Unit, TEXT("InitializeUnit"), 3);
+		Call.Set<FNameProperty>(TEXT("DefinitionID"), ID);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("NewOwner"));
+		if (!Test.TestTrue(TEXT("Initialization faction type"), Prop && Prop->GetEnum() == StaticEnum<EFactionID>())) return false;
+		Prop->GetUnderlyingProperty()->SetIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Faction));
+		Call.Execute(); return Call.Read<FBoolProperty, bool>();
+	}
+	void SetOwner(FAutomationTestBase& Test, UObject* Unit, EFactionID Faction)
+	{
+		FCall Call(Test, Unit, TEXT("SetOwnerFaction"), 1);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("NewOwner"));
+		if (!Test.TestTrue(TEXT("Owner setter uses faction enum"), Prop && Prop->GetEnum() == StaticEnum<EFactionID>())) return;
+		Prop->GetUnderlyingProperty()->SetIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Faction));
+		Call.Execute();
+	}
+	void Dodge(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("PerformDodge"), 1);
+		FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Direction"));
+		if (!Test.TestTrue(TEXT("Dodge takes FVector2D"), Prop && Prop->Struct == TBaseStructure<FVector2D>::Get())) return;
+		const FVector2D Direction(1.0, 0.0);
+		Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Direction);
+		Call.Execute();
+	}
+	struct FInitializationSnapshot
+	{
+		FName DefinitionID;
+		EFactionID Owner = EFactionID::None;
+		FUnitData Definition;
+		EUnitLifeState State = EUnitLifeState::Uninitialized;
+		int32 Health = 0, MaxHealth = 0, Morale = 0;
+		float CurrentStamina = 0.0f;
+		FInitializationSnapshot(FAutomationTestBase& Test, UObject* Unit)
+		{
+			FCall IDCall(Test, Unit, TEXT("GetUnitDefinitionID"), 1); IDCall.Execute();
+			DefinitionID = IDCall.Read<FNameProperty, FName>();
+			FCall OwnerCall(Test, Unit, TEXT("GetOwnerFaction"), 1);
+			FEnumProperty* OwnerProp = OwnerCall.Property<FEnumProperty>(TEXT("ReturnValue"), true);
+			if (Test.TestTrue(TEXT("Owner query uses faction enum"), OwnerProp && OwnerProp->GetEnum() == StaticEnum<EFactionID>()))
+			{
+				OwnerCall.Execute();
+				Owner = static_cast<EFactionID>(OwnerProp->GetUnderlyingProperty()->GetSignedIntPropertyValue(
+					OwnerProp->ContainerPtrToValuePtr<void>(OwnerCall.Params.GetStructMemory())));
+			}
+			FCall DataCall(Test, Unit, TEXT("GetUnitData"), 1);
+			FStructProperty* DataProp = DataCall.Property<FStructProperty>(TEXT("ReturnValue"), true);
+			if (Test.TestTrue(TEXT("Definition query uses public unit struct"), DataProp && DataProp->Struct == FUnitData::StaticStruct()))
+			{
+				DataCall.Execute();
+				DataProp->CopyCompleteValue(&Definition, DataProp->ContainerPtrToValuePtr<void>(DataCall.Params.GetStructMemory()));
+			}
+			State = Life(Test, Unit);
+			Health = Int(Test, Unit, TEXT("GetCurrentHealth"));
+			MaxHealth = Int(Test, Unit, TEXT("GetMaxHealth"));
+			Morale = Int(Test, Unit, TEXT("GetCurrentMorale"));
+			CurrentStamina = Stamina(Test, Unit);
+		}
+		void CheckUnchanged(FAutomationTestBase& Test, UObject* Unit) const
+		{
+			const FInitializationSnapshot After(Test, Unit);
+			Test.TestEqual(TEXT("Snapshot definition ID unchanged"), After.DefinitionID, DefinitionID);
+			Test.TestEqual(TEXT("Snapshot owner unchanged"), After.Owner, Owner);
+			Test.TestTrue(TEXT("Snapshot complete definition unchanged"), FUnitData::StaticStruct()->CompareScriptStruct(&Definition, &After.Definition, 0));
+			Test.TestEqual(TEXT("Snapshot lifecycle unchanged"), After.State, State);
+			Test.TestEqual(TEXT("Snapshot health unchanged"), After.Health, Health);
+			Test.TestEqual(TEXT("Snapshot maximum health unchanged"), After.MaxHealth, MaxHealth);
+			Test.TestEqual(TEXT("Snapshot morale unchanged"), After.Morale, Morale);
+			Test.TestEqual(TEXT("Snapshot stamina unchanged"), After.CurrentStamina, CurrentStamina);
+		}
+		void CheckAuthored(FAutomationTestBase& Test, const FUnitData& Authored, EFactionID Faction) const
+		{
+			Test.TestEqual(TEXT("Authored stable ID applied"), DefinitionID, Authored.UnitID);
+			Test.TestEqual(TEXT("Requested faction applied"), Owner, Faction);
+			Test.TestTrue(TEXT("Complete authored definition applied"), FUnitData::StaticStruct()->CompareScriptStruct(&Definition, &Authored, 0));
+			Test.TestEqual(TEXT("Initialized state is alive"), State, EUnitLifeState::Alive);
+			Test.TestEqual(TEXT("Authored health applied"), Health, Authored.BaseStats.MaxHealth);
+			Test.TestEqual(TEXT("Authored maximum health applied"), MaxHealth, Authored.BaseStats.MaxHealth);
+			Test.TestEqual(TEXT("Authored morale applied"), Morale, Authored.BaseStats.Morale);
+			Test.TestEqual(TEXT("Authored stamina applied"), CurrentStamina, Authored.BaseStats.Stamina);
+		}
+	};
+	bool BindProbe(FAutomationTestBase& Test, UObject* Unit, FName Event, UUnitLifecycleProbe* Probe, FName Handler)
+	{
+		FMulticastDelegateProperty* Property = FindFProperty<FMulticastDelegateProperty>(Unit->GetClass(), Event);
+		UFunction* Function = Probe->FindFunction(Handler);
+		if (!Test.TestTrue(TEXT("Probe signature matches actual unit event"), Property && Function &&
+			Property->SignatureFunction && Property->SignatureFunction->IsSignatureCompatibleWith(Function))) return false;
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(Probe, Handler);
+		Property->AddDelegate(Delegate, Unit);
+		return true;
+	}
+	UObject* Component(FAutomationTestBase& Test, UObject* Unit, FName Field)
+	{
+		FObjectPropertyBase* Prop = FindFProperty<FObjectPropertyBase>(Unit->GetClass(), Field);
+		if (!Test.TestNotNull(*FString::Printf(TEXT("Reflected component %s exists"), *Field.ToString()), Prop)) return nullptr;
+		return Prop->GetObjectPropertyValue_InContainer(Unit);
+	}
+	FUnitVitalState StoredVitals(FAutomationTestBase& Test, UObject* Unit)
+	{
+		// ProcessEvent intentionally rejects destroyed actors. Inspect their retained
+		// reflected storage synchronously before GC instead of reading default params.
+		FStructProperty* Prop = FindFProperty<FStructProperty>(Unit->GetClass(), TEXT("Vitals"));
+		FUnitVitalState Result;
+		if (Test.TestTrue(TEXT("Actor retains typed vital storage"), Prop && Prop->Struct == FUnitVitalState::StaticStruct()))
+		{
+			Prop->CopyCompleteValue(&Result, Prop->ContainerPtrToValuePtr<void>(Unit));
+		}
+		return Result;
+	}
+	bool StoredBool(FAutomationTestBase& Test, UObject* Unit, FName Field)
+	{
+		FBoolProperty* Prop = FindFProperty<FBoolProperty>(Unit->GetClass(), Field);
+		return Test.TestNotNull(*Field.ToString(), Prop) && Prop->GetPropertyValue_InContainer(Unit);
+	}
+	void CheckComponents(FAutomationTestBase& Test, AActor* Unit)
+	{
+		const TPair<FName, FName> Names[] = {
+			{TEXT("VisualMesh"), TEXT("VisualMesh")}, {TEXT("SelectionDecal"), TEXT("SelectionDecal")},
+			{TEXT("SelectionRingMesh"), TEXT("SelectionRing")}, {TEXT("HeadMesh"), TEXT("HeadMesh")},
+			{TEXT("WeaponMesh"), TEXT("WeaponMesh")}, {TEXT("ShieldMesh"), TEXT("ShieldMesh")},
+			{TEXT("FPSCameraArm"), TEXT("FPSCameraArm")}, {TEXT("FPSCamera"), TEXT("FPSCamera")},
+			{TEXT("RightArmMesh"), TEXT("RightArm")}, {TEXT("LeftArmMesh"), TEXT("LeftArm")},
+			{TEXT("RightLegMesh"), TEXT("RightLeg")}, {TEXT("LeftLegMesh"), TEXT("LeftLeg")},
+			{TEXT("RightHandMesh"), TEXT("RightHand")}, {TEXT("LeftHandMesh"), TEXT("LeftHand")},
+			{TEXT("RightFootMesh"), TEXT("RightFoot")}, {TEXT("LeftFootMesh"), TEXT("LeftFoot")}
+		};
+		for (const auto& Pair : Names)
+		{
+			USceneComponent* Part = Cast<USceneComponent>(Component(Test, Unit, Pair.Key));
+			if (!Test.TestNotNull(*Pair.Key.ToString(), Part)) continue;
+			Test.TestTrue(TEXT("Component retains its constructor identity"), Part == Unit->GetDefaultSubobjectByName(Pair.Value));
+			Test.TestTrue(TEXT("Component belongs to this actor"), Part->GetOwner() == Unit);
+			USceneComponent* Parent = Pair.Key == TEXT("FPSCamera")
+				? Cast<USceneComponent>(Component(Test, Unit, TEXT("FPSCameraArm"))) : Unit->GetRootComponent();
+			Test.TestTrue(TEXT("Component attachment retained"), Part->GetAttachParent() == Parent);
+		}
+	}
+	void CheckQuiescent(FAutomationTestBase& Test, AActor* Unit)
+	{
+		if (IsValid(Unit)) Test.TestFalse(TEXT("Unit cannot accept commands"), Bool(Test, Unit, TEXT("CanAcceptCommands")));
+		else Test.TestEqual(TEXT("Destroyed unit retains terminal state"), StoredVitals(Test, Unit).GetLifeState(), EUnitLifeState::Ended);
+		Test.TestFalse(TEXT("Selection cleared"), StoredBool(Test, Unit, TEXT("bIsSelected")));
+		Test.TestFalse(TEXT("Possession flag cleared"), StoredBool(Test, Unit, TEXT("bIsPossessedByPlayer")));
+		Test.TestFalse(TEXT("Blocking cleared"), StoredBool(Test, Unit, TEXT("bIsBlocking")));
+		Test.TestFalse(TEXT("Special action cleared"), StoredBool(Test, Unit, TEXT("bInTestudo")));
+		Test.TestFalse(TEXT("Move command cleared"), StoredBool(Test, Unit, TEXT("bHasMoveCommand")));
+		FBoolProperty* Attacking = FindFProperty<FBoolProperty>(Unit->GetClass(), TEXT("bIsAttacking"));
+		if (Test.TestNotNull(TEXT("Attack flag is observable"), Attacking)) Test.TestFalse(TEXT("Attack animation cleared"), Attacking->GetPropertyValue_InContainer(Unit));
+		FFloatProperty* Cooldown = FindFProperty<FFloatProperty>(Unit->GetClass(), TEXT("AttackCooldownRemaining"));
+		if (Test.TestNotNull(TEXT("Cooldown is observable"), Cooldown)) Test.TestEqual(TEXT("Attack cooldown cleared"), Cooldown->GetPropertyValue_InContainer(Unit), 0.0f);
+		UStaticMeshComponent* Ring = Cast<UStaticMeshComponent>(Component(Test, Unit, TEXT("SelectionRingMesh")));
+		if (Test.TestNotNull(TEXT("Corpse selection ring exists"), Ring)) Test.TestTrue(TEXT("Corpse selection ring fully hidden"), !Ring->IsVisible() && Ring->bHiddenInGame);
+		FWeakObjectProperty* TargetProp = FindFProperty<FWeakObjectProperty>(Unit->GetClass(), TEXT("AttackTarget"));
+		if (Test.TestNotNull(TEXT("Target is a weak reflected reference"), TargetProp))
+			Test.TestTrue(TEXT("Attack target reset, not merely invalid"), TargetProp->GetPropertyValue_InContainer(Unit).IsExplicitlyNull());
+		Test.TestFalse(TEXT("Corpse collision disabled"), Unit->GetActorEnableCollision());
+		ACharacter* Character = Cast<ACharacter>(Unit);
+		if (Test.TestNotNull(TEXT("Unit is a character"), Character))
+		{
+			Test.TestEqual(TEXT("Movement disabled"), Character->GetCharacterMovement()->MovementMode.GetValue(), MOVE_None);
+			Test.TestTrue(TEXT("Velocity cleared"), Character->GetVelocity().IsNearlyZero());
+			Test.TestTrue(TEXT("Pending dodge launch cleared"), Character->GetCharacterMovement()->PendingLaunchVelocity.IsNearlyZero());
+		}
+		UCameraComponent* Camera = Cast<UCameraComponent>(Component(Test, Unit, TEXT("FPSCamera")));
+		if (Camera) Test.TestFalse(TEXT("Camera inactive"), Camera->IsActive());
+	}
+
+	class FExerciseUnits : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseUnits(FAutomationTestBase* InTest) : Test(*InTest) {}
+		virtual bool Update() override
+		{
+			if (StartedAt == 0.0) StartedAt = FPlatformTime::Seconds();
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Unit lifecycle PIE test timed out")); return true; }
+			if (Stage == 1)
+			{
+				if (!World || World != OwnedWorld.Get()) { Test.AddError(TEXT("Owned unit PIE world ended early")); return true; }
+				if (World->GetTimeSeconds() - DeathTime < 3.3f) return false;
+				Test.TestFalse(TEXT("Low-altitude corpse expires on time"), Low.IsValid());
+				Test.TestFalse(TEXT("High-altitude corpse expires on same deadline"), High.IsValid());
+				Test.TestFalse(TEXT("Invalid spawn has bounded cleanup"), Invalid.IsValid());
+				Test.TestEqual(TEXT("Lifespan does not deliver another death"), Probe->DeathEvents, 1);
+				for (const auto& NestedProbe : NestedProbes)
+				{
+					Test.TestFalse(TEXT("Nested termination leaves no live unit"), NestedProbe->ObservedUnit.IsValid());
+					Test.TestEqual(TEXT("Nested termination has no delayed death callbacks"), NestedProbe->DeathEvents, NestedProbe->bDestroyDuringVitals ? 0 : 1);
+					Test.TestEqual(TEXT("Nested termination has no delayed vitals callbacks"), NestedProbe->VitalsEvents, NestedProbe->bDestroyDuringVitals ? 1 : 2);
+				}
+				return true;
+			}
+			ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!World || !State || !State->IsGameplayInitialized()) return false;
+			OwnedWorld = World;
+			UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestNotNull(TEXT("Real Legionary class"), Class)) return true;
+			const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(World);
+			const URomanUnitDefinition* Definition = Registry ? Registry->FindUnit(TEXT("Legionary")) : nullptr;
+			if (!Test.TestNotNull(TEXT("Canonical Legionary definition"), Definition)) return true;
+			if (!Test.TestTrue(TEXT("Authored Legionary supports both encounter factions"),
+				Definition->AvailableToFactions.Contains(TEXT("Rome")) && Definition->AvailableToFactions.Contains(TEXT("Carthage")))) return true;
+			CheckComponents(Test, Class->GetDefaultObject<AActor>());
+			auto Spawn = [&](float Z)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				Params.ObjectFlags |= RF_Transient;
+				return World->SpawnActor<ACharacter>(Class, FTransform(FVector(40000.0, 40000.0, Z)), Params);
+			};
+			ACharacter* Unit = Spawn(-500.0f);
+			if (!Test.TestNotNull(TEXT("Deferred fixture"), Unit)) return true;
+			Low = Unit;
+			CheckComponents(Test, Unit);
+			Test.TestEqual(TEXT("Deferred unit has explicit uninitialized state"), Life(Test, Unit), EUnitLifeState::Uninitialized);
+			const FInitializationSnapshot Uninitialized(Test, Unit);
+			Command(Test, Unit, TEXT("PerformAttack"));
+			Command(Test, Unit, TEXT("StartBlocking"));
+			SetBool(Test, Unit, TEXT("SetSelected"), TEXT("bNewSelected"), true);
+			SetBool(Test, Unit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+			Test.TestFalse(TEXT("Uninitialized cannot be selected"), Bool(Test, Unit, TEXT("IsSelected")));
+			Test.TestFalse(TEXT("Uninitialized cannot be possessed"), Bool(Test, Unit, TEXT("IsPossessedByPlayer")));
+			Test.TestFalse(TEXT("Invalid definition rejected atomically"), Initialize(Test, Unit, TEXT("MissingUnit"), EFactionID::Rome));
+			Test.TestEqual(TEXT("Invalid initialization preserves state"), Life(Test, Unit), EUnitLifeState::Uninitialized);
+			Uninitialized.CheckUnchanged(Test, Unit);
+			Test.TestFalse(TEXT("Invalid faction rejected atomically"), Initialize(Test, Unit, TEXT("Legionary"), EFactionID::None));
+			Uninitialized.CheckUnchanged(Test, Unit);
+			Test.TestTrue(TEXT("Initialize valid deferred spawn"), Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome));
+			const FInitializationSnapshot Initialized(Test, Unit);
+			Initialized.CheckAuthored(Test, Definition->Definition, EFactionID::Rome);
+			const int32 InitialHealth = Int(Test, Unit, TEXT("GetCurrentHealth"));
+			Test.TestTrue(TEXT("Deferred initialization applies health before BeginPlay"), InitialHealth > 0);
+			Test.TestFalse(TEXT("Initialized deferred actor cannot act before BeginPlay"), Bool(Test, Unit, TEXT("CanAcceptCommands")));
+			Health(Test, Unit, 1);
+			Test.TestEqual(TEXT("Deferred health command rejected"), Int(Test, Unit, TEXT("GetCurrentHealth")), InitialHealth);
+			Test.TestFalse(TEXT("Second initialization with different valid faction rejected"), Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Carthage));
+			Initialized.CheckUnchanged(Test, Unit);
+			Unit->FinishSpawning(Unit->GetActorTransform());
+			Unit->SetActorTickEnabled(false);
+			Initialized.CheckUnchanged(Test, Unit);
+			Test.TestTrue(TEXT("Begun unit accepts commands"), Bool(Test, Unit, TEXT("CanAcceptCommands")));
+			Health(Test, Unit, InitialHealth - 1);
+			const FInitializationSnapshot Damaged(Test, Unit);
+			Test.TestFalse(TEXT("Reinitialize cannot heal or transfer live unit"), Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Carthage));
+			Damaged.CheckUnchanged(Test, Unit);
+			Test.TestEqual(TEXT("Health remains damaged"), Int(Test, Unit, TEXT("GetCurrentHealth")), InitialHealth - 1);
+			Damage(Test, Unit, 0.0f);
+			Damage(Test, Unit, -10.0f);
+			Damage(Test, Unit, std::numeric_limits<float>::quiet_NaN());
+			Damage(Test, Unit, std::numeric_limits<float>::infinity());
+			Damage(Test, Unit, -std::numeric_limits<float>::infinity());
+			Test.TestEqual(TEXT("Invalid damage preserves health"), Int(Test, Unit, TEXT("GetCurrentHealth")), InitialHealth - 1);
+			Damaged.CheckUnchanged(Test, Unit);
+			ACharacter* BeginPlayUnit = Spawn(8000.0f);
+			if (!Test.TestNotNull(TEXT("BeginPlay initialization fixture"), BeginPlayUnit)) return true;
+			SetOwner(Test, BeginPlayUnit, EFactionID::Rome);
+			Test.TestFalse(TEXT("Configuring owner alone does not initialize"), Bool(Test, BeginPlayUnit, TEXT("IsInitialized")));
+			BeginPlayUnit->FinishSpawning(BeginPlayUnit->GetActorTransform());
+			FInitializationSnapshot(Test, BeginPlayUnit).CheckAuthored(Test, Definition->Definition, EFactionID::Rome);
+			Test.TestTrue(TEXT("Normal BeginPlay initialization accepts commands"), Bool(Test, BeginPlayUnit, TEXT("CanAcceptCommands")));
+			BeginPlayUnit->Destroy();
+			SetBool(Test, Unit, TEXT("SetSelected"), TEXT("bNewSelected"), true);
+			UStaticMeshComponent* Ring = Cast<UStaticMeshComponent>(Component(Test, Unit, TEXT("SelectionRingMesh")));
+			if (Test.TestNotNull(TEXT("Selection ring exists"), Ring))
+			{
+				Test.TestTrue(TEXT("Selected ring visible and not hidden in game"), Ring->IsVisible() && !Ring->bHiddenInGame);
+				UObject* Material = Ring->GetMaterial(0);
+				SetBool(Test, Unit, TEXT("SetSelected"), TEXT("bNewSelected"), false);
+				Test.TestTrue(TEXT("Deselected ring hidden"), !Ring->IsVisible() && Ring->bHiddenInGame);
+				SetBool(Test, Unit, TEXT("SetSelected"), TEXT("bNewSelected"), true);
+				Test.TestTrue(TEXT("Repeated selection reuses material"), Material && Ring->GetMaterial(0) == Material);
+			}
+			SetBool(Test, Unit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+			UCameraComponent* Camera = Cast<UCameraComponent>(Component(Test, Unit, TEXT("FPSCamera")));
+			if (Test.TestNotNull(TEXT("FPS camera exists"), Camera)) Test.TestTrue(TEXT("Possession activates actual camera"), Camera->IsActive());
+			SetBool(Test, Unit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), false);
+			if (Camera) Test.TestFalse(TEXT("Normal possession exit deactivates actual camera"), Camera->IsActive());
+			Test.TestFalse(TEXT("Normal exit clears possession flag"), Bool(Test, Unit, TEXT("IsPossessedByPlayer")));
+			Test.TestEqual(TEXT("Normal exit restores authored speed"), Unit->GetCharacterMovement()->MaxWalkSpeed, Definition->Definition.BaseStats.Speed);
+			SetBool(Test, Unit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+			if (Camera) Test.TestTrue(TEXT("Camera supports another possession"), Camera->IsActive());
+			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+			CheckComponents(Test, Unit);
+			Command(Test, Unit, TEXT("PerformAttack"));
+			Unit->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+			Unit->GetCharacterMovement()->Activate();
+			Dodge(Test, Unit);
+			Test.TestFalse(TEXT("Live dodge establishes pending launch before death"), Unit->GetCharacterMovement()->PendingLaunchVelocity.IsNearlyZero());
+			Command(Test, Unit, TEXT("StartBlocking"));
+			Command(Test, Unit, TEXT("ActivateTestudo"));
+			ACharacter* Enemy = Spawn(10000.0f);
+			if (!Test.TestNotNull(TEXT("Enemy fixture"), Enemy)) return true;
+			Test.TestTrue(TEXT("Enemy definition and faction valid"), Initialize(Test, Enemy, TEXT("Legionary"), EFactionID::Carthage));
+			Enemy->FinishSpawning(Enemy->GetActorTransform());
+			Enemy->SetActorTickEnabled(false);
+			Move(Test, Unit);
+			Test.TestTrue(TEXT("Living unit accepts move order"), Bool(Test, Unit, TEXT("HasMoveCommand")));
+			Attack(Test, Unit, Enemy);
+			FCall AttackQuery(Test, Unit, TEXT("GetAttackTarget"), 1); AttackQuery.Execute();
+			FObjectPropertyBase* AttackProp = AttackQuery.Property<FObjectPropertyBase>(TEXT("ReturnValue"), true);
+			if (AttackProp) Test.TestTrue(TEXT("Attack order preserves target while establishing movement"),
+				AttackProp->GetObjectPropertyValue_InContainer(AttackQuery.Params.GetStructMemory()) == Enemy);
+			Unit->GetCharacterMovement()->Velocity = FVector(100.0, 20.0, 0.0);
+			Probe.Reset(NewObject<UUnitLifecycleProbe>());
+			Probe->Test = &Test;
+			Probe->ObservedUnit = Unit;
+			FMulticastDelegateProperty* Death = FindFProperty<FMulticastDelegateProperty>(Class, TEXT("OnUnitDied"));
+			if (!Test.TestNotNull(TEXT("Real death event"), Death)) return true;
+			if (!Test.TestTrue(TEXT("Death observer signature is compatible"), Death->SignatureFunction &&
+				Death->SignatureFunction->IsSignatureCompatibleWith(Probe->FindFunction(TEXT("HandleDeath"))))) return true;
+			FScriptDelegate Delegate;
+			Delegate.BindUFunction(Probe.Get(), TEXT("HandleDeath"));
+			Death->AddDelegate(Delegate, Unit);
+			Health(Test, Unit, 0);
+			Test.TestEqual(TEXT("Exactly one death event"), Probe->DeathEvents, 1);
+			CheckQuiescent(Test, Unit);
+			Move(Test, Unit);
+			Attack(Test, Unit, Enemy);
+			Damage(Test, Unit, MAX_flt);
+			CheckQuiescent(Test, Unit);
+			Test.TestEqual(TEXT("Post-death damage cannot deliver another death"), Probe->DeathEvents, 1);
+			Enemy->Destroy();
+			Test.TestTrue(TEXT("Corpse lifespan scheduled before return"), Unit->GetLifeSpan() > 2.5f && Unit->GetLifeSpan() <= 3.0f);
+			ACharacter* HighUnit = Spawn(20000.0f);
+			if (!Test.TestNotNull(TEXT("High-altitude fixture"), HighUnit)) return true;
+			High = HighUnit;
+			Initialize(Test, HighUnit, TEXT("Legionary"), EFactionID::Rome);
+			HighUnit->FinishSpawning(HighUnit->GetActorTransform());
+			Damage(Test, HighUnit, MAX_flt);
+			Test.TestEqual(TEXT("Large finite damage commits death without integer overflow"), Life(Test, HighUnit), EUnitLifeState::Dead);
+			Unit->Tick(0.1f);
+			HighUnit->Tick(0.1f);
+			Test.TestTrue(TEXT("Low corpse is not destroyed by absolute Z threshold"), IsValid(Unit));
+			Test.TestTrue(TEXT("High corpse remains until its deadline"), IsValid(HighUnit));
+			ACharacter* InvalidUnit = Spawn(10000.0f);
+			if (!Test.TestNotNull(TEXT("Invalid spawn fixture"), InvalidUnit)) return true;
+			Invalid = InvalidUnit;
+			Test.AddExpectedError(TEXT("has no valid content definition"), EAutomationExpectedErrorFlags::Contains, 1);
+			InvalidUnit->FinishSpawning(InvalidUnit->GetActorTransform());
+			Test.TestEqual(TEXT("Missing owner produces explicit failure state"), Life(Test, InvalidUnit), EUnitLifeState::InitializationFailed);
+			Test.TestFalse(TEXT("Invalid spawn collision disabled"), InvalidUnit->GetActorEnableCollision());
+			Test.TestFalse(TEXT("Invalid spawn tick disabled"), InvalidUnit->IsActorTickEnabled());
+			Test.TestFalse(TEXT("Failed spawn cannot initialize late"), Initialize(Test, InvalidUnit, TEXT("Legionary"), EFactionID::Rome));
+			ACharacter* Early = Spawn(5000.0f);
+			if (!Test.TestNotNull(TEXT("Early destruction fixture"), Early)) return true;
+			Initialize(Test, Early, TEXT("Legionary"), EFactionID::Rome);
+			Early->FinishSpawning(Early->GetActorTransform());
+			Move(Test, Early);
+			Death->AddDelegate(Delegate, Early);
+			Early->SetLifeSpan(2.0f);
+			Early->Destroy();
+			Test.TestEqual(TEXT("Early destruction commits Ended"), StoredVitals(Test, Early).GetLifeState(), EUnitLifeState::Ended);
+			CheckQuiescent(Test, Early);
+			Test.TestEqual(TEXT("Early destruction clears scheduled lifespan"), Early->GetLifeSpan(), 0.0f);
+			Test.TestEqual(TEXT("Destroy is not a combat death event"), Probe->DeathEvents, 1);
+			for (const bool bDestroy : {false, true})
+			{
+				ACharacter* Nested = Spawn(12000.0f);
+				if (!Test.TestNotNull(TEXT("Nested vitals fixture"), Nested)) return true;
+				Test.TestTrue(TEXT("Nested fixture initializes"), Initialize(Test, Nested, TEXT("Legionary"), EFactionID::Rome));
+				Nested->FinishSpawning(Nested->GetActorTransform());
+				Nested->SetActorTickEnabled(false);
+				TStrongObjectPtr<UUnitLifecycleProbe> NestedProbe(NewObject<UUnitLifecycleProbe>());
+				NestedProbe->Test = &Test;
+				NestedProbe->ObservedUnit = Nested;
+				NestedProbe->bTerminateOnVitals = true;
+				NestedProbe->bDestroyDuringVitals = bDestroy;
+				if (!BindProbe(Test, Nested, TEXT("OnUnitDied"), NestedProbe.Get(), TEXT("HandleDeath")) ||
+					!BindProbe(Test, Nested, TEXT("OnUnitVitalsChanged"), NestedProbe.Get(), TEXT("HandleVitals"))) return true;
+				const float BeforeStamina = Stamina(Test, Nested);
+				Nested->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+				Nested->GetCharacterMovement()->Activate();
+				Dodge(Test, Nested);
+				Test.TestTrue(TEXT("Vitals observer performed nested termination"), NestedProbe->bHandledVitalsAction);
+				const FUnitVitalState AfterNested = StoredVitals(Test, Nested);
+				Test.TestEqual(TEXT("Dodge spends once before observer termination"), AfterNested.GetStamina(), BeforeStamina - 20.0f);
+				Test.TestEqual(TEXT("Nested callback commits expected terminal state"), AfterNested.GetLifeState(), bDestroy ? EUnitLifeState::Ended : EUnitLifeState::Dead);
+				Test.TestEqual(TEXT("Destroy is not damage and kill notifies once"), NestedProbe->DeathEvents, bDestroy ? 0 : 1);
+				Test.TestEqual(TEXT("No vitals notification after EndPlay"), NestedProbe->VitalsEvents, bDestroy ? 1 : 2);
+				CheckQuiescent(Test, Nested);
+				Test.TestTrue(TEXT("Dodge cannot queue launch after observer termination"), Nested->GetCharacterMovement()->PendingLaunchVelocity.IsNearlyZero());
+				if (bDestroy) Test.TestEqual(TEXT("Nested destruction leaves no timer"), Nested->GetLifeSpan(), 0.0f);
+				NestedProbes.Add(MoveTemp(NestedProbe));
+			}
+			DeathTime = World->GetTimeSeconds();
+			Stage = 1;
+			return false;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt = 0.0;
+		float DeathTime = 0.0f;
+		int32 Stage = 0;
+		TWeakObjectPtr<UWorld> OwnedWorld;
+		TWeakObjectPtr<AActor> Low, High, Invalid;
+		TStrongObjectPtr<UUnitLifecycleProbe> Probe;
+		TArray<TStrongObjectPtr<UUnitLifecycleProbe>> NestedProbes;
+	};
+	class FWaitForUnitPIEEnd : public IAutomationLatentCommand
+	{
+	public:
+		explicit FWaitForUnitPIEEnd(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (!GEditor || !GEditor->PlayWorld) return true;
+			if (FPlatformTime::Seconds() - StartedAt < 60.0) return false;
+			Test.AddError(TEXT("Unit test PIE teardown timed out")); return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+	};
+}
+
+void UUnitLifecycleProbe::HandleDeath(AUnitBase* Unit)
+{
+	++DeathEvents;
+	if (!Test || DeathEvents != 1 || !ObservedUnit.IsValid()) return;
+	using namespace RomanEmpireUnitTests;
+	AActor* Actor = ObservedUnit.Get();
+	Test->TestTrue(TEXT("Death payload identifies the observed unit"),
+		static_cast<const void*>(Unit) == static_cast<const void*>(Actor));
+	Test->TestEqual(TEXT("Observer sees committed death"), Life(*Test, Actor), EUnitLifeState::Dead);
+	CheckQuiescent(*Test, Actor);
+	Test->TestTrue(TEXT("Observer sees scheduled cleanup"), Actor->GetLifeSpan() > 0.0f);
+	const float BeforeStamina = Stamina(*Test, Actor);
+	Health(*Test, Actor, 999);
+	Damage(*Test, Actor, 999.0f);
+	Move(*Test, Actor);
+	Command(*Test, Actor, TEXT("PerformAttack"));
+	Command(*Test, Actor, TEXT("ThrowPilum"));
+	Command(*Test, Actor, TEXT("StartBlocking"));
+	Command(*Test, Actor, TEXT("ActivateTestudo"));
+	SetBool(*Test, Actor, TEXT("SetSelected"), TEXT("bNewSelected"), true);
+	SetBool(*Test, Actor, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+	Test->TestFalse(TEXT("Death callback cannot reinitialize"), Initialize(*Test, Actor, TEXT("Legionary"), EFactionID::Rome));
+	Test->TestEqual(TEXT("Death callback cannot heal"), Int(*Test, Actor, TEXT("GetCurrentHealth")), 0);
+	Test->TestEqual(TEXT("Death callback cannot consume stamina"), Stamina(*Test, Actor), BeforeStamina);
+	CheckQuiescent(*Test, Actor);
+}
+
+void UUnitLifecycleProbe::HandleVitals(AUnitBase* Unit)
+{
+	++VitalsEvents;
+	if (!Test || !ObservedUnit.IsValid()) return;
+	AActor* Actor = ObservedUnit.Get();
+	Test->TestTrue(TEXT("Vitals payload identifies the observed unit"),
+		static_cast<const void*>(Unit) == static_cast<const void*>(Actor));
+	if (!bTerminateOnVitals || bHandledVitalsAction) return;
+	bHandledVitalsAction = true; // Bound recursion before issuing any command.
+	if (bDestroyDuringVitals)
+	{
+		Actor->Destroy();
+	}
+	else
+	{
+		RomanEmpireUnitTests::Health(*Test, Actor, 0);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitFoundationTest, "RomanEmpireGame.Units.FoundationPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitFoundationTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnits(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+#endif

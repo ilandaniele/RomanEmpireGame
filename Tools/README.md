@@ -33,6 +33,12 @@ M2.6 adds configuration/negative-contract tests, authored-default/modifier check
 
 For an Editor-hosted `-game` diagnostic, use the process-only flag `-DisablePlugins=ModelContextProtocol,EditorToolset,AutomationTestToolset,ToolsetRegistry`. The UE 5.8 editor toolsets' Python startup otherwise expects editor-only reflected classes that are absent in this game host. Keep normal Editor tooling enabled in the project. This fallback never replaces an actual packaged-player launch gate.
 
+## Unit foundation tests
+
+`RomanEmpireGame.Units.VitalState` checks one-time/atomic initialization, terminal health, bounded stamina/morale, invalid values and an extreme float-rounding regression. `RomanEmpireGame.Units.FoundationPIE` owns a fresh `L_Testbed` session and transient native actors. It checks complete initialization snapshots, component identity/attachments through GC, ring visibility/material reuse, real camera activation/exit, active-order cancellation, death/reentrant commands, early destruction, bounded corpse timers at different altitudes, and termination from a vitals callback during dodge.
+
+Destroyed actors deliberately reject reflected function calls in Unreal. The fixture therefore inspects retained reflected storage synchronously before GC for post-Destroy assertions; zero-filled return parameters are not accepted as evidence. These tests are not rendered-pixel, navigation or complete combat certification. Mutation controls and verification logs: `M3_UNIT_FOUNDATION_REVIEW.md`.
+
 ## Optional Fab module failure on the audited host
 
 The engine's external Fab 0.0.17 update is rejected by Windows Code Integrity on this workstation. The offline prototype has no Fab dependency. Use `BuildProject.ps1 -Action Test -DisableFab` or `-Action Package -DisableFab` (also supported for `Cook`) to omit only the optional Fab Editor browser for that automation process. The switch is rejected for other actions to avoid silently ineffective options. It does not change `.uproject`, engine files, Windows policy or the packaged player's launch arguments. Do not disable application control or modify the rejected DLL. For a manual Editor-hosted diagnostic, append `Fab` to its `-DisablePlugins` list until a trusted installation is available. Exact failure and passing-run evidence lives in `M2_EXIT_REVIEW.md`.

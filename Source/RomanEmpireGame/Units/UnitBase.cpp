@@ -273,9 +273,6 @@ AUnitBase::AUnitBase()
 
 	// Initialize state
 	OwnerFaction = EFactionID::None;
-	CurrentHealth = 0;
-	CurrentStamina = 0.0f;
-	CurrentMorale = 0;
 	bIsSelected = false;
 	bIsPossessedByPlayer = false;
 	bIsBlocking = false;
@@ -286,37 +283,24 @@ AUnitBase::AUnitBase()
 	AttackCooldown = 0.0f;
 	AttackCooldownRemaining = 0.0f;
 	WalkAnimTime = 0.0f;
-	SelectionRingMesh = nullptr;
-	HeadMesh = nullptr;
-	WeaponMesh = nullptr;
-	ShieldMesh = nullptr;
-	FPSCameraArm = nullptr; // Will be set by CreateDefaultSubobject above
-	FPSCamera = nullptr;
-	RightArmMesh = nullptr;
-	LeftArmMesh = nullptr;
-	RightLegMesh = nullptr;
-	LeftLegMesh = nullptr;
-	RightHandMesh = nullptr;
-	LeftHandMesh = nullptr;
-	RightFootMesh = nullptr;
-	LeftFootMesh = nullptr;
 }
 
 void AUnitBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (!bUnitInitialized && !InitializeUnit(UnitDefinitionID, OwnerFaction))
+	if (GetLifeState() == EUnitLifeState::Uninitialized && !InitializeUnit(UnitDefinitionID, OwnerFaction))
 	{
 		UE_LOG(LogRomanEmpire, Error, TEXT("Unit %s has no valid content definition"), *GetName());
+		Vitals.MarkInitializationFailed();
+		StopAllActions();
+		SetActorEnableCollision(false);
+		GetCharacterMovement()->DisableMovement();
 		SetActorTickEnabled(false);
+		SetLifeSpan(1.0f);
 		return;
 	}
-	
-	// Initialize from unit data
-	CurrentHealth = UnitData.BaseStats.MaxHealth;
-	CurrentStamina = UnitData.BaseStats.Stamina;
-	CurrentMorale = UnitData.BaseStats.Morale;
+	if (!IsAlive()) return;
 	
 	// Set movement speed from unit data
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
@@ -340,7 +324,8 @@ void AUnitBase::BeginPlay()
 
 bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
 {
-	if (bUnitInitialized || !RomanEmpireContent::IsStableID(DefinitionID))
+	if (GetLifeState() != EUnitLifeState::Uninitialized || IsActorBeingDestroyed() ||
+		!RomanEmpireContent::IsStableID(DefinitionID))
 	{
 		return false;
 	}
@@ -354,36 +339,53 @@ bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
 		return false;
 	}
 
+	FUnitVitalState InitialVitals;
+	if (!InitialVitals.Initialize(Asset->Definition.BaseStats.MaxHealth,
+		Asset->Definition.BaseStats.Stamina, Asset->Definition.BaseStats.Morale)) return false;
+
 	UnitDefinitionID = DefinitionID;
 	UnitData = Asset->Definition;
 	OwnerFaction = NewOwner;
-	bUnitInitialized = true;
+	Vitals = InitialVitals;
 	return true;
+}
+
+bool AUnitBase::CanAcceptCommands() const
+{
+	return HasActorBegunPlay() && IsAlive() && !IsActorBeingDestroyed();
+}
+
+void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Vitals.EndLife();
+	SetLifeSpan(0.0f);
+	StopAllActions();
+	SetActorEnableCollision(false);
+	if (GetCharacterMovement()) GetCharacterMovement()->DisableMovement();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AUnitBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	// Death sink: if dead, sink into ground and destroy
-	if (!IsAlive())
+	if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f) return;
+	// Presentation only. Actor lifespan owns cleanup independently of world altitude.
+	if (GetLifeState() == EUnitLifeState::Dead)
 	{
 		FVector Loc = GetActorLocation();
 		Loc.Z -= 30.0f * DeltaSeconds;
 		SetActorLocation(Loc, false);
-		if (Loc.Z < -200.0f)
-		{
-			Destroy();
-		}
 		return; // Dead units skip all other logic
 	}
+	if (!CanAcceptCommands()) return;
 
 	if (!bIsPossessedByPlayer)
 	{
 		// === UNIFIED COMBAT (all factions) ===
-		if (AttackTarget && IsValid(AttackTarget))
+		if (AttackTarget.IsValid())
 		{
-			AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+			AUnitBase* Target = Cast<AUnitBase>(AttackTarget.Get());
 			if (Target && Target->IsAlive())
 			{
 				float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
@@ -396,6 +398,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 					{
 						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
 						Target->TakeCombatDamage(Dmg, this, false);
+						if (!CanAcceptCommands()) return;
 						AttackCooldownRemaining = AttackCooldown;
 
 						// Arm swing
@@ -406,7 +409,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 							FString::Printf(TEXT("HIT! %s->%s DMG:%.0f HP:%d/%d"),
 								*UnitData.DisplayName.ToString(),
 								*Target->UnitData.DisplayName.ToString(),
-								Dmg, Target->CurrentHealth,
+								Dmg, Target->GetCurrentHealth(),
 								Target->UnitData.BaseStats.MaxHealth));
 
 					}
@@ -603,29 +606,32 @@ void AUnitBase::ApplyFactionColor()
 
 void AUnitBase::SetSelected(bool bNewSelected)
 {
+	if (bNewSelected && !CanAcceptCommands()) return;
 	bIsSelected = bNewSelected;
 	
 	// Show/hide selection decal
 	if (SelectionDecal)
 	{
 		SelectionDecal->SetVisibility(bNewSelected);
+		SelectionDecal->SetHiddenInGame(!bNewSelected);
 	}
 
 	// Show/hide selection ring
 	if (SelectionRingMesh)
 	{
 		SelectionRingMesh->SetVisibility(bNewSelected);
-		if (bNewSelected)
+		SelectionRingMesh->SetHiddenInGame(!bNewSelected);
+		if (bNewSelected && !SelectionRingMaterial)
 		{
 			// Apply green glowing material to selection ring
 			UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
 			if (BaseMat)
 			{
-				UMaterialInstanceDynamic* RingMat = UMaterialInstanceDynamic::Create(BaseMat, this);
-				if (RingMat)
+				SelectionRingMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
+				if (SelectionRingMaterial)
 				{
-					RingMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.0f, 1.0f, 0.0f, 0.7f)); // Green
-					SelectionRingMesh->SetMaterial(0, RingMat);
+					SelectionRingMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.0f, 1.0f, 0.0f, 0.7f));
+					SelectionRingMesh->SetMaterial(0, SelectionRingMaterial);
 				}
 			}
 		}
@@ -634,6 +640,7 @@ void AUnitBase::SetSelected(bool bNewSelected)
 
 void AUnitBase::CommandMoveTo(const FVector& Destination)
 {
+	if (!CanAcceptCommands() || Destination.ContainsNaN()) return;
 	MoveDestination = Destination;
 	bHasMoveCommand = true;
 	AttackTarget = nullptr;
@@ -641,28 +648,33 @@ void AUnitBase::CommandMoveTo(const FVector& Destination)
 
 void AUnitBase::CommandAttack(AActor* Target)
 {
+	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld()) return;
+	const AUnitBase* TargetUnit = Cast<AUnitBase>(Target);
+	if (!TargetUnit || !TargetUnit->CanAcceptCommands() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
 	AttackTarget = Target;
-	if (Target)
-	{
-		CommandMoveTo(Target->GetActorLocation());
-	}
+	MoveDestination = Target->GetActorLocation();
+	bHasMoveCommand = true;
 }
 
 void AUnitBase::CommandStop()
 {
 	bHasMoveCommand = false;
 	AttackTarget = nullptr;
+	MoveDestination = FVector::ZeroVector;
+	ConsumeMovementInputVector();
+	if (GetCharacterMovement()) GetCharacterMovement()->StopMovementImmediately();
 }
 
 void AUnitBase::CommandHold()
 {
+	if (!CanAcceptCommands()) return;
 	CommandStop();
 	CurrentStance = EUnitStance::StandGround;
 }
 
 void AUnitBase::MoveInput(const FVector2D& InputVector)
 {
-	if (!bIsPossessedByPlayer)
+	if (!CanAcceptCommands() || !bIsPossessedByPlayer || InputVector.ContainsNaN())
 	{
 		return;
 	}
@@ -682,7 +694,7 @@ void AUnitBase::MoveInput(const FVector2D& InputVector)
 
 void AUnitBase::LookInput(const FVector2D& InputVector)
 {
-	if (!bIsPossessedByPlayer)
+	if (!CanAcceptCommands() || !bIsPossessedByPlayer || InputVector.ContainsNaN())
 	{
 		return;
 	}
@@ -694,20 +706,20 @@ void AUnitBase::LookInput(const FVector2D& InputVector)
 
 void AUnitBase::PerformAttack()
 {
-	if (AttackCooldownRemaining > 0.0f)
+	if (!CanAcceptCommands() || AttackCooldownRemaining > 0.0f)
 	{
 		return; // Still on cooldown
 	}
 
-	if (CurrentStamina < 10.0f)
+	if (!TrySpendUnitStamina(10.0f))
 	{
 		return; // Not enough stamina
 	}
 
 	bIsAttacking = true;
 	AttackCooldownRemaining = AttackCooldown / UnitData.BaseStats.AttackSpeed;
-	CurrentStamina -= 10.0f;
 	OnUnitVitalsChanged.Broadcast(this);
+	if (!CanAcceptCommands()) return;
 
 	// Perform melee attack trace
 	FVector Start = GetActorLocation() + FVector(0, 0, 80);
@@ -737,7 +749,7 @@ void AUnitBase::PerformAttack()
 
 void AUnitBase::StartBlocking()
 {
-	if (!UnitData.bHasShield)
+	if (!CanAcceptCommands() || !UnitData.bHasShield)
 	{
 		return;
 	}
@@ -767,13 +779,13 @@ void AUnitBase::StopBlocking()
 
 void AUnitBase::PerformDodge(const FVector2D& Direction)
 {
-	if (CurrentStamina < 20.0f)
+	if (!CanAcceptCommands() || Direction.ContainsNaN() || !TrySpendUnitStamina(20.0f))
 	{
 		return; // Not enough stamina
 	}
 
-	CurrentStamina -= 20.0f;
 	OnUnitVitalsChanged.Broadcast(this);
+	if (!CanAcceptCommands()) return;
 
 	// Launch in direction
 	FVector DodgeVector = GetActorRightVector() * Direction.X + GetActorForwardVector() * Direction.Y;
@@ -786,39 +798,32 @@ void AUnitBase::PerformDodge(const FVector2D& Direction)
 
 void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRanged)
 {
-	if (!IsAlive())
+	if (!CanAcceptCommands() || !FMath::IsFinite(Damage) || Damage <= 0.0f)
 	{
 		return;
 	}
 
 	// Calculate damage reduction from armor and blocking
-	float ActualDamage = CalculateDamageReduction(Damage, bIsRanged);
-
-	CurrentHealth = FMath::Max(0, CurrentHealth - FMath::RoundToInt(ActualDamage));
-	
-	// Reduce morale when taking damage
-	CurrentMorale = FMath::Max(0, CurrentMorale - FMath::RoundToInt(ActualDamage * 0.1f));
-
+	const float ActualDamage = CalculateDamageReduction(Damage, bIsRanged);
+	if (!FMath::IsFinite(ActualDamage)) return;
+	// Clamp in double precision before rounding/conversion to avoid int32 overflow.
+	const int32 HealthDamage = FMath::RoundToInt(FMath::Min(double(ActualDamage), double(GetCurrentHealth())));
+	const int32 MoraleDamage = FMath::RoundToInt(FMath::Min(double(ActualDamage) * 0.1, double(GetCurrentMorale())));
+	if (!Vitals.ApplyDamage(HealthDamage, MoraleDamage)) return;
+	if (!IsAlive()) OnDeath();
+	if (IsActorBeingDestroyed() || GetLifeState() == EUnitLifeState::Ended) return;
 	OnUnitDamaged.Broadcast(this, ActualDamage);
-	OnUnitVitalsChanged.Broadcast(this);
-
-	if (CurrentHealth <= 0)
-	{
-		OnDeath();
-	}
+	if (!IsActorBeingDestroyed() && GetLifeState() != EUnitLifeState::Ended) OnUnitVitalsChanged.Broadcast(this);
 }
 
 void AUnitBase::SetCurrentHealth(int32 NewHealth)
 {
-	const int32 PreviousHealth = CurrentHealth;
-	CurrentHealth = FMath::Clamp(NewHealth, 0, UnitData.BaseStats.MaxHealth);
-	if (CurrentHealth != PreviousHealth)
+	if (!CanAcceptCommands()) return;
+	const int32 PreviousHealth = GetCurrentHealth();
+	if (Vitals.SetHealth(FMath::Max(0, NewHealth)) && GetCurrentHealth() != PreviousHealth)
 	{
-		OnUnitVitalsChanged.Broadcast(this);
-		if (PreviousHealth > 0 && CurrentHealth == 0)
-		{
-			OnDeath();
-		}
+		if (!IsAlive()) OnDeath();
+		if (!IsActorBeingDestroyed() && GetLifeState() != EUnitLifeState::Ended) OnUnitVitalsChanged.Broadcast(this);
 	}
 }
 
@@ -842,6 +847,7 @@ float AUnitBase::CalculateDamageReduction(float RawDamage, bool bIsRanged) const
 
 void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 {
+	if (bPossessed && !CanAcceptCommands()) return;
 	bIsPossessedByPlayer = bPossessed;
 	if (!bPossessed)
 	{
@@ -881,6 +887,7 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 
 void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 {
+	if (!CanAcceptCommands()) return;
 	// Rome units are player-controlled — no AI movement
 	if (OwnerFaction == EFactionID::Rome)
 	{
@@ -888,7 +895,7 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 	}
 
 	// Check if we have an attack target and are in range
-	if (AttackTarget && IsValid(AttackTarget))
+	if (AttackTarget.IsValid())
 	{
 		float Distance = FVector::Dist2D(GetActorLocation(), AttackTarget->GetActorLocation());
 		
@@ -899,11 +906,12 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 			AttackCooldownRemaining -= DeltaSeconds;
 			if (AttackCooldownRemaining <= 0.0f)
 			{
-				AUnitBase* Target = Cast<AUnitBase>(AttackTarget);
+				AUnitBase* Target = Cast<AUnitBase>(AttackTarget.Get());
 				if (Target && Target->IsAlive())
 				{
 					const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
 					Target->TakeCombatDamage(Dmg, this, false);
+					if (!CanAcceptCommands()) return;
 					AttackCooldownRemaining = AttackCooldown;
 
 					// Attack arm swing
@@ -929,7 +937,8 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 		else
 		{
 			// Move toward target
-			CommandMoveTo(AttackTarget->GetActorLocation());
+			MoveDestination = AttackTarget->GetActorLocation();
+			bHasMoveCommand = true;
 			return;
 		}
 	}
@@ -976,6 +985,7 @@ void AUnitBase::UpdateAIMovement(float DeltaSeconds)
 
 void AUnitBase::UpdateCombatCooldowns(float DeltaSeconds)
 {
+	if (!CanAcceptCommands()) return;
 	if (AttackCooldownRemaining > 0.0f)
 	{
 		AttackCooldownRemaining -= DeltaSeconds;
@@ -990,11 +1000,11 @@ void AUnitBase::UpdateCombatCooldowns(float DeltaSeconds)
 void AUnitBase::UpdateStamina(float DeltaSeconds)
 {
 	// Regenerate stamina when not blocking or attacking
-	if (!bIsBlocking && !bIsAttacking)
+	if (CanAcceptCommands() && !bIsBlocking && !bIsAttacking)
 	{
 		float RegenRate = 10.0f; // Stamina per second
 		const int32 PreviousPercent = FMath::FloorToInt(GetStaminaPercent() * 100.0f);
-		CurrentStamina = FMath::Min(UnitData.BaseStats.Stamina, CurrentStamina + RegenRate * DeltaSeconds);
+		Vitals.RegenerateStamina(RegenRate * DeltaSeconds);
 		if (PreviousPercent != FMath::FloorToInt(GetStaminaPercent() * 100.0f))
 		{
 			OnUnitVitalsChanged.Broadcast(this);
@@ -1004,17 +1014,19 @@ void AUnitBase::UpdateStamina(float DeltaSeconds)
 
 void AUnitBase::OnDeath()
 {
-	StopBlocking();
-	UE_LOG(LogRomanEmpire, Log, TEXT("Unit died: %s"), *GetName());
-	
-	OnUnitDied.Broadcast(this);
-	
-	// Disable collision — unit is no longer interactable
+	if (GetLifeState() != EUnitLifeState::Dead || bDeathNotified) return;
+	bDeathNotified = true;
+	StopAllActions();
+	if (GetLifeState() != EUnitLifeState::Dead || IsActorBeingDestroyed()) return;
 	SetActorEnableCollision(false);
-	
-	// Stop all commands
-	bHasMoveCommand = false;
-	AttackTarget = nullptr;
+	if (GetCharacterMovement()) GetCharacterMovement()->DisableMovement();
+	if (GetLifeState() != EUnitLifeState::Dead || IsActorBeingDestroyed()) return;
+	const float Lifetime = FMath::IsFinite(CorpseLifetimeSeconds) && CorpseLifetimeSeconds > 0.0f
+		? CorpseLifetimeSeconds : 3.0f;
+	SetLifeSpan(Lifetime);
+	UE_LOG(LogRomanEmpire, Log, TEXT("Unit died: %s"), *GetName());
+	// Every observer sees a fully quiescent corpse. Reentrant commands are rejected.
+	OnUnitDied.Broadcast(this);
 	
 	if (GEngine)
 	{
@@ -1022,6 +1034,23 @@ void AUnitBase::OnDeath()
 			FString::Printf(TEXT("%s died!"), *GetName()));
 	}
 	
-	// Sink animation handled in Tick — no instant hide/destroy
+	// Sink animation is presentation only; the engine lifespan owns destruction.
+}
+
+bool AUnitBase::TrySpendUnitStamina(float Amount)
+{
+	return CanAcceptCommands() && Vitals.TrySpendStamina(Amount);
+}
+
+void AUnitBase::StopAllActions()
+{
+	StopSpecialActions();
+	StopBlocking();
+	SetPossessedByPlayer(false);
+	SetSelected(false);
+	CommandStop();
+	if (GetCharacterMovement()) GetCharacterMovement()->ClearAccumulatedForces();
+	bIsAttacking = false;
+	AttackCooldownRemaining = 0.0f;
 }
 

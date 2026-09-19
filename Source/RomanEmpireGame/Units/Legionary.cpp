@@ -19,12 +19,13 @@ ALegionary::ALegionary()
 void ALegionary::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!IsAlive()) return;
 	PilaCount = UnitData.StartingRangedAmmo;
 }
 
 void ALegionary::ActivateTestudo()
 {
-	if (bInTestudo)
+	if (!CanAcceptCommands() || bInTestudo)
 	{
 		return;
 	}
@@ -69,19 +70,21 @@ void ALegionary::DeactivateTestudo()
 
 void ALegionary::ThrowPilum()
 {
+	if (!CanAcceptCommands()) return;
 	if (PilaCount <= 0)
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("No pila remaining"));
 		return;
 	}
 
-	if (CurrentStamina < 15.0f)
+	if (!TrySpendUnitStamina(15.0f))
 	{
 		return; // Not enough stamina
 	}
 
 	PilaCount--;
-	CurrentStamina -= 15.0f;
+	OnUnitVitalsChanged.Broadcast(this);
+	if (!CanAcceptCommands()) return;
 
 	// Projectile spawn
 	FVector SpawnLocation = GetActorLocation() + FVector(0, 0, 150); // Throw from shoulder height
@@ -116,5 +119,10 @@ void ALegionary::ThrowPilum()
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("%s threw pilum (%d remaining)"), *GetName(), PilaCount);
+}
+
+void ALegionary::StopSpecialActions()
+{
+	DeactivateTestudo();
 }
 

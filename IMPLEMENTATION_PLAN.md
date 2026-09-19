@@ -1,6 +1,6 @@
 # Roman Empire Game Implementation Plan
 
-Status: implementation active; M0–M2 complete, M3.1 unit foundation next
+Status: implementation active; M0–M2 complete, M3.1 unit foundation in progress
 Audit baseline: commit `89d8d66e5051d303dea9c965317cdb961d8a52f6`
 Plan date: 2026-09-03
 
@@ -458,12 +458,28 @@ Goal: deliver a complete, deterministic command-and-capture encounter.
 
 Execution preparation (source audit 2026-09-15):
 
-- `AUnitBase` still clears fourteen constructor-created component references. Preserve them and test their identity/attachment and GC lifetime. Selection must control both visibility and hidden-in-game state; camera tests must verify actual component activation, not only controller mode.
+- At the source audit, `AUnitBase` cleared fourteen constructor-created component references. Preserve them and test their identity/attachment and GC lifetime. Selection must control both visibility and hidden-in-game state; camera tests must verify actual component activation, not only controller mode.
 - Make initialization and death explicit lifecycle boundaries. Preserve deferred initialization from GameMode/Barracks; reject partial or repeated initialization. Dead/uninitialized units must reject new actions while cleanup operations remain legal.
 - Commit death and cancel orders/blocking/movement/collision before notifying observers; prevent repeated death and accidental resurrection through the health setter. Replace global-altitude corpse disposal with bounded time-based cleanup and safe EndPlay teardown.
 - Keep health/combat/selection/order ownership in focused components or clearly bounded classes without duplicating fields. M3.1 is not complete merely when the null assignments are removed.
 - Add actor-level tests for valid/invalid initialization, preserved components, visible selection, camera activation, reentrant death observers, rejected post-death commands and cleanup at different altitudes; keep existing UMG/input integration green. Follow with IWYU, Shipping and rendered selection/possession checks.
 - Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-module-build-system`; `unreal-packaging` for the actual-player gate. Navigation, formation commands, validated combat windows, faction registries and new animation/art remain their later M3 packages. Do not expand the procedural-limb presentation while repairing its existing references.
+
+M3.1 implementation progress (2026-09-15; not an exit approval):
+
+- `FUnitVitalState` owns live health, stamina, morale and explicit `Uninitialized/Alive/Dead/InitializationFailed/Ended` transitions. `AUnitBase` coordinates world effects and notifications; there are no duplicate live-vitals members. Invalid/repeated initialization and revival through health commands are rejected.
+- All sixteen reflected component references retain their constructor-created objects through `TObjectPtr`. Selection updates visibility and hidden-in-game together and reuses one material; possession activates the actual FPS camera.
+- Death commits before observers, stops special actions/blocking/selection/possession/orders/movement, disables collision and schedules a bounded lifespan. EndPlay cancels timers/forces and seals the lifecycle. Attack targets are weak references; establishing an attack no longer immediately clears its target.
+- New pure-state and real-PIE actor tests cover these foundations. Evidence and current limitations are tracked in `M3_UNIT_FOUNDATION_REVIEW.md`; an initial successful run is not the final gate for later edits.
+- Remaining M3.1 work: finish separation of command/combat/selection responsibilities and their explicit active states (including the routed-state policy), and inspect rendered selection/possession with an actual-player check. Existing direct movement, per-unit scans and legacy combat timing are not certified; their replacement remains M3.2–M3.4. No new animation or procedural limbs were added.
+
+Next M3.1 integration package (read-only architecture review, 2026-09-19):
+
+- Introduce a single `FUnitOrderState` for None/Move/Attack/Hold, destination and weak target. Replacing, completing and canceling orders must be explicit; pursuit updates must preserve Attack. It must not move actors, scan the world or apply damage.
+- Introduce bounded combat state for blocking/action/recovery, with one temporal update and one cooldown derivation. Remove the unused parallel `UpdateAIMovement` executor instead of moving both implementations. Shared wind-up/hit-window and damage validation remain M3.4.
+- Isolate local selection presentation (selected flag, ring/decal and reusable material) while the controller remains owner of the selected set. Faction eligibility and registries remain M3.2.
+- Keep `AUnitBase` as the lifecycle/world/event coordinator and existing public API facade, without parallel mutable fields. Derive idle/commanded/attacking activity from state owners. A routed unit is still alive; document its cancellation/action-rejection contract before selecting morale thresholds, flight or recovery policy. Do not silently invent those gameplay rules.
+- Verify order replacement/cancel/pursuit/dead targets, single cooldown advancement, idempotent selection and simultaneous cleanup on death/EndPlay with pure tests and the real PIE fixture.
 
 #### M3.2 Selection and ownership
 
