@@ -6,6 +6,10 @@
 #include "GameFramework/Character.h"
 #include "Units/UnitTypes.h"
 #include "Units/UnitVitalState.h"
+#include "Units/UnitOrderState.h"
+#include "Units/UnitCombatState.h"
+#include "Units/UnitSelectionPresentation.h"
+#include "Units/UnitActivity.h"
 #include "Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
@@ -15,7 +19,6 @@ class UStaticMeshComponent;
 class UCameraComponent;
 class USpringArmComponent;
 class UDecalComponent;
-class UMaterialInstanceDynamic;
 
 /**
  * Base class for all military units in the game
@@ -57,6 +60,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
 	bool CanAcceptCommands() const;
 
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	EUnitActivity GetActivity() const;
+
 	// Ownership
 	UFUNCTION(BlueprintPure, Category = "Unit")
 	EFactionID GetOwnerFaction() const { return OwnerFaction; }
@@ -69,7 +75,7 @@ public:
 	void SetSelected(bool bNewSelected);
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Selection")
-	bool IsSelected() const { return bIsSelected; }
+	bool IsSelected() const { return SelectionPresentation.IsSelected(); }
 
 	// Commands (RTS mode)
 	UFUNCTION(BlueprintCallable, Category = "Unit|Commands")
@@ -85,10 +91,13 @@ public:
 	void CommandHold();
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Commands")
-	bool HasMoveCommand() const { return bHasMoveCommand; }
+	bool HasMoveCommand() const { return Orders.HasMoveCommand(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|Commands")
-	AActor* GetAttackTarget() const { return AttackTarget.Get(); }
+	AActor* GetAttackTarget() const { return Orders.GetTarget(); }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|Commands")
+	EUnitOrderType GetOrderType() const { return Orders.GetOrderType(); }
 
 	// FPS Mode input
 	UFUNCTION(BlueprintCallable, Category = "Unit|FPS")
@@ -107,7 +116,13 @@ public:
 	void StopBlocking();
 
 	UFUNCTION(BlueprintPure, Category = "Unit|FPS")
-	bool IsBlocking() const { return bIsBlocking; }
+	bool IsBlocking() const { return Combat.IsBlocking(); }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|Combat")
+	bool IsAttacking() const { return Combat.IsAttackInProgress(); }
+
+	UFUNCTION(BlueprintPure, Category = "Unit|Combat")
+	float GetAttackRecoveryRemaining() const { return Combat.GetRecoveryRemaining(); }
 
 	UFUNCTION(BlueprintCallable, Category = "Unit|FPS")
 	void PerformDodge(const FVector2D& Direction);
@@ -186,29 +201,7 @@ protected:
 	EFactionID OwnerFaction;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	bool bIsSelected;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
 	bool bIsPossessedByPlayer;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	bool bIsBlocking;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	bool bIsAttacking;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State")
-	EUnitStance CurrentStance;
-
-	// AI movement target
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|AI")
-	FVector MoveDestination;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|AI")
-	bool bHasMoveCommand;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|AI")
-	TWeakObjectPtr<AActor> AttackTarget;
 
 	// Visual mesh (placeholder geometry)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -269,19 +262,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Unit|Lifecycle", meta=(ClampMin="0.01"))
 	float CorpseLifetimeSeconds = 3.0f;
 
-	// Combat
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Combat")
-	float AttackCooldown;
-
 	// Walk animation
 	float WalkAnimTime;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|Combat")
-	float AttackCooldownRemaining;
-
 	// Internal
-	virtual void UpdateAIMovement(float DeltaSeconds);
-	virtual void UpdateCombatCooldowns(float DeltaSeconds);
 	virtual void UpdateStamina(float DeltaSeconds);
 	virtual void OnDeath();
 	virtual void StopSpecialActions() {}
@@ -293,8 +277,17 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State", meta=(AllowPrivateAccess="true"))
 	FUnitVitalState Vitals;
 
+	UPROPERTY(VisibleAnywhere, Category = "Unit|State")
+	FUnitOrderState Orders;
+
+	UPROPERTY(VisibleAnywhere, Category = "Unit|State")
+	FUnitCombatState Combat;
+
 	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> SelectionRingMaterial;
+	FUnitSelectionPresentation SelectionPresentation;
+
+	// Derive from the authored attack rate once when starting an attack.
+	float GetAttackRecoveryDuration() const;
 
 	// Event delivery guard, not a second life/health state.
 	bool bDeathNotified = false;

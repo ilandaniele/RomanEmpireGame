@@ -273,15 +273,7 @@ AUnitBase::AUnitBase()
 
 	// Initialize state
 	OwnerFaction = EFactionID::None;
-	bIsSelected = false;
 	bIsPossessedByPlayer = false;
-	bIsBlocking = false;
-	bIsAttacking = false;
-	CurrentStance = EUnitStance::Defensive;
-	bHasMoveCommand = false;
-	AttackTarget = nullptr;
-	AttackCooldown = 0.0f;
-	AttackCooldownRemaining = 0.0f;
 	WalkAnimTime = 0.0f;
 }
 
@@ -311,8 +303,6 @@ void AUnitBase::BeginPlay()
 	
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit spawned: %s"), *UnitData.DisplayName.ToString());
 	ApplyFactionColor();  // Apply faction color on spawn
-	AttackCooldown = 1.0f / UnitData.BaseStats.AttackSpeed;
-	AttackCooldownRemaining = 0.0f;
 
 	// Enable unit-to-unit avoidance so they don't overlap
 	if (GetCharacterMovement())
@@ -355,6 +345,15 @@ bool AUnitBase::CanAcceptCommands() const
 	return HasActorBegunPlay() && IsAlive() && !IsActorBeingDestroyed();
 }
 
+EUnitActivity AUnitBase::GetActivity() const
+{
+	if (GetLifeState() == EUnitLifeState::Ended) return EUnitActivity::Ended;
+	if (GetLifeState() == EUnitLifeState::Dead) return EUnitActivity::Dead;
+	if (!CanAcceptCommands()) return EUnitActivity::Unavailable;
+	if (Combat.IsAttackInProgress()) return EUnitActivity::Attacking;
+	return Orders.GetOrderType() == EUnitOrderType::None ? EUnitActivity::Idle : EUnitActivity::Commanded;
+}
+
 void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Vitals.EndLife();
@@ -380,26 +379,34 @@ void AUnitBase::Tick(float DeltaSeconds)
 	}
 	if (!CanAcceptCommands()) return;
 
+	// The only temporal combat update, before either AI or direct-control actions.
+	Combat.Advance(DeltaSeconds);
 	if (!bIsPossessedByPlayer)
 	{
-		// === UNIFIED COMBAT (all factions) ===
-		if (AttackTarget.IsValid())
+		// Order state owns intent; this legacy executor is replaced by navigation in M3.3.
+		if (Orders.GetOrderType() == EUnitOrderType::Attack)
 		{
-			AUnitBase* Target = Cast<AUnitBase>(AttackTarget.Get());
-			if (Target && Target->IsAlive())
+			AUnitBase* Target = Cast<AUnitBase>(Orders.GetTarget());
+			if (Target && Target->CanAcceptCommands() && Target->GetOwnerFaction() != OwnerFaction)
 			{
 				float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
 				if (Dist2D <= UnitData.AttackRange)
 				{
-					// In range: STOP moving, countdown, FIRE
-					bHasMoveCommand = false;
-					AttackCooldownRemaining -= DeltaSeconds;
-					if (AttackCooldownRemaining <= 0.0f)
+					// Commit recovery before damage observers can reenter this unit.
+					Orders.StopMovement();
+					if (Combat.TryBeginAttack(GetAttackRecoveryDuration()))
 					{
 						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
 						Target->TakeCombatDamage(Dmg, this, false);
 						if (!CanAcceptCommands()) return;
-						AttackCooldownRemaining = AttackCooldown;
+						if (!IsValid(Target) || !Target->CanAcceptCommands())
+						{
+							// Do not overwrite a replacement order issued by a damage callback.
+							if (Orders.GetTarget() == Target) Orders.Clear();
+							else Orders.ClearInvalidTarget();
+							return;
+						}
+						if (Orders.GetTarget() != Target) return;
 
 						// Arm swing
 						if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
@@ -422,13 +429,12 @@ void AUnitBase::Tick(float DeltaSeconds)
 				else
 				{
 					// Out of range: walk toward target
-					MoveDestination = Target->GetActorLocation();
-					bHasMoveCommand = true;
+					Orders.UpdatePursuitDestination(Target->GetActorLocation());
 				}
 			}
-			else AttackTarget = nullptr; // Target dead, clear
+			else Orders.Clear(); // Dead/destroyed/friendly targets retire pursuit as well.
 		}
-		else if (!bHasMoveCommand)
+		else if (Orders.GetOrderType() == EUnitOrderType::None)
 		{
 			// Auto-detect nearest enemy within 5000
 			AUnitBase* ClosestEnemy = nullptr;
@@ -438,7 +444,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 			for (AActor* Actor : AllActors)
 			{
 				AUnitBase* Other = Cast<AUnitBase>(Actor);
-				if (!Other || Other == this || !Other->IsAlive()) continue;
+				if (!Other || Other == this || !Other->CanAcceptCommands()) continue;
 				if (Other->GetOwnerFaction() == OwnerFaction) continue;
 				if (Other->GetOwnerFaction() == EFactionID::None) continue;
 				float D = FVector::Dist2D(GetActorLocation(), Other->GetActorLocation());
@@ -448,10 +454,10 @@ void AUnitBase::Tick(float DeltaSeconds)
 		}
 
 		// === MOVEMENT (inside bIsPossessedByPlayer check) ===
-		if (bHasMoveCommand)
+		if (Orders.HasMoveCommand())
 		{
 			FVector CurrentLoc = GetActorLocation();
-			FVector Dir = MoveDestination - CurrentLoc;
+			FVector Dir = Orders.GetDestination() - CurrentLoc;
 			Dir.Z = 0.0f;
 			float Dist = Dir.Size();
 
@@ -475,7 +481,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 			}
 			else
 			{
-				bHasMoveCommand = false;
+				Orders.StopMovement();
 			}
 		}
 	} // END if (!bIsPossessedByPlayer)
@@ -509,7 +515,6 @@ void AUnitBase::Tick(float DeltaSeconds)
 		if (LeftLegMesh) LeftLegMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 
-	UpdateCombatCooldowns(DeltaSeconds);
 	UpdateStamina(DeltaSeconds);
 }
 
@@ -607,43 +612,13 @@ void AUnitBase::ApplyFactionColor()
 void AUnitBase::SetSelected(bool bNewSelected)
 {
 	if (bNewSelected && !CanAcceptCommands()) return;
-	bIsSelected = bNewSelected;
-	
-	// Show/hide selection decal
-	if (SelectionDecal)
-	{
-		SelectionDecal->SetVisibility(bNewSelected);
-		SelectionDecal->SetHiddenInGame(!bNewSelected);
-	}
-
-	// Show/hide selection ring
-	if (SelectionRingMesh)
-	{
-		SelectionRingMesh->SetVisibility(bNewSelected);
-		SelectionRingMesh->SetHiddenInGame(!bNewSelected);
-		if (bNewSelected && !SelectionRingMaterial)
-		{
-			// Apply green glowing material to selection ring
-			UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
-			if (BaseMat)
-			{
-				SelectionRingMaterial = UMaterialInstanceDynamic::Create(BaseMat, this);
-				if (SelectionRingMaterial)
-				{
-					SelectionRingMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.0f, 1.0f, 0.0f, 0.7f));
-					SelectionRingMesh->SetMaterial(0, SelectionRingMaterial);
-				}
-			}
-		}
-	}
+	SelectionPresentation.SetSelected(bNewSelected, SelectionDecal, SelectionRingMesh, this);
 }
 
 void AUnitBase::CommandMoveTo(const FVector& Destination)
 {
-	if (!CanAcceptCommands() || Destination.ContainsNaN()) return;
-	MoveDestination = Destination;
-	bHasMoveCommand = true;
-	AttackTarget = nullptr;
+	if (!CanAcceptCommands()) return;
+	Orders.IssueMove(Destination);
 }
 
 void AUnitBase::CommandAttack(AActor* Target)
@@ -651,16 +626,12 @@ void AUnitBase::CommandAttack(AActor* Target)
 	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld()) return;
 	const AUnitBase* TargetUnit = Cast<AUnitBase>(Target);
 	if (!TargetUnit || !TargetUnit->CanAcceptCommands() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
-	AttackTarget = Target;
-	MoveDestination = Target->GetActorLocation();
-	bHasMoveCommand = true;
+	Orders.IssueAttack(Target, Target->GetActorLocation());
 }
 
 void AUnitBase::CommandStop()
 {
-	bHasMoveCommand = false;
-	AttackTarget = nullptr;
-	MoveDestination = FVector::ZeroVector;
+	Orders.Clear();
 	ConsumeMovementInputVector();
 	if (GetCharacterMovement()) GetCharacterMovement()->StopMovementImmediately();
 }
@@ -669,7 +640,7 @@ void AUnitBase::CommandHold()
 {
 	if (!CanAcceptCommands()) return;
 	CommandStop();
-	CurrentStance = EUnitStance::StandGround;
+	Orders.Hold();
 }
 
 void AUnitBase::MoveInput(const FVector2D& InputVector)
@@ -706,7 +677,8 @@ void AUnitBase::LookInput(const FVector2D& InputVector)
 
 void AUnitBase::PerformAttack()
 {
-	if (!CanAcceptCommands() || AttackCooldownRemaining > 0.0f)
+	const float RecoveryDuration = GetAttackRecoveryDuration();
+	if (!CanAcceptCommands() || !Combat.CanAttack() || RecoveryDuration <= 0.0f)
 	{
 		return; // Still on cooldown
 	}
@@ -716,8 +688,7 @@ void AUnitBase::PerformAttack()
 		return; // Not enough stamina
 	}
 
-	bIsAttacking = true;
-	AttackCooldownRemaining = AttackCooldown / UnitData.BaseStats.AttackSpeed;
+	Combat.TryBeginAttack(RecoveryDuration);
 	OnUnitVitalsChanged.Broadcast(this);
 	if (!CanAcceptCommands()) return;
 
@@ -754,7 +725,7 @@ void AUnitBase::StartBlocking()
 		return;
 	}
 
-	bIsBlocking = true;
+	Combat.SetBlocking(true);
 	
 	// Reduce movement speed while blocking
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
@@ -766,8 +737,8 @@ void AUnitBase::StartBlocking()
 
 void AUnitBase::StopBlocking()
 {
-	if (!bIsBlocking) return;
-	bIsBlocking = false;
+	if (!Combat.IsBlocking()) return;
+	Combat.SetBlocking(false);
 	
 	// Restore movement speed
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
@@ -833,7 +804,7 @@ float AUnitBase::CalculateDamageReduction(float RawDamage, bool bIsRanged) const
 	float ArmorReduction = UnitData.BaseStats.Armor;
 
 	// Blocking reduces damage significantly
-	if (bIsBlocking && !bIsRanged)
+	if (Combat.IsBlocking() && !bIsRanged)
 	{
 		Defense += 20 * UnitData.BaseStats.BlockStrength;
 	}
@@ -858,12 +829,6 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 	bUseControllerRotationYaw = bPossessed;
 	bUseControllerRotationPitch = bPossessed;
 
-	// Activate/deactivate FPS camera
-	if (FPSCamera)
-	{
-		FPSCamera->SetActive(bPossessed);
-	}
-
 	if (bPossessed)
 	{
 		// Stop AI movement when possessed
@@ -883,124 +848,23 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 			GetCharacterMovement()->MaxWalkSpeed = UnitData.BaseStats.Speed;
 		}
 	}
+	// SetActive broadcasts synchronously. Finish all effects before observers can
+	// exit possession or destroy this actor; never apply stale effects afterward.
+	if (FPSCamera) FPSCamera->SetActive(bPossessed);
 }
 
-void AUnitBase::UpdateAIMovement(float DeltaSeconds)
+float AUnitBase::GetAttackRecoveryDuration() const
 {
-	if (!CanAcceptCommands()) return;
-	// Rome units are player-controlled — no AI movement
-	if (OwnerFaction == EFactionID::Rome)
-	{
-		return;
-	}
-
-	// Check if we have an attack target and are in range
-	if (AttackTarget.IsValid())
-	{
-		float Distance = FVector::Dist2D(GetActorLocation(), AttackTarget->GetActorLocation());
-		
-		if (Distance <= UnitData.AttackRange)
-		{
-			// In attack range - stop and deal damage directly
-			bHasMoveCommand = false;
-			AttackCooldownRemaining -= DeltaSeconds;
-			if (AttackCooldownRemaining <= 0.0f)
-			{
-				AUnitBase* Target = Cast<AUnitBase>(AttackTarget.Get());
-				if (Target && Target->IsAlive())
-				{
-					const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
-					Target->TakeCombatDamage(Dmg, this, false);
-					if (!CanAcceptCommands()) return;
-					AttackCooldownRemaining = AttackCooldown;
-
-					// Attack arm swing
-					if (RightArmMesh)
-					{
-						RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
-					}
-
-					if (GEngine)
-					{
-						GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Orange,
-							FString::Printf(TEXT("AI %s hits %s for %.0f dmg (HP: %d)"),
-								*GetName(), *Target->GetName(), Dmg, Target->GetCurrentHealth()));
-					}
-				}
-				else
-				{
-					AttackTarget = nullptr;
-				}
-			}
-			return;
-		}
-		else
-		{
-			// Move toward target
-			MoveDestination = AttackTarget->GetActorLocation();
-			bHasMoveCommand = true;
-			return;
-		}
-	}
-
-	// Auto-detect enemies (only for non-player-controlled units)
-	if (OwnerFaction != EFactionID::None && OwnerFaction != EFactionID::Rome)
-	{
-		// Enemy AI: scan for nearby Roman units
-		const float DetectRange = 5000.0f;
-		AUnitBase* ClosestEnemy = nullptr;
-		float ClosestDist = DetectRange;
-
-		TArray<AActor*> AllActors;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
-
-		for (AActor* Actor : AllActors)
-		{
-			AUnitBase* OtherUnit = Cast<AUnitBase>(Actor);
-			if (!OtherUnit || OtherUnit == this || !OtherUnit->IsAlive()) continue;
-			if (OtherUnit->GetOwnerFaction() == OwnerFaction) continue; // Same team
-
-			float Dist = FVector::Dist2D(GetActorLocation(), OtherUnit->GetActorLocation());
-			if (Dist < ClosestDist)
-			{
-				ClosestDist = Dist;
-				ClosestEnemy = OtherUnit;
-			}
-		}
-
-		if (ClosestEnemy)
-		{
-			CommandAttack(ClosestEnemy);
-			return;
-		}
-	}
-
-	// If no attack target and no move command, patrol randomly (enemies only)
-	if (!bHasMoveCommand && OwnerFaction != EFactionID::Rome && FMath::FRand() < 0.005f)
-	{
-		FVector PatrolOffset = FVector(FMath::RandRange(-500.0f, 500.0f), FMath::RandRange(-500.0f, 500.0f), 0.0f);
-		CommandMoveTo(GetActorLocation() + PatrolOffset);
-	}
-}
-
-void AUnitBase::UpdateCombatCooldowns(float DeltaSeconds)
-{
-	if (!CanAcceptCommands()) return;
-	if (AttackCooldownRemaining > 0.0f)
-	{
-		AttackCooldownRemaining -= DeltaSeconds;
-		
-		if (AttackCooldownRemaining <= 0.0f)
-		{
-			bIsAttacking = false;
-		}
-	}
+	const float Rate = UnitData.BaseStats.AttackSpeed;
+	if (!FMath::IsFinite(Rate) || Rate <= 0.0f) return 0.0f;
+	const double Duration = 1.0 / double(Rate);
+	return Duration <= double(MAX_flt) ? static_cast<float>(Duration) : 0.0f;
 }
 
 void AUnitBase::UpdateStamina(float DeltaSeconds)
 {
 	// Regenerate stamina when not blocking or attacking
-	if (CanAcceptCommands() && !bIsBlocking && !bIsAttacking)
+	if (CanAcceptCommands() && !Combat.IsBlocking() && !Combat.IsAttackInProgress())
 	{
 		float RegenRate = 10.0f; // Stamina per second
 		const int32 PreviousPercent = FMath::FloorToInt(GetStaminaPercent() * 100.0f);
@@ -1050,7 +914,6 @@ void AUnitBase::StopAllActions()
 	SetSelected(false);
 	CommandStop();
 	if (GetCharacterMovement()) GetCharacterMovement()->ClearAccumulatedForces();
-	bIsAttacking = false;
-	AttackCooldownRemaining = 0.0f;
+	Combat.Reset();
 }
 

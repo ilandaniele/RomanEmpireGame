@@ -473,13 +473,22 @@ M3.1 implementation progress (2026-09-15; not an exit approval):
 - New pure-state and real-PIE actor tests cover these foundations. Evidence and current limitations are tracked in `M3_UNIT_FOUNDATION_REVIEW.md`; an initial successful run is not the final gate for later edits.
 - Remaining M3.1 work: finish separation of command/combat/selection responsibilities and their explicit active states (including the routed-state policy), and inspect rendered selection/possession with an actual-player check. Existing direct movement, per-unit scans and legacy combat timing are not certified; their replacement remains M3.2–M3.4. No new animation or procedural limbs were added.
 
-Next M3.1 integration package (read-only architecture review, 2026-09-19):
+M3.1 state integration package (verified 2026-09-20; 21/21 tests, strict IWYU and Shipping):
 
 - Introduce a single `FUnitOrderState` for None/Move/Attack/Hold, destination and weak target. Replacing, completing and canceling orders must be explicit; pursuit updates must preserve Attack. It must not move actors, scan the world or apply damage.
 - Introduce bounded combat state for blocking/action/recovery, with one temporal update and one cooldown derivation. Remove the unused parallel `UpdateAIMovement` executor instead of moving both implementations. Shared wind-up/hit-window and damage validation remain M3.4.
 - Isolate local selection presentation (selected flag, ring/decal and reusable material) while the controller remains owner of the selected set. Faction eligibility and registries remain M3.2.
 - Keep `AUnitBase` as the lifecycle/world/event coordinator and existing public API facade, without parallel mutable fields. Derive idle/commanded/attacking activity from state owners. A routed unit is still alive; document its cancellation/action-rejection contract before selecting morale thresholds, flight or recovery policy. Do not silently invent those gameplay rules.
 - Verify order replacement/cancel/pursuit/dead targets, single cooldown advancement, idempotent selection and simultaneous cleanup on death/EndPlay with pure tests and the real PIE fixture.
+
+Implementation details:
+
+- `FUnitOrderState` is the sole intent owner. Hold persists without acquiring enemies; Stop clears the current order but still allows later idle acquisition. Finishing a Move clears it, while pausing pursuit retains Attack and its weak target. Invalid replacements are atomic. Dead/destroyed/friendly attack targets retire the order and destination together.
+- `FUnitCombatState` owns recovery and blocking, with readiness/attack activity derived from remaining time. Both AI and direct attacks derive recovery as `1 / AttackSpeed`; the actor advances it once before action evaluation. Damage observers see recovery already committed. Movement/order cancellation does not refund recovery. The unused second AI executor has been removed; direct movement and the remaining per-unit scan await M3.2–M3.3.
+- `FUnitSelectionPresentation` owns selected presentation and one reflected material; the actor retains its constructor components. `GetActivity()` derives Unavailable/Idle/Commanded/Attacking/Dead/Ended, without another mutable state. Attacking currently includes recovery, not a validated hit window.
+- Camera activation/deactivation is the last possession effect, because it emits synchronous component callbacks. A nested exit/death cannot be followed by stale outer movement effects.
+- Routed behavior is not implemented and zero morale does not silently trigger it. Its cancellation, vulnerability, controller notifications, trigger and recovery policy remain explicit work before M3.1 closure. Rendered selected-ring/first-person evidence is also still required.
+- Full-suite and mutation-control evidence, exact logs and current limits: `M3_UNIT_STATE_REVIEW.md`. No new package/player gate is claimed for this source revision.
 
 #### M3.2 Selection and ownership
 

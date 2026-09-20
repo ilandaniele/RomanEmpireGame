@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 #include "UnitLifecycleProbe.h"
 #include "Camera/CameraComponent.h"
+#include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Content/RomanContentRegistry.h"
@@ -14,6 +15,10 @@
 #include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "Units/UnitActivity.h"
+#include "Units/UnitCombatState.h"
+#include "Units/UnitOrderState.h"
+#include "Units/UnitSelectionPresentation.h"
 #include "Units/UnitVitalState.h"
 #include "Units/UnitTypes.h"
 #include "UObject/Class.h"
@@ -69,6 +74,26 @@ namespace RomanEmpireUnitTests
 	{
 		FCall Call(Test, Unit, TEXT("GetCurrentStamina"), 1); Call.Execute(); return Call.Read<FFloatProperty, float>();
 	}
+	float Recovery(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetAttackRecoveryRemaining"), 1); Call.Execute(); return Call.Read<FFloatProperty, float>();
+	}
+	EUnitOrderType Order(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetOrderType"), 1);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Order query uses the public enum"), Prop && Prop->GetEnum() == StaticEnum<EUnitOrderType>())) return EUnitOrderType::None;
+		Call.Execute();
+		return static_cast<EUnitOrderType>(Prop->GetUnderlyingProperty()->GetSignedIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory())));
+	}
+	EUnitActivity Activity(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetActivity"), 1);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Activity query uses the public enum"), Prop && Prop->GetEnum() == StaticEnum<EUnitActivity>())) return EUnitActivity::Unavailable;
+		Call.Execute();
+		return static_cast<EUnitActivity>(Prop->GetUnderlyingProperty()->GetSignedIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory())));
+	}
 	EUnitLifeState Life(FAutomationTestBase& Test, UObject* Unit)
 	{
 		FCall Call(Test, Unit, TEXT("GetLifeState"), 1);
@@ -95,12 +120,11 @@ namespace RomanEmpireUnitTests
 		Call.Property<FObjectPropertyBase>(TEXT("DamageSource"));
 		Call.Execute();
 	}
-	void Move(FAutomationTestBase& Test, UObject* Unit)
+	void Move(FAutomationTestBase& Test, UObject* Unit, const FVector& Destination = FVector(45000.0, 40000.0, 100.0))
 	{
 		FCall Call(Test, Unit, TEXT("CommandMoveTo"), 1);
 		FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Destination"));
 		if (!Test.TestTrue(TEXT("Move takes FVector"), Prop && Prop->Struct == TBaseStructure<FVector>::Get())) return;
-		const FVector Destination(45000.0, 40000.0, 100.0);
 		Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
 		Call.Execute();
 	}
@@ -211,17 +235,27 @@ namespace RomanEmpireUnitTests
 		if (!Test.TestNotNull(*FString::Printf(TEXT("Reflected component %s exists"), *Field.ToString()), Prop)) return nullptr;
 		return Prop->GetObjectPropertyValue_InContainer(Unit);
 	}
-	FUnitVitalState StoredVitals(FAutomationTestBase& Test, UObject* Unit)
+	template<typename T> T StoredState(FAutomationTestBase& Test, UObject* Unit, FName Field)
 	{
 		// ProcessEvent intentionally rejects destroyed actors. Inspect their retained
 		// reflected storage synchronously before GC instead of reading default params.
-		FStructProperty* Prop = FindFProperty<FStructProperty>(Unit->GetClass(), TEXT("Vitals"));
-		FUnitVitalState Result;
-		if (Test.TestTrue(TEXT("Actor retains typed vital storage"), Prop && Prop->Struct == FUnitVitalState::StaticStruct()))
+		FStructProperty* Prop = FindFProperty<FStructProperty>(Unit->GetClass(), Field);
+		T Result;
+		if (Test.TestTrue(*FString::Printf(TEXT("Actor retains typed %s storage"), *Field.ToString()), Prop && Prop->Struct == T::StaticStruct()))
 		{
 			Prop->CopyCompleteValue(&Result, Prop->ContainerPtrToValuePtr<void>(Unit));
 		}
 		return Result;
+	}
+	FUnitVitalState StoredVitals(FAutomationTestBase& Test, UObject* Unit)
+	{
+		return StoredState<FUnitVitalState>(Test, Unit, TEXT("Vitals"));
+	}
+	void CheckTargetReset(FAutomationTestBase& Test, const FUnitOrderState& Orders)
+	{
+		FWeakObjectProperty* TargetProp = FindFProperty<FWeakObjectProperty>(FUnitOrderState::StaticStruct(), TEXT("Target"));
+		if (Test.TestNotNull(TEXT("Order target is a weak reflected reference"), TargetProp))
+			Test.TestTrue(TEXT("Attack target reset, not merely invalid"), TargetProp->GetPropertyValue_InContainer(&Orders).IsExplicitlyNull());
 	}
 	bool StoredBool(FAutomationTestBase& Test, UObject* Unit, FName Field)
 	{
@@ -255,20 +289,21 @@ namespace RomanEmpireUnitTests
 	{
 		if (IsValid(Unit)) Test.TestFalse(TEXT("Unit cannot accept commands"), Bool(Test, Unit, TEXT("CanAcceptCommands")));
 		else Test.TestEqual(TEXT("Destroyed unit retains terminal state"), StoredVitals(Test, Unit).GetLifeState(), EUnitLifeState::Ended);
-		Test.TestFalse(TEXT("Selection cleared"), StoredBool(Test, Unit, TEXT("bIsSelected")));
+		const FUnitOrderState Orders = StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders"));
+		const FUnitCombatState Combat = StoredState<FUnitCombatState>(Test, Unit, TEXT("Combat"));
+		const FUnitSelectionPresentation Selection = StoredState<FUnitSelectionPresentation>(Test, Unit, TEXT("SelectionPresentation"));
+		Test.TestFalse(TEXT("Selection cleared"), Selection.IsSelected());
 		Test.TestFalse(TEXT("Possession flag cleared"), StoredBool(Test, Unit, TEXT("bIsPossessedByPlayer")));
-		Test.TestFalse(TEXT("Blocking cleared"), StoredBool(Test, Unit, TEXT("bIsBlocking")));
+		Test.TestFalse(TEXT("Blocking cleared"), Combat.IsBlocking());
 		Test.TestFalse(TEXT("Special action cleared"), StoredBool(Test, Unit, TEXT("bInTestudo")));
-		Test.TestFalse(TEXT("Move command cleared"), StoredBool(Test, Unit, TEXT("bHasMoveCommand")));
-		FBoolProperty* Attacking = FindFProperty<FBoolProperty>(Unit->GetClass(), TEXT("bIsAttacking"));
-		if (Test.TestNotNull(TEXT("Attack flag is observable"), Attacking)) Test.TestFalse(TEXT("Attack animation cleared"), Attacking->GetPropertyValue_InContainer(Unit));
-		FFloatProperty* Cooldown = FindFProperty<FFloatProperty>(Unit->GetClass(), TEXT("AttackCooldownRemaining"));
-		if (Test.TestNotNull(TEXT("Cooldown is observable"), Cooldown)) Test.TestEqual(TEXT("Attack cooldown cleared"), Cooldown->GetPropertyValue_InContainer(Unit), 0.0f);
+		Test.TestFalse(TEXT("Move command cleared"), Orders.HasMoveCommand());
+		Test.TestEqual(TEXT("Active order cleared"), Orders.GetOrderType(), EUnitOrderType::None);
+		Test.TestTrue(TEXT("Order destination cleared"), Orders.GetDestination().IsZero());
+		Test.TestFalse(TEXT("Attack animation cleared"), Combat.IsAttackInProgress());
+		Test.TestEqual(TEXT("Attack cooldown cleared"), Combat.GetRecoveryRemaining(), 0.0f);
 		UStaticMeshComponent* Ring = Cast<UStaticMeshComponent>(Component(Test, Unit, TEXT("SelectionRingMesh")));
 		if (Test.TestNotNull(TEXT("Corpse selection ring exists"), Ring)) Test.TestTrue(TEXT("Corpse selection ring fully hidden"), !Ring->IsVisible() && Ring->bHiddenInGame);
-		FWeakObjectProperty* TargetProp = FindFProperty<FWeakObjectProperty>(Unit->GetClass(), TEXT("AttackTarget"));
-		if (Test.TestNotNull(TEXT("Target is a weak reflected reference"), TargetProp))
-			Test.TestTrue(TEXT("Attack target reset, not merely invalid"), TargetProp->GetPropertyValue_InContainer(Unit).IsExplicitlyNull());
+		CheckTargetReset(Test, Orders);
 		Test.TestFalse(TEXT("Corpse collision disabled"), Unit->GetActorEnableCollision());
 		ACharacter* Character = Cast<ACharacter>(Unit);
 		if (Test.TestNotNull(TEXT("Unit is a character"), Character))
@@ -280,6 +315,251 @@ namespace RomanEmpireUnitTests
 		UCameraComponent* Camera = Cast<UCameraComponent>(Component(Test, Unit, TEXT("FPSCamera")));
 		if (Camera) Test.TestFalse(TEXT("Camera inactive"), Camera->IsActive());
 	}
+
+	class FExerciseUnitOrders : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseUnitOrders(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Unit order/combat PIE test timed out")); return true; }
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestNotNull(TEXT("Order test uses real Legionary class"), Class)) return true;
+			// Every early return releases only this scenario's actors. Component ticks
+			// are disabled too: these checks advance the coordinator explicitly, once.
+			struct FFixtures
+			{
+				TArray<TWeakObjectPtr<ACharacter>> Actors;
+				~FFixtures() { for (const auto& Actor : Actors) if (Actor.IsValid()) Actor->Destroy(); }
+			} Fixtures;
+			auto SetAttackSpeed = [&](ACharacter* Actor, float Value)
+			{
+				FStructProperty* Prop = FindFProperty<FStructProperty>(Class, TEXT("UnitData"));
+				if (!Test.TestTrue(TEXT("Fixture config uses typed instance definition"), Prop && Prop->Struct == FUnitData::StaticStruct())) return false;
+				// Instance-only fixture setup. The canonical asset is never modified.
+				FUnitData* Data = Prop->ContainerPtrToValuePtr<FUnitData>(Actor);
+				Data->BaseStats.AttackSpeed = Value;
+				Data->BaseStats.MeleeAttack = 1; // Stable, nonlethal hits against real defense.
+				return true;
+			};
+			auto Spawn = [&](EFactionID Faction, const FVector& Location)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				Params.ObjectFlags |= RF_Transient;
+				ACharacter* Actor = World->SpawnActor<ACharacter>(Class, FTransform(Location), Params);
+				if (!Test.TestNotNull(TEXT("Order fixture spawned"), Actor)) return static_cast<ACharacter*>(nullptr);
+				Fixtures.Actors.Add(Actor);
+				Test.TestEqual(TEXT("Uninitialized activity is unavailable"), Activity(Test, Actor), EUnitActivity::Unavailable);
+				if (!Initialize(Test, Actor, TEXT("Legionary"), Faction) || !SetAttackSpeed(Actor, 2.0f)) return static_cast<ACharacter*>(nullptr);
+				Test.TestEqual(TEXT("Initialized deferred activity remains unavailable"), Activity(Test, Actor), EUnitActivity::Unavailable);
+				Actor->FinishSpawning(Actor->GetActorTransform());
+				Actor->SetActorTickEnabled(false);
+				Actor->GetCharacterMovement()->SetComponentTickEnabled(false);
+				Actor->SetActorEnableCollision(false);
+				Test.TestEqual(TEXT("Begun unit derives idle activity"), Activity(Test, Actor), EUnitActivity::Idle);
+				return Actor;
+			};
+			auto CheckTarget = [&](ACharacter* Actor, AActor* Target)
+			{
+				const FUnitOrderState Orders = StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders"));
+				Test.TestTrue(TEXT("Order owner retains expected target"), Orders.GetTarget() == Target);
+				FCall Query(Test, Actor, TEXT("GetAttackTarget"), 1); Query.Execute();
+				FObjectPropertyBase* Prop = Query.Property<FObjectPropertyBase>(TEXT("ReturnValue"), true);
+				if (Prop) Test.TestTrue(TEXT("Public target projects order owner"), Prop->GetObjectPropertyValue_InContainer(Query.Params.GetStructMemory()) == Target);
+			};
+			const FVector Origin(60000.0, 0.0, 400.0);
+			ACharacter* Unit = Spawn(EFactionID::Rome, Origin);
+			ACharacter* Enemy = Spawn(EFactionID::Carthage, Origin + FVector(1000.0, 0.0, 0.0));
+			if (!Unit || !Enemy) return true;
+			Attack(Test, Unit, Enemy);
+			Test.TestEqual(TEXT("Attack command owns explicit attack order"), Order(Test, Unit), EUnitOrderType::Attack);
+			Test.TestEqual(TEXT("Pursuit derives commanded activity"), Activity(Test, Unit), EUnitActivity::Commanded);
+			Test.TestTrue(TEXT("Attack starts pursuit"), Bool(Test, Unit, TEXT("HasMoveCommand")));
+			CheckTarget(Unit, Enemy);
+			Enemy->SetActorLocation(Origin + FVector(1200.0, 200.0, 0.0));
+			Unit->Tick(0.125f);
+			CheckTarget(Unit, Enemy);
+			Test.TestEqual(TEXT("Pursuit updates destination without replacing attack"), Order(Test, Unit), EUnitOrderType::Attack);
+			Test.TestEqual(TEXT("Pursuit follows target's current location"), StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")).GetDestination(), Enemy->GetActorLocation());
+			Test.TestFalse(TEXT("Pursuit actually advances position"), Unit->GetActorLocation().Equals(Origin));
+			Move(Test, Unit, Origin + FVector(0.0, 1000.0, 0.0));
+			Test.TestEqual(TEXT("Move replaces attack order"), Order(Test, Unit), EUnitOrderType::Move);
+			CheckTarget(Unit, nullptr);
+			CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")));
+			Command(Test, Unit, TEXT("CommandStop"));
+			Test.TestEqual(TEXT("Stop clears current order"), Order(Test, Unit), EUnitOrderType::None);
+			Test.TestEqual(TEXT("Stop derives idle activity"), Activity(Test, Unit), EUnitActivity::Idle);
+			Attack(Test, Unit, Enemy);
+			Command(Test, Unit, TEXT("CommandHold"));
+			Test.TestEqual(TEXT("Hold replaces pursuit"), Order(Test, Unit), EUnitOrderType::Hold);
+			Test.TestEqual(TEXT("Hold derives commanded activity"), Activity(Test, Unit), EUnitActivity::Commanded);
+			CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")));
+			const FVector HeldPosition = Unit->GetActorLocation();
+			const int32 HeldEnemyHealth = Int(Test, Enemy, TEXT("GetCurrentHealth"));
+			for (int32 Index = 0; Index < 3; ++Index) Unit->Tick(0.125f);
+			Test.TestEqual(TEXT("Hold persists with nearby enemy"), Order(Test, Unit), EUnitOrderType::Hold);
+			Test.TestEqual(TEXT("Hold does not move"), Unit->GetActorLocation(), HeldPosition);
+			Test.TestEqual(TEXT("Hold does not auto-acquire or attack"), Int(Test, Enemy, TEXT("GetCurrentHealth")), HeldEnemyHealth);
+			Test.TestFalse(TEXT("Hold has no movement command"), Bool(Test, Unit, TEXT("HasMoveCommand")));
+			CheckTarget(Unit, nullptr);
+			Attack(Test, Unit, nullptr);
+			Attack(Test, Unit, Unit);
+			Move(Test, Unit, FVector(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0));
+			Test.TestEqual(TEXT("Invalid commands preserve Hold"), Order(Test, Unit), EUnitOrderType::Hold);
+			Attack(Test, Unit, Enemy);
+			Health(Test, Enemy, 0);
+			Test.TestEqual(TEXT("Death projects terminal activity"), Activity(Test, Enemy), EUnitActivity::Dead);
+			Unit->Tick(0.125f);
+			Test.TestEqual(TEXT("Dead target retires attack order"), Order(Test, Unit), EUnitOrderType::None);
+			Test.TestEqual(TEXT("Retired pursuit cannot move toward dead target"), Unit->GetActorLocation(), HeldPosition);
+			CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")));
+			Enemy->Destroy();
+			ACharacter* DestroyedEnemy = Spawn(EFactionID::Carthage, Origin + FVector(1500.0, 0.0, 0.0));
+			if (!DestroyedEnemy) return true;
+			Attack(Test, Unit, DestroyedEnemy);
+			DestroyedEnemy->Destroy();
+			Unit->Tick(0.125f);
+			Test.TestEqual(TEXT("Destroyed target retires attack order"), Order(Test, Unit), EUnitOrderType::None);
+			Test.TestEqual(TEXT("Expired weak target cannot drive movement"), Unit->GetActorLocation(), HeldPosition);
+			CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")));
+
+			const FVector CombatOrigin(100000.0, 0.0, 400.0);
+			ACharacter* Fighter = Spawn(EFactionID::Rome, CombatOrigin);
+			ACharacter* Defender = Spawn(EFactionID::Carthage, CombatOrigin + FVector(1.0, 0.0, 0.0));
+			if (!Fighter || !Defender) return true;
+			const int32 BeforeHealth = Int(Test, Defender, TEXT("GetCurrentHealth"));
+			Attack(Test, Fighter, Defender);
+			Fighter->Tick(0.125f);
+			Test.TestEqual(TEXT("AI first hit deals actual damage once"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
+			Test.TestEqual(TEXT("AI hit starts full recovery without charging current frame twice"), Recovery(Test, Fighter), 0.5f);
+			Test.TestEqual(TEXT("AI recovery derives attacking activity"), Activity(Test, Fighter), EUnitActivity::Attacking);
+			Test.TestTrue(TEXT("AI attack marks combat in progress"), Bool(Test, Fighter, TEXT("IsAttacking")));
+			Test.TestFalse(TEXT("In-range attack pauses movement"), Bool(Test, Fighter, TEXT("HasMoveCommand")));
+			CheckTarget(Fighter, Defender);
+			for (int32 Index = 1; Index <= 3; ++Index)
+			{
+				Fighter->Tick(0.125f);
+				Test.TestEqual(TEXT("AI recovery advances exactly once per explicit tick"), Recovery(Test, Fighter), 0.5f - Index * 0.125f);
+				Test.TestEqual(TEXT("AI cannot strike again before complete recovery"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
+			}
+			Fighter->Tick(0.125f);
+			Test.TestEqual(TEXT("AI strikes once when recovery reaches zero"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 2);
+			Test.TestEqual(TEXT("Second AI strike starts one full recovery"), Recovery(Test, Fighter), 0.5f);
+
+			ACharacter* PlayerUnit = Spawn(EFactionID::Rome, FVector(140000.0, 0.0, 400.0));
+			if (!PlayerUnit) return true;
+			SetBool(Test, PlayerUnit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+			TStrongObjectPtr<UUnitLifecycleProbe> AttackProbe(NewObject<UUnitLifecycleProbe>());
+			AttackProbe->Test = &Test;
+			AttackProbe->ObservedUnit = PlayerUnit;
+			AttackProbe->bReattackOnVitals = true;
+			if (!BindProbe(Test, PlayerUnit, TEXT("OnUnitVitalsChanged"), AttackProbe.Get(), TEXT("HandleVitals"))) return true;
+			const float BeforeStamina = Stamina(Test, PlayerUnit);
+			for (const float InvalidSpeed : {0.0f, -1.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), std::numeric_limits<float>::min() * 0.125f})
+			{
+				SetAttackSpeed(PlayerUnit, InvalidSpeed);
+				Command(Test, PlayerUnit, TEXT("PerformAttack"));
+				Test.TestEqual(TEXT("Invalid attack speed cannot consume stamina"), Stamina(Test, PlayerUnit), BeforeStamina);
+				Test.TestEqual(TEXT("Invalid attack speed cannot start recovery"), Recovery(Test, PlayerUnit), 0.0f);
+			}
+			Test.TestEqual(TEXT("Rejected attacks emit no vitals notification"), AttackProbe->VitalsEvents, 0);
+			SetAttackSpeed(PlayerUnit, 2.0f);
+			Command(Test, PlayerUnit, TEXT("PerformAttack"));
+			Test.TestTrue(TEXT("Attack observer attempted nested attack"), AttackProbe->bHandledVitalsReattack);
+			Test.TestEqual(TEXT("FPS attack spends stamina exactly once including nested request"), Stamina(Test, PlayerUnit), BeforeStamina - 10.0f);
+			Test.TestEqual(TEXT("Only committed attack emits vitals notification"), AttackProbe->VitalsEvents, 1);
+			Test.TestEqual(TEXT("FPS duration derives inverse speed once, not squared"), Recovery(Test, PlayerUnit), 0.5f);
+			Command(Test, PlayerUnit, TEXT("PerformAttack"));
+			Test.TestEqual(TEXT("Repeated attack cannot spend stamina during recovery"), Stamina(Test, PlayerUnit), BeforeStamina - 10.0f);
+			PlayerUnit->Tick(0.125f);
+			Test.TestEqual(TEXT("FPS recovery advances once"), Recovery(Test, PlayerUnit), 0.375f);
+			Test.TestEqual(TEXT("Attack recovery suppresses stamina regeneration"), Stamina(Test, PlayerUnit), BeforeStamina - 10.0f);
+			PlayerUnit->Tick(0.375f);
+			Test.TestEqual(TEXT("FPS recovery completes at exact duration"), Recovery(Test, PlayerUnit), 0.0f);
+			Test.TestFalse(TEXT("Completed recovery clears attacking projection"), Bool(Test, PlayerUnit, TEXT("IsAttacking")));
+			Test.TestEqual(TEXT("Completed recovery derives idle activity"), Activity(Test, PlayerUnit), EUnitActivity::Idle);
+			SetAttackSpeed(PlayerUnit, 4.0f);
+			const float BeforeNextAttack = Stamina(Test, PlayerUnit);
+			Command(Test, PlayerUnit, TEXT("PerformAttack"));
+			Test.TestEqual(TEXT("Next attack derives current instance speed once"), Recovery(Test, PlayerUnit), 0.25f);
+			Test.TestEqual(TEXT("Next legal attack spends once"), Stamina(Test, PlayerUnit), BeforeNextAttack - 10.0f);
+
+			int32 ScenarioIndex = 0;
+			for (const EUnitProbeDamageAction Action : {EUnitProbeDamageAction::MoveAttacker, EUnitProbeDamageAction::HoldAttacker,
+				EUnitProbeDamageAction::KillAttacker, EUnitProbeDamageAction::DestroyAttacker, EUnitProbeDamageAction::KillTarget, EUnitProbeDamageAction::DestroyTarget})
+			{
+				const FVector Location(180000.0 + 20000.0 * ScenarioIndex++, 0.0, 400.0);
+				ACharacter* Attacker = Spawn(EFactionID::Rome, Location);
+				ACharacter* Target = Spawn(EFactionID::Carthage, Location + FVector(1.0, 0.0, 0.0));
+				if (!Attacker || !Target) return true;
+				TStrongObjectPtr<UUnitLifecycleProbe> DamageProbe(NewObject<UUnitLifecycleProbe>());
+				DamageProbe->Test = &Test;
+				DamageProbe->ObservedUnit = Target;
+				DamageProbe->ActionUnit = Attacker;
+				DamageProbe->DamageAction = Action;
+				if (!BindProbe(Test, Target, TEXT("OnUnitDamaged"), DamageProbe.Get(), TEXT("HandleDamage"))) return true;
+				const float AttackerStamina = Stamina(Test, Attacker);
+				Attack(Test, Attacker, Target);
+				Attacker->Tick(0.125f);
+				Test.TestEqual(TEXT("AI hit notifies target once despite nested direct attack"), DamageProbe->DamageEvents, 1);
+				Test.TestEqual(TEXT("Damage observer sees already-committed full recovery"), DamageProbe->RecoveryAtDamage, 0.5f);
+				Test.TestEqual(TEXT("Damage callback cannot start another attack or spend stamina"), StoredVitals(Test, Attacker).GetStamina(), AttackerStamina);
+				if (Action == EUnitProbeDamageAction::KillAttacker || Action == EUnitProbeDamageAction::DestroyAttacker)
+				{
+					Test.TestEqual(TEXT("Nested attacker termination persists"), StoredVitals(Test, Attacker).GetLifeState(),
+						Action == EUnitProbeDamageAction::KillAttacker ? EUnitLifeState::Dead : EUnitLifeState::Ended);
+					CheckQuiescent(Test, Attacker);
+				}
+				else
+				{
+					const EUnitOrderType Expected = Action == EUnitProbeDamageAction::MoveAttacker ? EUnitOrderType::Move :
+						Action == EUnitProbeDamageAction::HoldAttacker ? EUnitOrderType::Hold : EUnitOrderType::None;
+					Test.TestEqual(TEXT("Damage callback replacement/cancellation survives outer AI attack"), Order(Test, Attacker), Expected);
+					CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Attacker, TEXT("Orders")));
+					Test.TestEqual(TEXT("Nested order change cannot charge recovery twice"), Recovery(Test, Attacker), 0.5f);
+					Test.TestEqual(TEXT("Outer attack cannot perform stale target movement after callback"), Attacker->GetActorLocation(), Location);
+				}
+			}
+
+			for (const bool bKill : {false, true})
+			{
+				ACharacter* Possessed = Spawn(EFactionID::Rome, FVector(400000.0, bKill ? 20000.0 : 0.0, 400.0));
+				if (!Possessed) return true;
+				UCameraComponent* Camera = Cast<UCameraComponent>(Component(Test, Possessed, TEXT("FPSCamera")));
+				if (!Test.TestNotNull(TEXT("Activation reentry uses actual FPS camera"), Camera)) return true;
+				const float NormalSpeed = Possessed->GetCharacterMovement()->MaxWalkSpeed;
+				TStrongObjectPtr<UUnitLifecycleProbe> CameraProbe(NewObject<UUnitLifecycleProbe>());
+				CameraProbe->Test = &Test;
+				CameraProbe->ObservedUnit = Possessed;
+				CameraProbe->bKillOnCameraActivation = bKill;
+				Camera->OnComponentActivated.AddDynamic(CameraProbe.Get(), &UUnitLifecycleProbe::HandleCameraActivated);
+				SetBool(Test, Possessed, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
+				Test.TestEqual(TEXT("Camera observer handles one real activation"), CameraProbe->CameraActivationEvents, 1);
+				Test.TestFalse(TEXT("Nested activation exit leaves camera inactive"), Camera->IsActive());
+				Test.TestFalse(TEXT("Outer activation cannot restore stale possession flag"), Bool(Test, Possessed, TEXT("IsPossessedByPlayer")));
+				if (bKill)
+				{
+					Test.TestEqual(TEXT("Camera activation observer can commit death"), Life(Test, Possessed), EUnitLifeState::Dead);
+					CheckQuiescent(Test, Possessed);
+				}
+				else
+				{
+					Test.TestEqual(TEXT("Outer possession cannot overwrite callback-restored movement speed"), Possessed->GetCharacterMovement()->MaxWalkSpeed, NormalSpeed);
+					Test.TestEqual(TEXT("Outer possession cannot cancel callback's replacement move"), Order(Test, Possessed), EUnitOrderType::Move);
+					Test.TestTrue(TEXT("Callback replacement movement remains active"), Bool(Test, Possessed, TEXT("HasMoveCommand")));
+				}
+			}
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+	};
 
 	class FExerciseUnits : public IAutomationLatentCommand
 	{
@@ -563,6 +843,11 @@ void UUnitLifecycleProbe::HandleVitals(AUnitBase* Unit)
 	AActor* Actor = ObservedUnit.Get();
 	Test->TestTrue(TEXT("Vitals payload identifies the observed unit"),
 		static_cast<const void*>(Unit) == static_cast<const void*>(Actor));
+	if (bReattackOnVitals && !bHandledVitalsReattack)
+	{
+		bHandledVitalsReattack = true;
+		RomanEmpireUnitTests::Command(*Test, Actor, TEXT("PerformAttack"));
+	}
 	if (!bTerminateOnVitals || bHandledVitalsAction) return;
 	bHandledVitalsAction = true; // Bound recursion before issuing any command.
 	if (bDestroyDuringVitals)
@@ -572,6 +857,45 @@ void UUnitLifecycleProbe::HandleVitals(AUnitBase* Unit)
 	else
 	{
 		RomanEmpireUnitTests::Health(*Test, Actor, 0);
+	}
+}
+
+void UUnitLifecycleProbe::HandleDamage(AUnitBase* Unit, float Damage)
+{
+	++DamageEvents;
+	if (!Test || DamageEvents != 1 || !ObservedUnit.IsValid() || !ActionUnit.IsValid()) return;
+	using namespace RomanEmpireUnitTests;
+	AActor* Target = ObservedUnit.Get();
+	AActor* Attacker = ActionUnit.Get();
+	Test->TestTrue(TEXT("Damage payload identifies observed target"), static_cast<const void*>(Unit) == static_cast<const void*>(Target));
+	Test->TestTrue(TEXT("Damage observer receives positive committed damage"), Damage > 0.0f);
+	RecoveryAtDamage = Recovery(*Test, Attacker);
+	Command(*Test, Attacker, TEXT("PerformAttack"));
+	switch (DamageAction)
+	{
+	case EUnitProbeDamageAction::MoveAttacker: Move(*Test, Attacker, Attacker->GetActorLocation() + FVector(0.0, 1000.0, 0.0)); break;
+	case EUnitProbeDamageAction::HoldAttacker: Command(*Test, Attacker, TEXT("CommandHold")); break;
+	case EUnitProbeDamageAction::KillAttacker: Health(*Test, Attacker, 0); break;
+	case EUnitProbeDamageAction::DestroyAttacker: Attacker->Destroy(); break;
+	case EUnitProbeDamageAction::KillTarget: Health(*Test, Target, 0); break;
+	case EUnitProbeDamageAction::DestroyTarget: Target->Destroy(); break;
+	case EUnitProbeDamageAction::None: break;
+	}
+}
+
+void UUnitLifecycleProbe::HandleCameraActivated(UActorComponent* Component, bool bReset)
+{
+	++CameraActivationEvents;
+	if (!Test || CameraActivationEvents != 1 || !ObservedUnit.IsValid()) return;
+	using namespace RomanEmpireUnitTests;
+	AActor* Actor = ObservedUnit.Get();
+	Test->TestTrue(TEXT("Activation callback receives the observed unit's camera"), Component && Component->GetOwner() == Actor);
+	Test->TestTrue(TEXT("Activation observer sees committed possession"), Bool(*Test, Actor, TEXT("IsPossessedByPlayer")));
+	if (bKillOnCameraActivation) Health(*Test, Actor, 0);
+	else
+	{
+		SetBool(*Test, Actor, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), false);
+		Move(*Test, Actor, Actor->GetActorLocation() + FVector(1000.0, 0.0, 0.0));
 	}
 }
 
@@ -585,6 +909,21 @@ bool FUnitFoundationTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnits(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitOrdersCombatTest, "RomanEmpireGame.Units.OrdersCombatPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitOrdersCombatTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitOrders(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
