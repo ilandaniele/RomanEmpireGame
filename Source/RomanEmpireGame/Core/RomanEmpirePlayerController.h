@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Camera/ZoomConfiguration.h"
 #include "Core/GameplayMode.h"
+#include "Faction/FactionData.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
 #include "RomanEmpirePlayerController.generated.h"
@@ -83,6 +84,16 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Selection")
 	void SelectUnits(const TArray<AUnitBase*>& Units);
+
+	/** Ownership/lifecycle eligibility, independent of the current input mode. */
+	UFUNCTION(BlueprintPure, Category = "Selection")
+	bool IsPlayerUnitEligible(const AUnitBase* Unit) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void CommandSelectedUnitsMove(const FVector& Destination);
+
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void CommandSelectedUnitsAttack(AUnitBase* Target);
 
 	UFUNCTION(BlueprintCallable, Category = "Selection")
 	void ClearSelection();
@@ -238,6 +249,15 @@ private:
 
 	UFUNCTION()
 	void HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode);
+	UFUNCTION()
+	void HandlePlayerFactionChanged(EFactionID NewFaction);
+	UFUNCTION()
+	void HandleSelectedUnitOwnerChanged(AUnitBase* Unit);
+	UFUNCTION()
+	void HandlePossessedUnitOwnerChanged(AUnitBase* Unit);
+	void ReconcileUnitOwnership();
+	bool bExitingPossession = false;
+	bool bControllerEndingPlay = false;
 	void PerformBoxSelect();
 	void ClearSelectedActors();
 	void BroadcastSelectionChanged();

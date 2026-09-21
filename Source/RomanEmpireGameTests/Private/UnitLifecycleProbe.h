@@ -7,12 +7,15 @@
 class AUnitBase;
 class AActor;
 class UActorComponent;
+class ABuildingBase;
 class FAutomationTestBase;
 
 enum class EUnitProbeDamageAction : uint8
 {
 	None, MoveAttacker, HoldAttacker, KillAttacker, DestroyAttacker, KillTarget, DestroyTarget
 };
+
+enum class EUnitControllerProbeAction : uint8 { ChangeOwner, Kill, Destroy, Exit, SelectReplacement };
 
 UCLASS()
 class UUnitLifecycleProbe : public UObject
@@ -42,4 +45,14 @@ public:
 	void HandleDamage(AUnitBase* Unit, float Damage);
 	UFUNCTION()
 	void HandleCameraActivated(UActorComponent* Component, bool bReset);
+	TWeakObjectPtr<UObject> ObservedController;
+	TWeakObjectPtr<AActor> ReplacementUnit;
+	EUnitControllerProbeAction ControllerAction = EUnitControllerProbeAction::ChangeOwner;
+	bool bHandledControllerAction = false;
+	UFUNCTION()
+	void HandleControllerCameraActivated(UActorComponent* Component, bool bReset);
+	UFUNCTION()
+	void HandleControllerCameraDeactivated(UActorComponent* Component);
+	UFUNCTION()
+	void HandleControllerSelection(const TArray<AUnitBase*>& Units, ABuildingBase* Building);
 };

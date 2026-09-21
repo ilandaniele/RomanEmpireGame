@@ -1,6 +1,6 @@
 # Roman Empire Game Implementation Plan
 
-Status: implementation active; M0–M2 complete, M3.1 unit foundation in progress
+Status: implementation active; M0–M2 and M3.2a complete; M3.1 routed policy and remaining M3 work open
 Audit baseline: commit `89d8d66e5051d303dea9c965317cdb961d8a52f6`
 Plan date: 2026-09-03
 
@@ -504,13 +504,23 @@ M3.1 presentation package (verified 2026-09-21; not M3.1 closure):
 - Broadcast selection state to UMG.
 - Add unit/squad registries so gameplay and HUD do not scan every actor every frame.
 
-Next bounded package, M3.2a (read-only audit 2026-09-21; not implemented):
+M3.2a ownership package (implemented and verified 2026-09-21):
 
 - Share a controller-side eligibility query for a same-world, command-ready unit owned by the current canonical player faction. Reuse it for selection, player order dispatch, possession entry and continued control. Do not restrict actor command APIs to the player faction: campaign AI also uses them.
 - Notify committed unit ownership changes and observe public player-faction changes. Re-query current state, prune selection and exit invalid possession, including block/camera/input/UMG cleanup. Cleanup must remain legal outside Tactical and after permissions are lost.
 - Revalidate possession after synchronous camera callbacks; selection UMG observers must bind to the controller's current selection, not an event payload overtaken by a nested change.
 - Keep replace-selection semantics for this repair. Additive input, invalid-target feedback and building-selection ownership remain explicit M3.2 scope, not implied by unit tests. Cover mixed-faction/dead/deferred/foreign-world selections, ownership loss during callbacks, repeated cleanup, and preserved enemy AI commands.
 - Follow with M3.2b live unit/squad registries. Keep actor ownership canonical, with only derived faction indexes and weak live-actor references. The content-definition registry is not a live-unit registry. Squad identity/membership needs its own contract; the current spawn formation does not provide one.
+
+Implementation evidence:
+
+- Shared eligibility now protects selected-unit move/attack dispatch and possession without restricting enemy actor command APIs. Committed unit/player-faction events synchronously prune selection, restore invalid possession and clean up blocking/input/UMG. Controller EndPlay unbinds observers and cannot reinstall contexts.
+- Possession revalidates after actual camera callbacks; recursive teardown is guarded. UMG reads current canonical selection after nested notifications, with an immutable event snapshot.
+- `PlayerOwnershipPIE` brings the suite to 22/22 with zero result warnings/failures/pending. Both stale-UMG-payload and missing-faction-boundary mutations fail before restoration. Strict IWYU and Shipping pass. The fresh Development package cooked 559 packages plus 7 platform skips without cook errors/warnings; exact binary/hash/logs and limits are in `M3_OWNERSHIP_REVIEW.md`.
+- `-LoseOwnership` adds a transient packaged-player scenario that returns automatically after faction transfer, with no explicit exit/clear commands. Both ordinary and ownership-loss actual-player runs passed strict identity/state checks and exited 0; six 1920×1080 captures were inspected. Parser regression separately has 4 synthetic positives and 20 expected rejections. Two known player-only engine/host warnings are recorded, not suppressed.
+- Skills: `unreal-cpp-gameplay`, `ue-ui-umg-slate`, `ue-input-system`, `ue-testing-debugging`, `ue-module-build-system`, `unreal-packaging`, `ue-project-context`. No new assets, dependencies, plugins or security changes.
+
+Next bounded registry work must cover registration after successful initialization/BeginPlay, death/EndPlay removal, ownership reindexing, weak-reference cleanup, world isolation and nested-event safety before replacing scans. The remaining concrete scans are idle enemy acquisition in `UnitBase.cpp` and box selection in `RomanEmpirePlayerController.cpp`. A live registry removes actor enumeration, but does not alone solve per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract.
 
 #### M3.3 Commands, navigation, and formations
 

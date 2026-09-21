@@ -118,3 +118,14 @@ foreach ($case in $cases) {
     Write-Output "Rejected as expected: $($case[0])"
 }
 Write-Output "Presentation log parser passed: 3 synthetic positive fixtures and $($cases.Count) expected rejection cases. No game/build launched."
+
+$ownerLine = "0) Legionary $unit.OwnerFaction = Carthage`n"
+Assert-PresentationLog ($fixture + $ownerLine) $true
+foreach ($ownerFixture in @($fixture, ($fixture + $ownerLine.Replace('Carthage', 'Rome')), ($ownerLine + $fixture))) {
+    $failure = $null
+    try { Assert-PresentationLog $ownerFixture $true } catch { $failure = $_.Exception.Message }
+    if ($null -eq $failure -or -not $failure.Contains('ownership-loss scenario must record')) {
+        throw 'Ownership-loss parser mutation survived or failed for an unrelated reason.'
+    }
+}
+Write-Output 'Ownership-loss parser passed: 1 synthetic positive and 3 expected rejection cases. No game/build launched.'

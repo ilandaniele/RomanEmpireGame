@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 #include "UnitLifecycleProbe.h"
 #include "Camera/CameraComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -8,12 +9,17 @@
 #include "Core/RomanEmpireGameState.h"
 #include "Editor.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Faction/FactionData.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Units/UnitActivity.h"
 #include "Units/UnitCombatState.h"
@@ -793,6 +799,274 @@ namespace RomanEmpireUnitTests
 		TStrongObjectPtr<UUnitLifecycleProbe> Probe;
 		TArray<TStrongObjectPtr<UUnitLifecycleProbe>> NestedProbes;
 	};
+	void ObjectCommand(FAutomationTestBase& Test, UObject* Target, FName Function, FName Param, UObject* Value)
+	{
+		FCall Call(Test, Target, Function, 1);
+		if (FObjectPropertyBase* Prop = Call.Property<FObjectPropertyBase>(Param))
+			Prop->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Value);
+		Call.Execute();
+	}
+	UObject* ObjectQuery(FAutomationTestBase& Test, UObject* Target, FName Function)
+	{
+		FCall Call(Test, Target, Function, 1);
+		FObjectPropertyBase* Prop = Call.Property<FObjectPropertyBase>(TEXT("ReturnValue"), true);
+		Call.Execute();
+		return Prop ? Prop->GetObjectPropertyValue_InContainer(Call.Params.GetStructMemory()) : nullptr;
+	}
+	void SelectMany(FAutomationTestBase& Test, UObject* Controller, const TArray<AActor*>& Units)
+	{
+		FCall Call(Test, Controller, TEXT("SelectUnits"), 1);
+		FArrayProperty* Prop = Call.Property<FArrayProperty>(TEXT("Units"));
+		FObjectPropertyBase* Inner = Prop ? CastField<FObjectPropertyBase>(Prop->Inner) : nullptr;
+		if (!Test.TestNotNull(TEXT("Selection takes an object array"), Inner)) return;
+		FScriptArrayHelper Array(Prop, Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()));
+		for (AActor* Unit : Units) Inner->SetObjectPropertyValue(Array.GetRawPtr(Array.AddValue()), Unit);
+		Call.Execute();
+	}
+	TArray<AActor*> SelectedActors(FAutomationTestBase& Test, UObject* Controller)
+	{
+		FCall Call(Test, Controller, TEXT("GetSelectedUnits"), 1);
+		FArrayProperty* Prop = Call.Property<FArrayProperty>(TEXT("ReturnValue"), true);
+		FObjectPropertyBase* Inner = Prop ? CastField<FObjectPropertyBase>(Prop->Inner) : nullptr;
+		TArray<AActor*> Result;
+		if (!Test.TestNotNull(TEXT("Selection query returns an object array"), Inner)) return Result;
+		Call.Execute();
+		FScriptArrayHelper Array(Prop, Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()));
+		for (int32 Index = 0; Index < Array.Num(); ++Index) Result.Add(Cast<AActor>(Inner->GetObjectPropertyValue(Array.GetRawPtr(Index))));
+		return Result;
+	}
+	bool Eligible(FAutomationTestBase& Test, UObject* Controller, AActor* Unit)
+	{
+		FCall Call(Test, Controller, TEXT("IsPlayerUnitEligible"), 2);
+		if (FObjectPropertyBase* Prop = Call.Property<FObjectPropertyBase>(TEXT("Unit")))
+			Prop->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Unit);
+		Call.Execute();
+		return Call.Read<FBoolProperty, bool>();
+	}
+	bool HasListener(FAutomationTestBase& Test, UObject* Source, FName Event, UObject* Listener, FName Handler)
+	{
+		FMulticastDelegateProperty* Prop = FindFProperty<FMulticastDelegateProperty>(Source->GetClass(), Event);
+		if (!Test.TestNotNull(TEXT("Ownership event exists"), Prop)) return false;
+		const FMulticastScriptDelegate* Delegate = Prop->GetMulticastDelegate(Prop->ContainerPtrToValuePtr<void>(Source));
+		return Delegate && Delegate->Contains(Listener, Handler);
+	}
+	void ApplyControllerProbe(UUnitLifecycleProbe* Probe)
+	{
+		if (!Probe->Test || Probe->bHandledControllerAction || !Probe->ObservedUnit.IsValid() || !Probe->ObservedController.IsValid()) return;
+		Probe->bHandledControllerAction = true;
+		switch (Probe->ControllerAction)
+		{
+		case EUnitControllerProbeAction::ChangeOwner: SetOwner(*Probe->Test, Probe->ObservedUnit.Get(), EFactionID::Carthage); break;
+		case EUnitControllerProbeAction::Kill: Health(*Probe->Test, Probe->ObservedUnit.Get(), 0); break;
+		case EUnitControllerProbeAction::Destroy: Probe->ObservedUnit->Destroy(); break;
+		case EUnitControllerProbeAction::Exit: Command(*Probe->Test, Probe->ObservedController.Get(), TEXT("ExitFirstPersonMode")); break;
+		case EUnitControllerProbeAction::SelectReplacement:
+			ObjectCommand(*Probe->Test, Probe->ObservedController.Get(), TEXT("SelectUnit"), TEXT("Unit"), Probe->ReplacementUnit.Get()); break;
+		}
+	}
+	class FExerciseOwnership : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseOwnership(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Ownership PIE startup timed out")); return true; }
+			ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Controller = World->GetFirstPlayerController();
+			if (!Controller || !Bool(Test, Controller, TEXT("CanIssueTacticalCommands"))) return false;
+			APawn* OriginalCamera = Controller->GetPawn();
+			UUserWidget* Root = Cast<UUserWidget>(ObjectQuery(Test, Controller, TEXT("GetMainWidget")));
+			UClass* UnitClass = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestTrue(TEXT("Ownership fixture has real controller, camera, UMG and unit class"), OriginalCamera && Root && UnitClass)) return true;
+			int32 SpawnIndex = 0;
+			auto Spawn = [&](EFactionID Faction, bool bDeferred = false, UWorld* SpawnWorld = nullptr)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				Params.ObjectFlags |= RF_Transient;
+				ACharacter* Unit = (SpawnWorld ? SpawnWorld : World)->SpawnActor<ACharacter>(UnitClass,
+					FTransform(FVector(150000.0 + 2000.0 * SpawnIndex++, 100000.0, 300.0)), Params);
+				if (!Test.TestNotNull(TEXT("Transient ownership unit spawned"), Unit)) return Unit;
+				Test.TestTrue(TEXT("Ownership fixture initialization succeeded"), Initialize(Test, Unit, TEXT("Legionary"), Faction));
+				if (!bDeferred) Unit->FinishSpawning(Unit->GetActorTransform());
+				Unit->SetActorTickEnabled(false);
+				for (UActorComponent* Component : Unit->GetComponents()) if (Component) Component->SetComponentTickEnabled(false);
+				return Unit;
+			};
+			ACharacter* Owned = Spawn(EFactionID::Rome);
+			ACharacter* Other = Spawn(EFactionID::Rome);
+			ACharacter* Enemy = Spawn(EFactionID::Carthage);
+			ACharacter* Dead = Spawn(EFactionID::Rome);
+			ACharacter* Deferred = Spawn(EFactionID::Rome, true);
+			if (!Owned || !Other || !Enemy || !Dead || !Deferred) return true;
+			Health(Test, Dead, 0);
+			Test.TestTrue(TEXT("Live owned unit eligible"), Eligible(Test, Controller, Owned));
+			if (!Test.TestFalse(TEXT("Enemy unit ineligible"), Eligible(Test, Controller, Enemy))) return true;
+			Test.TestFalse(TEXT("Null unit ineligible"), Eligible(Test, Controller, nullptr));
+			Test.TestFalse(TEXT("Dead unit ineligible"), Eligible(Test, Controller, Dead));
+			Test.TestFalse(TEXT("Initialized deferred unit ineligible before BeginPlay"), Eligible(Test, Controller, Deferred));
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Deferred);
+			Test.TestTrue(TEXT("Deferred possession rejected"), Controller->GetPawn() == OriginalCamera);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Enemy);
+			Test.TestTrue(TEXT("Enemy possession rejected"), Controller->GetPawn() == OriginalCamera);
+
+			UWorld* ForeignWorld = UWorld::CreateWorld(EWorldType::Game, false);
+			if (!Test.TestNotNull(TEXT("Foreign world created"), ForeignWorld)) return true;
+			GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(ForeignWorld);
+			ON_SCOPE_EXIT
+			{
+				ForeignWorld->DestroyWorld(false);
+				GEngine->DestroyWorldContext(ForeignWorld);
+				// Enhanced Input enumerates world subsystems through TObjectIterator.
+				// Collect the deinitialized auxiliary subsystem before Slate next dispatches input.
+				CollectGarbage(RF_NoFlags);
+			};
+			ForeignWorld->SetGameInstance(World->GetGameInstance());
+			ForeignWorld->InitializeActorsForPlay(FURL());
+			ACharacter* Foreign = Spawn(EFactionID::Rome, false, ForeignWorld);
+			if (!Foreign) return true;
+			Foreign->DispatchBeginPlay();
+			Test.TestTrue(TEXT("Foreign unit is otherwise command-ready"), Bool(Test, Foreign, TEXT("CanAcceptCommands")));
+			Test.TestFalse(TEXT("Foreign-world unit ineligible"), Eligible(Test, Controller, Foreign));
+			SelectMany(Test, Controller, { Owned, Enemy, nullptr, Other, Owned, Dead, Deferred, Foreign });
+			Test.TestTrue(TEXT("Mixed selection retains only unique eligible owned units"), SelectedActors(Test, Controller) == TArray<AActor*>({ Owned, Other }));
+			Test.TestTrue(TEXT("Owned selection ring active"), Bool(Test, Owned, TEXT("IsSelected")));
+			Test.TestFalse(TEXT("Enemy selection ring inactive"), Bool(Test, Enemy, TEXT("IsSelected")));
+			auto PlayerMove = [&]()
+			{
+				FCall Call(Test, Controller, TEXT("CommandSelectedUnitsMove"), 1);
+				FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Destination"));
+				if (!Test.TestTrue(TEXT("Player move accepts FVector"), Prop && Prop->Struct == TBaseStructure<FVector>::Get())) return;
+				const FVector Destination(170000.0, 100000.0, 300.0);
+				Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
+				Call.Execute();
+			};
+			PlayerMove();
+			Test.TestEqual(TEXT("Player move reaches owned selected unit"), Order(Test, Owned), EUnitOrderType::Move);
+			Test.TestEqual(TEXT("Player move does not reach enemy"), Order(Test, Enemy), EUnitOrderType::None);
+			ObjectCommand(Test, Controller, TEXT("CommandSelectedUnitsAttack"), TEXT("Target"), Enemy);
+			Test.TestEqual(TEXT("Player attack orders reach owned selection"), Order(Test, Owned), EUnitOrderType::Attack);
+			Test.TestEqual(TEXT("Rejected enemy receives no player order"), Order(Test, Enemy), EUnitOrderType::None);
+			Attack(Test, Enemy, Owned);
+			Test.TestEqual(TEXT("Enemy AI actor command remains legal"), Order(Test, Enemy), EUnitOrderType::Attack);
+			SetOwner(Test, Owned, EFactionID::Carthage);
+			Test.TestTrue(TEXT("Ownership change synchronously prunes selection"), SelectedActors(Test, Controller) == TArray<AActor*>({ Other }));
+			Test.TestFalse(TEXT("Ownership change clears the former ring"), Bool(Test, Owned, TEXT("IsSelected")));
+			Command(Test, Owned, TEXT("CommandHold"));
+			PlayerMove();
+			Test.TestEqual(TEXT("Player move cannot command former selection"), Order(Test, Owned), EUnitOrderType::Hold);
+			ObjectCommand(Test, Controller, TEXT("CommandSelectedUnitsAttack"), TEXT("Target"), Enemy);
+			Test.TestEqual(TEXT("Former selection receives no subsequent player order"), Order(Test, Owned), EUnitOrderType::Hold);
+			SetOwner(Test, Owned, EFactionID::None);
+			Test.TestFalse(TEXT("Unowned unit is ineligible"), Eligible(Test, Controller, Owned));
+			SetOwner(Test, Owned, EFactionID::Rome);
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Owned);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Owned);
+			Test.TestTrue(TEXT("Owned possession transfers actual Pawn"), Controller->GetPawn() == Owned);
+			PlayerMove();
+			Test.TestEqual(TEXT("Tactical order facade rejects possession mode"), Order(Test, Owned), EUnitOrderType::None);
+			Command(Test, Owned, TEXT("StartBlocking"));
+			SetOwner(Test, Owned, EFactionID::Carthage);
+			CheckReturned(Controller, OriginalCamera, Root);
+			Test.TestFalse(TEXT("Ownership loss clears unit blocking"), Bool(Test, Owned, TEXT("IsBlocking")));
+			Test.TestFalse(TEXT("Ownership loss clears unit possession"), Bool(Test, Owned, TEXT("IsPossessedByPlayer")));
+			Test.TestFalse(TEXT("Ownership loss unbinds selection observer"), HasListener(Test, Owned, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
+			Test.TestFalse(TEXT("Ownership loss unbinds possession observer"), HasListener(Test, Owned, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandlePossessedUnitOwnerChanged")));
+
+			UObject* Factions = ObjectQuery(Test, World->GetAuthGameMode(), TEXT("GetFactionManager"));
+			auto SetPlayerFaction = [&](EFactionID Faction)
+			{
+				FCall Call(Test, Factions, TEXT("SetPlayerFaction"), 1);
+				if (FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("NewFaction")))
+					Prop->GetUnderlyingProperty()->SetIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Faction));
+				Call.Execute();
+			};
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Other);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
+			SetPlayerFaction(EFactionID::Carthage);
+			CheckReturned(Controller, OriginalCamera, Root);
+			Test.TestTrue(TEXT("Eligibility follows canonical player faction"), Eligible(Test, Controller, Enemy));
+			SetPlayerFaction(EFactionID::Rome);
+
+			for (EUnitControllerProbeAction Action : { EUnitControllerProbeAction::ChangeOwner, EUnitControllerProbeAction::Kill,
+				EUnitControllerProbeAction::Destroy, EUnitControllerProbeAction::Exit })
+			{
+				ACharacter* Unit = Spawn(EFactionID::Rome);
+				if (!Unit) return true;
+				TStrongObjectPtr<UUnitLifecycleProbe> Probe(NewObject<UUnitLifecycleProbe>());
+				Probe->Test = &Test; Probe->ObservedUnit = Unit; Probe->ObservedController = Controller; Probe->ControllerAction = Action;
+				UCameraComponent* Camera = Cast<UCameraComponent>(Component(Test, Unit, TEXT("FPSCamera")));
+				if (!Test.TestNotNull(TEXT("Real unit camera"), Camera)) return true;
+				Camera->OnComponentActivated.AddDynamic(Probe.Get(), &UUnitLifecycleProbe::HandleControllerCameraActivated);
+				ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Unit);
+				Test.TestTrue(TEXT("Actual camera callback interrupted controller entry"), Probe->bHandledControllerAction);
+				CheckReturned(Controller, OriginalCamera, Root);
+				Test.TestFalse(TEXT("Interrupted entry leaves no stored possession flag"), StoredBool(Test, Unit, TEXT("bIsPossessedByPlayer")));
+			}
+			TStrongObjectPtr<UUnitLifecycleProbe> ExitProbe(NewObject<UUnitLifecycleProbe>());
+			ExitProbe->Test = &Test; ExitProbe->ObservedUnit = Other; ExitProbe->ObservedController = Controller;
+			UCameraComponent* ExitCamera = Cast<UCameraComponent>(Component(Test, Other, TEXT("FPSCamera")));
+			if (!ExitCamera) return true;
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
+			ExitCamera->OnComponentDeactivated.AddDynamic(ExitProbe.Get(), &UUnitLifecycleProbe::HandleControllerCameraDeactivated);
+			Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+			Test.TestTrue(TEXT("Real deactivation attempted recursive exit and entry"), ExitProbe->bHandledControllerAction);
+			CheckReturned(Controller, OriginalCamera, Root);
+			Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+
+			SetOwner(Test, Owned, EFactionID::Rome);
+			TStrongObjectPtr<UUnitLifecycleProbe> SelectionProbe(NewObject<UUnitLifecycleProbe>());
+			SelectionProbe->Test = &Test; SelectionProbe->ObservedUnit = Owned; SelectionProbe->ObservedController = Controller;
+			SelectionProbe->ReplacementUnit = Other; SelectionProbe->ControllerAction = EUnitControllerProbeAction::SelectReplacement;
+			if (!BindProbe(Test, Controller, TEXT("OnSelectionChanged"), SelectionProbe.Get(), TEXT("HandleControllerSelection"))) return true;
+			// Register the real UMG observer after the mutating observer. Otherwise
+			// it can run before the nested change and a stale-payload regression is masked.
+			FMulticastDelegateProperty* SelectionEvent = FindFProperty<FMulticastDelegateProperty>(Controller->GetClass(), TEXT("OnSelectionChanged"));
+			UFunction* UIHandler = Root->FindFunction(TEXT("HandleSelectionChanged"));
+			if (!Test.TestTrue(TEXT("Production selection observer has the real event signature"), SelectionEvent && UIHandler &&
+				SelectionEvent->SignatureFunction->IsSignatureCompatibleWith(UIHandler))) return true;
+			FScriptDelegate UIDelegate;
+			UIDelegate.BindUFunction(Root, TEXT("HandleSelectionChanged"));
+			SelectionEvent->RemoveDelegate(UIDelegate, Controller);
+			SelectionEvent->AddDelegate(UIDelegate, Controller);
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Owned);
+			Test.TestTrue(TEXT("Selection observer committed its replacement"), SelectedActors(Test, Controller) == TArray<AActor*>({ Other }));
+			FObjectPropertyBase* Observed = FindFProperty<FObjectPropertyBase>(Root->GetClass(), TEXT("ObservedUnit"));
+			Test.TestTrue(TEXT("UMG observes current selection, not stale outer payload"), Observed && Observed->GetObjectPropertyValue_InContainer(Root) == Other);
+			SelectionProbe->ControllerAction = EUnitControllerProbeAction::ChangeOwner; SelectionProbe->bHandledControllerAction = false;
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Owned);
+			Test.TestTrue(TEXT("Owner change inside selection notification removes the unit"), SelectedActors(Test, Controller).IsEmpty());
+			Test.TestFalse(TEXT("Nested ownership change leaves no ring"), Bool(Test, Owned, TEXT("IsSelected")));
+			Command(Test, Controller, TEXT("ClearSelection"));
+			Deferred->Destroy();
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Other);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
+			Test.TestTrue(TEXT("Live controller observes selected ownership"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
+			Test.TestTrue(TEXT("Live controller observes possessed ownership"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandlePossessedUnitOwnerChanged")));
+			Test.TestTrue(TEXT("Live controller observes player faction"), HasListener(Test, State, TEXT("OnPlayerFactionChanged"), Controller, TEXT("HandlePlayerFactionChanged")));
+			Controller->RouteEndPlay(EEndPlayReason::RemovedFromWorld);
+			Test.TestFalse(TEXT("Controller teardown releases unit possession"), Bool(Test, Other, TEXT("IsPossessedByPlayer")));
+			Test.TestFalse(TEXT("Controller teardown releases selected ownership observer"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
+			Test.TestFalse(TEXT("Controller teardown releases possessed ownership observer"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandlePossessedUnitOwnerChanged")));
+			Test.TestFalse(TEXT("Controller teardown releases public faction observer"), HasListener(Test, State, TEXT("OnPlayerFactionChanged"), Controller, TEXT("HandlePlayerFactionChanged")));
+			return true;
+		}
+	private:
+		void CheckReturned(APlayerController* Controller, APawn* Camera, UUserWidget* Root)
+		{
+			Test.TestTrue(TEXT("Original actual camera restored"), Controller->GetPawn() == Camera);
+			Test.TestFalse(TEXT("Controller no longer in possession mode"), Bool(Test, Controller, TEXT("IsInFirstPersonMode")));
+			Test.TestTrue(TEXT("Canonical selection is empty"), SelectedActors(Test, Controller).IsEmpty());
+			Test.TestTrue(TEXT("Tactical command eligibility restored"), Bool(Test, Controller, TEXT("CanIssueTacticalCommands")));
+			Test.TestEqual(TEXT("Crosshair collapsed after ownership cleanup"), Root->GetWidgetFromName(TEXT("CrosshairText"))->GetVisibility(), ESlateVisibility::Collapsed);
+			Test.TestEqual(TEXT("Possession HUD collapsed after ownership cleanup"), Root->GetWidgetFromName(TEXT("PossessionText"))->GetVisibility(), ESlateVisibility::Collapsed);
+		}
+		FAutomationTestBase& Test;
+		double StartedAt;
+	};
 	class FWaitForUnitPIEEnd : public IAutomationLatentCommand
 	{
 	public:
@@ -834,6 +1108,27 @@ void UUnitLifecycleProbe::HandleDeath(AUnitBase* Unit)
 	Test->TestEqual(TEXT("Death callback cannot heal"), Int(*Test, Actor, TEXT("GetCurrentHealth")), 0);
 	Test->TestEqual(TEXT("Death callback cannot consume stamina"), Stamina(*Test, Actor), BeforeStamina);
 	CheckQuiescent(*Test, Actor);
+}
+
+void UUnitLifecycleProbe::HandleControllerCameraActivated(UActorComponent* Component, bool bReset)
+{
+	(void)Component; (void)bReset;
+	RomanEmpireUnitTests::ApplyControllerProbe(this);
+}
+
+void UUnitLifecycleProbe::HandleControllerCameraDeactivated(UActorComponent* Component)
+{
+	(void)Component;
+	if (!Test || bHandledControllerAction || !ObservedController.IsValid()) return;
+	bHandledControllerAction = true;
+	RomanEmpireUnitTests::Command(*Test, ObservedController.Get(), TEXT("ExitFirstPersonMode"));
+	RomanEmpireUnitTests::ObjectCommand(*Test, ObservedController.Get(), TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), ObservedUnit.Get());
+}
+
+void UUnitLifecycleProbe::HandleControllerSelection(const TArray<AUnitBase*>& Units, ABuildingBase* Building)
+{
+	(void)Units; (void)Building;
+	RomanEmpireUnitTests::ApplyControllerProbe(this);
 }
 
 void UUnitLifecycleProbe::HandleVitals(AUnitBase* Unit)
@@ -924,6 +1219,20 @@ bool FUnitOrdersCombatTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitOrders(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitOwnershipTest, "RomanEmpireGame.Units.PlayerOwnershipPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitOwnershipTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseOwnership(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

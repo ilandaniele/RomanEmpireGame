@@ -187,6 +187,11 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
 	FOnUnitVitalsChanged OnUnitVitalsChanged;
 
+	/** Committed ownership invalidation; observers must re-query current ownership. */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitOwnerFactionChanged, AUnitBase*, Unit);
+	UPROPERTY(BlueprintAssignable, Category = "Unit|Events")
+	FOnUnitOwnerFactionChanged OnOwnerFactionChanged;
+
 protected:
 	/** Stable ID only; authored values live in URomanUnitDefinition assets. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit")

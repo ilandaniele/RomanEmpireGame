@@ -39,7 +39,9 @@ For an Editor-hosted `-game` diagnostic, use the process-only flag `-DisablePlug
 
 Destroyed actors deliberately reject reflected function calls in Unreal. The fixture therefore inspects retained reflected storage synchronously before GC for post-Destroy assertions; zero-filled return parameters are not accepted as evidence. These tests are not rendered-pixel, navigation or complete combat certification. Mutation controls and verification logs: `M3_UNIT_FOUNDATION_REVIEW.md`.
 
-`RomanEmpireGame.Units.OrderState` uses real actors in an owned transient world/context for weak-target destruction/GC, alongside atomic order/pursuit/hold transitions. `CombatState` checks the sole recovery clock and orthogonal blocking. `OrdersCombatPIE` verifies actual coordinator timing, target retirement, persistent Hold, derived activity, and reentrant damage/vitals/camera callbacks. The complete suite currently has 21 tests. The old double-clock/double-rate/camera-order regressions were detected by mutation control before restoration; evidence and remaining scope: `M3_UNIT_STATE_REVIEW.md`.
+`RomanEmpireGame.Units.OrderState` uses real actors in an owned transient world/context for weak-target destruction/GC, alongside atomic order/pursuit/hold transitions. `CombatState` checks the sole recovery clock and orthogonal blocking. `OrdersCombatPIE` verifies actual coordinator timing, target retirement, persistent Hold, derived activity, and reentrant damage/vitals/camera callbacks. The old double-clock/double-rate/camera-order regressions were detected by mutation control before restoration; evidence and remaining scope: `M3_UNIT_STATE_REVIEW.md`.
+
+The complete suite now has 22 tests. `PlayerOwnershipPIE` adds same-world/player-faction/lifecycle boundaries, mixed selection, player orders versus enemy AI orders, unit/player-faction changes, interrupted possession, nested selection and real controller teardown. Its observer ordering is explicit so stale UMG payloads cannot accidentally pass. Both stale-payload and missing-faction mutations fail before restoration. Fixtures are transient; the auxiliary world's deinitialized subsystem is collected before Slate next dispatches input. Evidence: `M3_OWNERSHIP_REVIEW.md`.
 
 ## Packaged selection and possession presentation
 
@@ -54,6 +56,15 @@ The helper launches the **actual Development player**, records its hash, holds t
 The helper compares observed actor/controller identities, phase ordering, restored camera and cleared selection/possession flags; a successful console dispatch is insufficient. It also checks exit status, captures and failure signatures. Its bounded timeout reports the existing PID without killing or restarting it. Manually inspect all three PNGs before accepting the rendered result. This is **not** OS input injection, a full visual-regression suite, a performance benchmark or Shipping-player execution.
 
 The two local `roman.Debug.*` commands use normal gameplay facades and are compile-time excluded from Shipping. No remote service or editor/test dependency is introduced. The parser self-test extracts only the validation function through PowerShell's syntax tree, without running the player-launch body; its synthetic fixtures are parser evidence only. Exact real-run evidence and limits: `M3_PRESENTATION_REVIEW.md`.
+
+For the M3.2a ownership build, pass its archive explicitly. `-LoseOwnership` transfers the initial legionaries to Carthage after possession and requires automatic camera restoration and selection/possession cleanup, without an explicit exit or clear command:
+
+```powershell
+.\Tools\verify_unit_presentation.ps1 -ArchiveDirectory Artifacts/Packages/M3_Ownership -OutputDirectory Artifacts/Ownership-Explicit-NewRun
+.\Tools\verify_unit_presentation.ps1 -ArchiveDirectory Artifacts/Packages/M3_Ownership -OutputDirectory Artifacts/Ownership-Loss-NewRun -LoseOwnership
+```
+
+The exact formerly selected actor must also be observed as Carthage after exit. This changes only the temporary player session, not saved assets. Parser coverage totals 4 positive fixtures and 20 expected rejections. Current package evidence and limitations: `M3_OWNERSHIP_REVIEW.md`.
 
 ## Optional Fab module failure on the audited host
 

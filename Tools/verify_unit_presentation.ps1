@@ -2,6 +2,7 @@
 param(
     [string]$ArchiveDirectory = 'Artifacts/Packages/M3_PresentationFinal',
     [string]$OutputDirectory = 'Artifacts/UnitPresentation',
+    [switch]$LoseOwnership,
     [ValidateRange(1, 600)]
     [int]$TimeoutSeconds = 120
 )
@@ -11,7 +12,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Assert-PresentationLog([string]$Log) {
+function Assert-PresentationLog([string]$Log, [bool]$OwnershipLoss = $false) {
     # Strip only UE's timestamp/frame prefix; preserve array indentation and
     # object paths. These checks compare observed state, not KE dispatch success.
     $lines = [regex]::Replace($Log, '(?m)^\[[^\]\r\n]+\]\[\s*\d+\]', '')
@@ -66,6 +67,10 @@ function Assert-PresentationLog([string]$Log) {
     $active = @($during | Where-Object { $_.Groups['value'].Value -eq 'True' })
     Assert-Check ($active.Count -eq 1 -and $active[0].Groups['unit'].Value -eq $unitPath) 'exactly the selected unit must report possession.'
     Assert-Check (@($after | Where-Object { $_.Groups['value'].Value -eq 'True' }).Count -eq 0) 'a unit remains flagged as possessed after return.'
+    if ($OwnershipLoss) {
+        $owner = [regex]::Matches($lines, '(?m)^\d+\) \S+ ' + [regex]::Escape($unitPath) + '\.OwnerFaction = (?:EFactionID::)?Carthage\r?$')
+        Assert-Check ($owner.Count -eq 1 -and $owner[0].Index -gt $exited[0].Index) 'ownership-loss scenario must record the former selected unit as Carthage after automatic exit.'
+    }
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -99,8 +104,15 @@ Add-Step 85 'getall RomanEmpirePlayerController PossessedUnit'
 Add-Step 86 'getall RomanEmpirePlayerController Pawn'
 Add-Step 86 'getall UnitBase bIsPossessedByPlayer'
 Add-Step 90 "shot showui filename=$possessedPath -nosuffix"
-Add-Step 120 'ke RomanEmpirePlayerController ExitFirstPersonMode'
-Add-Step 125 'ke RomanEmpirePlayerController ClearSelection'
+if ($LoseOwnership) {
+    # Controlled transient fixture: transfer all initial legionaries, including
+    # the selected/possessed unit. Do not explicitly exit or clear selection.
+    Add-Step 120 'ke Legionary SetOwnerFaction Carthage'
+    Add-Step 149 'getall UnitBase OwnerFaction'
+} else {
+    Add-Step 120 'ke RomanEmpirePlayerController ExitFirstPersonMode'
+    Add-Step 125 'ke RomanEmpirePlayerController ClearSelection'
+}
 Add-Step 145 'getall RomanEmpirePlayerController PossessedUnit'
 Add-Step 146 'getall RomanEmpirePlayerController SelectedUnits'
 Add-Step 147 'getall RomanEmpirePlayerController Pawn'
@@ -111,6 +123,7 @@ $arguments = @('-windowed', '-ResX=1920', '-ResY=1080', '-forceres', '-nosplash'
     '-unattended', '-benchmark', '-seconds=8', '-log',
     ('-abslog="' + $logPath + '"'), ('-ExecCmds="' + $commands + '"'))
 Write-Output ("Player SHA256: " + (Get-FileHash -LiteralPath $playerPath -Algorithm SHA256).Hash)
+Write-Output ("Scenario: " + $(if ($LoseOwnership) { 'ownership loss with automatic exit/selection cleanup' } else { 'explicit exit and selection clear' }))
 $process = Start-Process -FilePath $playerPath -ArgumentList $arguments -WindowStyle Hidden -PassThru
 Write-Output "Presentation player PID: $($process.Id)"
 # The command runner can yield/poll this script. Never automatically relaunch
@@ -126,5 +139,5 @@ foreach ($path in @($selectedPath, $possessedPath, $returnedPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Capture missing: $path" }
 }
 $log = Get-Content -LiteralPath $logPath -Raw -Encoding UTF8
-Assert-PresentationLog $log
+Assert-PresentationLog $log $LoseOwnership.IsPresent
 Write-Output 'Player exited 0; selected/Pawn identity, restored camera, cleared selection and possession flags passed. All three captures exist; inspect their pixels before claiming the rendered gate passed. This does not exercise physical input.'

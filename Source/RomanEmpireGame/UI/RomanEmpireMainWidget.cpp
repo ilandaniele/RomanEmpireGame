@@ -703,7 +703,13 @@ void URomanEmpireMainWidget::HandleSelectionChanged(
 	const TArray<AUnitBase*>& Units,
 	ABuildingBase* Building)
 {
-	BindSelectionEvents(Units, Building);
+	(void)Units;
+	(void)Building;
+	// A preceding observer can commit another selection before this callback runs.
+	if (CachedController)
+	{
+		BindSelectionEvents(CachedController->GetSelectedUnits(), CachedController->GetSelectedBuilding());
+	}
 	RefreshSelection();
 	RefreshDiagnostic();
 }

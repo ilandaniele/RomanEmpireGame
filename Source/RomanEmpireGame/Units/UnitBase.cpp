@@ -526,8 +526,10 @@ void AUnitBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 void AUnitBase::SetOwnerFaction(EFactionID NewOwner)
 {
+	if (OwnerFaction == NewOwner || IsActorBeingDestroyed() || GetLifeState() == EUnitLifeState::Ended) return;
 	OwnerFaction = NewOwner;
 	ApplyFactionColor();
+	OnOwnerFactionChanged.Broadcast(this);
 }
 
 void AUnitBase::ApplyFactionColor()
