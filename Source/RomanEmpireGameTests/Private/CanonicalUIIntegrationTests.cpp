@@ -681,6 +681,8 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("Possession changes the authoritative controller mode"), ReadBool(Test, Controller, TEXT("IsInFirstPersonMode")));
 			Test.TestTrue(TEXT("Possession events display crosshair and soldier vitals"), Crosshair->IsVisible() && PossessionText->IsVisible());
 			Test.TestTrue(TEXT("Possession UI reads the same damaged health"), PossessionText->GetText().ToString().Contains(HealthLabel));
+			Test.TestFalse(TEXT("Possession mode header remains single-line after its text grows"), PhaseText->GetAutoWrapText());
+			Test.TestTrue(TEXT("Header follows the actual possessed mode"), PhaseText->GetText().ToString().StartsWith(TEXT("Possessed   |   Turn ")));
 			CheckGameStateProjection();
 
 			FCall KillCall(Test, Soldier, TEXT("SetCurrentHealth"), 1);
@@ -689,6 +691,8 @@ namespace RomanEmpireUITests
 			Test.TestFalse(TEXT("Canonical health transition kills the possessed soldier"), ReadBool(Test, Soldier, TEXT("IsAlive")));
 			Test.TestTrue(TEXT("Possessed soldier death restores the original camera pawn"), Controller->GetPawn() == CameraPawn);
 			Test.TestFalse(TEXT("Death exits the controller's possession mode"), ReadBool(Test, Controller, TEXT("IsInFirstPersonMode")));
+			Test.TestFalse(TEXT("Restored tactical header remains single-line"), PhaseText->GetAutoWrapText());
+			Test.TestTrue(TEXT("Header follows the restored tactical mode"), PhaseText->GetText().ToString().StartsWith(TEXT("Tactical   |   Turn ")));
 			FCall SelectedCall(Test, Controller, TEXT("GetSelectedUnits"), 1);
 			SelectedCall.Execute();
 			Test.TestEqual(TEXT("Death removes the soldier from canonical selection"), SelectedCall.ReadObjectArrayCount(), 0);
@@ -717,6 +721,8 @@ namespace RomanEmpireUITests
 			if (!Test.TestTrue(TEXT("All production UI controls materialize as the expected UMG types"),
 				ResourceText && PhaseText && ProductionText && OutcomeText && TrainButton && DiagnosticText && SelectionText && ObjectiveText &&
 				Root->GetWidgetFromName(TEXT("BuildingMenu")) && Root->GetWidgetFromName(TEXT("OutcomePanel")))) return false;
+			Test.TestFalse(TEXT("Fixed-height resource header must not wrap"), ResourceText->GetAutoWrapText());
+			Test.TestFalse(TEXT("Fixed-height mode/turn header must not wrap"), PhaseText->GetAutoWrapText());
 
 			AGameModeBase* GameMode = World->GetAuthGameMode();
 			GameState = World->GetGameState<ARomanEmpireGameState>();

@@ -41,6 +41,20 @@ Destroyed actors deliberately reject reflected function calls in Unreal. The fix
 
 `RomanEmpireGame.Units.OrderState` uses real actors in an owned transient world/context for weak-target destruction/GC, alongside atomic order/pursuit/hold transitions. `CombatState` checks the sole recovery clock and orthogonal blocking. `OrdersCombatPIE` verifies actual coordinator timing, target retirement, persistent Hold, derived activity, and reentrant damage/vitals/camera callbacks. The complete suite currently has 21 tests. The old double-clock/double-rate/camera-order regressions were detected by mutation control before restoration; evidence and remaining scope: `M3_UNIT_STATE_REVIEW.md`.
 
+## Packaged selection and possession presentation
+
+```powershell
+.\BuildProject.ps1 -Action Package -Configuration Development -ArchiveDirectory Artifacts/Packages/M3_PresentationFinal -DisableFab
+.\Tools\tests\test_unit_presentation_log.ps1
+.\Tools\verify_unit_presentation.ps1 -OutputDirectory Artifacts/UnitPresentation-NewRun
+```
+
+The helper launches the **actual Development player**, records its hash, holds the initial formation, selects/focuses one player unit, enters possession, restores the original camera and clears selection. It records `Player.log`, `Selected.png`, `Possessed.png` and `Returned.png`. Each run requires a new output directory without spaces, commas or quotes. `-ArchiveDirectory` can select another newly built Development archive; older binaries without the two diagnostic commands must fail.
+
+The helper compares observed actor/controller identities, phase ordering, restored camera and cleared selection/possession flags; a successful console dispatch is insufficient. It also checks exit status, captures and failure signatures. Its bounded timeout reports the existing PID without killing or restarting it. Manually inspect all three PNGs before accepting the rendered result. This is **not** OS input injection, a full visual-regression suite, a performance benchmark or Shipping-player execution.
+
+The two local `roman.Debug.*` commands use normal gameplay facades and are compile-time excluded from Shipping. No remote service or editor/test dependency is introduced. The parser self-test extracts only the validation function through PowerShell's syntax tree, without running the player-launch body; its synthetic fixtures are parser evidence only. Exact real-run evidence and limits: `M3_PRESENTATION_REVIEW.md`.
+
 ## Optional Fab module failure on the audited host
 
 The engine's external Fab 0.0.17 update is rejected by Windows Code Integrity on this workstation. The offline prototype has no Fab dependency. Use `BuildProject.ps1 -Action Test -DisableFab` or `-Action Package -DisableFab` (also supported for `Cook`) to omit only the optional Fab Editor browser for that automation process. The switch is rejected for other actions to avoid silently ineffective options. It does not change `.uproject`, engine files, Windows policy or the packaged player's launch arguments. Do not disable application control or modify the rejected DLL. For a manual Editor-hosted diagnostic, append `Fab` to its `-DisablePlugins` list until a trusted installation is available. Exact failure and passing-run evidence lives in `M2_EXIT_REVIEW.md`.

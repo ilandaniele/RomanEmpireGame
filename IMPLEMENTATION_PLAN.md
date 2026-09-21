@@ -487,8 +487,15 @@ Implementation details:
 - `FUnitCombatState` owns recovery and blocking, with readiness/attack activity derived from remaining time. Both AI and direct attacks derive recovery as `1 / AttackSpeed`; the actor advances it once before action evaluation. Damage observers see recovery already committed. Movement/order cancellation does not refund recovery. The unused second AI executor has been removed; direct movement and the remaining per-unit scan await M3.2–M3.3.
 - `FUnitSelectionPresentation` owns selected presentation and one reflected material; the actor retains its constructor components. `GetActivity()` derives Unavailable/Idle/Commanded/Attacking/Dead/Ended, without another mutable state. Attacking currently includes recovery, not a validated hit window.
 - Camera activation/deactivation is the last possession effect, because it emits synchronous component callbacks. A nested exit/death cannot be followed by stale outer movement effects.
-- Routed behavior is not implemented and zero morale does not silently trigger it. Its cancellation, vulnerability, controller notifications, trigger and recovery policy remain explicit work before M3.1 closure. Rendered selected-ring/first-person evidence is also still required.
-- Full-suite and mutation-control evidence, exact logs and current limits: `M3_UNIT_STATE_REVIEW.md`. No new package/player gate is claimed for this source revision.
+- Routed behavior is not implemented and zero morale does not silently trigger it. Its cancellation, vulnerability, controller notifications, trigger and recovery policy remain explicit work before M3.1 closure. The rendered selected-ring/first-person/return gate subsequently passed in the presentation package below.
+- Full-suite and mutation-control evidence, exact logs and current limits: `M3_UNIT_STATE_REVIEW.md`. Its build evidence remains specific to the state-integration revision; the later package has separate evidence.
+
+M3.1 presentation package (verified 2026-09-21; not M3.1 closure):
+
+- Actual archived Development player selected an eligible unit, entered first person and restored the original tactical camera. The strict helper checks the same actor across selection, `PossessedUnit` and actual Pawn, exactly one possessed flag, and empty selection/possession with all flags false on return. Three 1920×1080 captures were inspected, including the selected ring and camera/HUD transitions.
+- Fix mode/turn auto-wrapping below the fixed-height native HUD header, with live-PIE regression assertions. The `roman.Debug.*` helpers invoke existing commands without changing input mappings and are compile-time absent from Shipping. This is not a physical-input or complete visual-regression test.
+- Verification: 21/21 native tests without warnings, strict IWYU, Shipping, 559 cooked packages (7 platform-skipped; 566 total processed) without cook errors/warnings, actual-player exit 0, and parser fixtures with 17 expected rejection cases. Exact hash, logs, captures, two player-only engine/host warnings and limits: `M3_PRESENTATION_REVIEW.md`.
+- Skills: `unreal-packaging`, `ue-ui-umg-slate`, `ue-testing-debugging`, `unreal-cpp-gameplay`, `ue-module-build-system`, `ue-project-context`. No engine/plugin/driver/security changes or new art assets. M3.1 remains open for routed policy/implementation; independent M3.2a ownership work is next.
 
 #### M3.2 Selection and ownership
 
@@ -496,6 +503,14 @@ Implementation details:
 - Define additive selection, deselection, invalid target feedback, and selection cleanup on death.
 - Broadcast selection state to UMG.
 - Add unit/squad registries so gameplay and HUD do not scan every actor every frame.
+
+Next bounded package, M3.2a (read-only audit 2026-09-21; not implemented):
+
+- Share a controller-side eligibility query for a same-world, command-ready unit owned by the current canonical player faction. Reuse it for selection, player order dispatch, possession entry and continued control. Do not restrict actor command APIs to the player faction: campaign AI also uses them.
+- Notify committed unit ownership changes and observe public player-faction changes. Re-query current state, prune selection and exit invalid possession, including block/camera/input/UMG cleanup. Cleanup must remain legal outside Tactical and after permissions are lost.
+- Revalidate possession after synchronous camera callbacks; selection UMG observers must bind to the controller's current selection, not an event payload overtaken by a nested change.
+- Keep replace-selection semantics for this repair. Additive input, invalid-target feedback and building-selection ownership remain explicit M3.2 scope, not implied by unit tests. Cover mixed-faction/dead/deferred/foreign-world selections, ownership loss during callbacks, repeated cleanup, and preserved enemy AI commands.
+- Follow with M3.2b live unit/squad registries. Keep actor ownership canonical, with only derived faction indexes and weak live-actor references. The content-definition registry is not a live-unit registry. Squad identity/membership needs its own contract; the current spawn formation does not provide one.
 
 #### M3.3 Commands, navigation, and formations
 

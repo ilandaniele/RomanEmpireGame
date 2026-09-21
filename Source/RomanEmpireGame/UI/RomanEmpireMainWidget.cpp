@@ -118,6 +118,10 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	UOverlay* TopOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("TopOverlay"));
 	ResourceText = CreateTextBlock(WidgetTree, TEXT("ResourceText"), 17, FLinearColor(0.95f, 0.86f, 0.55f));
 	PhaseText = CreateTextBlock(WidgetTree, TEXT("PhaseText"), 17, FLinearColor(0.75f, 0.85f, 1.0f));
+	// These labels share a fixed-height header. Auto-wrap can retain the previous
+	// mode's narrower layout width and spill a longer mode/turn onto a second line.
+	ResourceText->SetAutoWrapText(false);
+	PhaseText->SetAutoWrapText(false);
 	UOverlaySlot* ResourceSlot = TopOverlay->AddChildToOverlay(ResourceText);
 	ResourceSlot->SetHorizontalAlignment(HAlign_Left);
 	ResourceSlot->SetVerticalAlignment(VAlign_Center);
