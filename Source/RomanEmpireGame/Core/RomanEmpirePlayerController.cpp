@@ -5,6 +5,7 @@
 #include "Core/RomanEmpireGameState.h"
 #include "RomanEmpireGame.h"
 #include "Content/RomanContentRegistry.h"
+#include "Units/RomanUnitRegistry.h"
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
@@ -1096,10 +1097,34 @@ void ARomanEmpirePlayerController::HandleCameraZoomLevelChanged(
 		static_cast<int32>(OldLevel), static_cast<int32>(NewLevel));
 }
 
+void ARomanEmpirePlayerController::SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End)
+{
+	if (!CanIssueTacticalCommands() || Start.ContainsNaN() || End.ContainsNaN()) return;
+	const URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
+	if (!Registry) return;
+	const TArray<AUnitBase*> Candidates = Registry->GetUnitsForFaction(PublicGameState->GetPlayerFaction());
+	const FVector2D MinBox(FMath::Min(Start.X, End.X), FMath::Min(Start.Y, End.Y));
+	const FVector2D MaxBox(FMath::Max(Start.X, End.X), FMath::Max(Start.Y, End.Y));
+	TArray<AUnitBase*> UnitsInBox;
+	for (AUnitBase* Unit : Candidates)
+	{
+		if (!IsPlayerUnitEligible(Unit)) continue;
+		FVector2D ScreenPos = FVector2D::ZeroVector;
+		if (ProjectWorldLocationToScreen(Unit->GetActorLocation(), ScreenPos) &&
+			ScreenPos.X >= MinBox.X && ScreenPos.X <= MaxBox.X &&
+			ScreenPos.Y >= MinBox.Y && ScreenPos.Y <= MaxBox.Y)
+		{
+			UnitsInBox.Add(Unit);
+		}
+	}
+	SelectUnits(UnitsInBox);
+	UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), SelectedUnits.Num());
+}
+
 void ARomanEmpirePlayerController::PerformBoxSelect()
 {
-	FVector2D CurrentMousePos;
-	GetMousePosition(CurrentMousePos.X, CurrentMousePos.Y);
+	FVector2D CurrentMousePos = FVector2D::ZeroVector;
+	if (!GetMousePosition(CurrentMousePos.X, CurrentMousePos.Y)) return;
 	
 	float Distance = FVector2D::Distance(BoxSelectStart, CurrentMousePos);
 	
@@ -1125,32 +1150,7 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 	}
 	else
 	{
-		// Box selection — find all units within screen rect
-		TArray<AUnitBase*> UnitsInBox;
-		TArray<AActor*> AllUnits;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllUnits);
-		
-		FVector2D MinBox(FMath::Min(BoxSelectStart.X, CurrentMousePos.X), FMath::Min(BoxSelectStart.Y, CurrentMousePos.Y));
-		FVector2D MaxBox(FMath::Max(BoxSelectStart.X, CurrentMousePos.X), FMath::Max(BoxSelectStart.Y, CurrentMousePos.Y));
-		
-		for (AActor* Actor : AllUnits)
-		{
-			AUnitBase* Unit = Cast<AUnitBase>(Actor);
-			if (!Unit) continue;
-			
-			FVector2D ScreenPos;
-			if (ProjectWorldLocationToScreen(Unit->GetActorLocation(), ScreenPos))
-			{
-				if (ScreenPos.X >= MinBox.X && ScreenPos.X <= MaxBox.X &&
-					ScreenPos.Y >= MinBox.Y && ScreenPos.Y <= MaxBox.Y)
-				{
-					UnitsInBox.Add(Unit);
-				}
-			}
-		}
-
-		SelectUnits(UnitsInBox);
-		UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), SelectedUnits.Num());
+		SelectUnitsInScreenRect(BoxSelectStart, CurrentMousePos);
 	}
 }
 

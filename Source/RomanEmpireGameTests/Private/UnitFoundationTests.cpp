@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 #include "UnitLifecycleProbe.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
@@ -11,22 +12,27 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Engine/EngineBaseTypes.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/LocalPlayer.h"
 #include "Faction/FactionData.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "Slate/SceneViewport.h"
 #include "Units/UnitActivity.h"
 #include "Units/UnitCombatState.h"
 #include "Units/UnitOrderState.h"
 #include "Units/UnitSelectionPresentation.h"
 #include "Units/UnitVitalState.h"
 #include "Units/UnitTypes.h"
+#include "Units/RomanUnitRegistry.h"
 #include "UObject/Class.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/ScriptDelegates.h"
@@ -1067,6 +1073,239 @@ namespace RomanEmpireUnitTests
 		FAutomationTestBase& Test;
 		double StartedAt;
 	};
+	bool SnapshotContains(const TArray<AUnitBase*>& Snapshot, const AActor* Actor)
+	{
+		return Snapshot.ContainsByPredicate([Actor](const AUnitBase* Unit)
+		{
+			return static_cast<const void*>(Unit) == static_cast<const void*>(Actor);
+		});
+	}
+	// NullRHI automation may have no sized viewport. Supply dimensions only;
+	// projection still uses the real local player, camera and engine matrix code.
+	class FRegistryProjectionViewport final : public FSceneViewport
+	{
+	public:
+		FRegistryProjectionViewport() : FSceneViewport(TSharedPtr<SViewport>()) {}
+		virtual FIntPoint GetSizeXY() const override { return FIntPoint(1920, 1080); }
+	};
+	class FExerciseUnitRegistry : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseUnitRegistry(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Registry PIE startup timed out")); return true; }
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			UClass* UnitClass = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestTrue(TEXT("Real PIE live registry and unit class exist"), Registry && UnitClass)) return true;
+			Test.TestNull(TEXT("Editor world has no live gameplay registry"), GEditor->GetEditorWorldContext().World()->GetSubsystem<URomanUnitRegistrySubsystem>());
+			const int32 Baseline = Registry->GetRegisteredUnitCount();
+			Test.TestTrue(TEXT("Bootstrap units register without a world scan"), Baseline > 0);
+			Test.TestFalse(TEXT("Registry rejects null membership"), Registry->ContainsUnit(nullptr));
+			Test.TestFalse(TEXT("Registry rejects non-unit actors"), Registry->ContainsUnit(World->GetFirstPlayerController()));
+			const FVector Origin(250000.0, 200000.0, 300.0);
+			auto Spawn = [&](EFactionID Faction, double Offset, bool bFinish = true, UWorld* SpawnWorld = nullptr)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Unit = (SpawnWorld ? SpawnWorld : World)->SpawnActor<ACharacter>(UnitClass, FTransform(Origin + FVector(Offset, 0, 0)), Params);
+				if (!Test.TestNotNull(TEXT("Registry transient fixture spawned"), Unit)) return Unit;
+				Test.TestTrue(TEXT("Registry fixture initialization succeeded"), Initialize(Test, Unit, TEXT("Legionary"), Faction));
+				if (bFinish) Unit->FinishSpawning(Unit->GetActorTransform());
+				Unit->SetActorTickEnabled(false);
+				for (UActorComponent* Part : Unit->GetComponents()) if (Part) Part->SetComponentTickEnabled(false);
+				return Unit;
+			};
+			ACharacter* Deferred = Spawn(EFactionID::Rome, 3000, false);
+			if (!Deferred) return true;
+			Test.TestFalse(TEXT("Initialized deferred actor not registered before BeginPlay"), Registry->ContainsUnit(Deferred));
+			SetOwner(Test, Deferred, EFactionID::Carthage);
+			Test.TestEqual(TEXT("Deferred ownership changes do not register early"), Registry->GetRegisteredUnitCount(), Baseline);
+			Deferred->FinishSpawning(Deferred->GetActorTransform());
+			Test.TestTrue(TEXT("BeginPlay registers initialized actor"), Registry->ContainsUnit(Deferred));
+			Test.TestTrue(TEXT("Registration uses latest deferred faction"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::Carthage), Deferred));
+			Test.TestEqual(TEXT("BeginPlay registers exactly once"), Registry->GetRegisteredUnitCount(), Baseline + 1);
+			SetOwner(Test, Deferred, EFactionID::Carthage);
+			Test.TestEqual(TEXT("Unchanged faction cannot duplicate a registration"), Registry->GetRegisteredUnitCount(), Baseline + 1);
+			Deferred->RouteEndPlay(EEndPlayReason::RemovedFromWorld);
+			Test.TestEqual(TEXT("EndPlay removes a still-valid actor"), Registry->GetRegisteredUnitCount(), Baseline);
+			Test.TestFalse(TEXT("Ended actor absent from registry"), Registry->ContainsUnit(Deferred));
+			SetOwner(Test, Deferred, EFactionID::Rome);
+			Deferred->Destroy();
+			Test.TestEqual(TEXT("Repeated cleanup is idempotent"), Registry->GetRegisteredUnitCount(), Baseline);
+			FActorSpawnParameters InvalidParams;
+			InvalidParams.bDeferConstruction = true;
+			InvalidParams.ObjectFlags |= RF_Transient;
+			InvalidParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			ACharacter* Invalid = World->SpawnActor<ACharacter>(UnitClass, FTransform(Origin + FVector(6000, 0, 0)), InvalidParams);
+			if (!Test.TestNotNull(TEXT("Invalid definition fixture exists"), Invalid)) return true;
+			Test.TestFalse(TEXT("Unknown definition rejected"), Initialize(Test, Invalid, TEXT("Missing_RegistryFixture"), EFactionID::Rome));
+			Test.AddExpectedError(TEXT("has no valid content definition"), EAutomationExpectedErrorFlags::Contains, 1);
+			Invalid->FinishSpawning(Invalid->GetActorTransform());
+			Test.TestEqual(TEXT("Failed initialization never enters registry"), Registry->GetRegisteredUnitCount(), Baseline);
+			Test.TestFalse(TEXT("Failed actor not a live member"), Registry->ContainsUnit(Invalid));
+			Invalid->Destroy();
+
+			ACharacter* Source = Spawn(EFactionID::Rome, 0);
+			ACharacter* Near = Spawn(EFactionID::Carthage, 500);
+			ACharacter* Far = Spawn(EFactionID::Carthage, 900);
+			if (!Source || !Near || !Far) return true;
+			const auto SameActor = [](const AUnitBase* Unit, const AActor* Actor) { return static_cast<const void*>(Unit) == static_cast<const void*>(Actor); };
+			Test.TestTrue(TEXT("Nearest enemy uses faction index"), SameActor(Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000), Near));
+			Test.TestNull(TEXT("Radius boundary stays strict"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, 500));
+			Test.TestNull(TEXT("Invalid radius rejected"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, std::numeric_limits<double>::infinity()));
+			Test.TestNull(TEXT("Negative radius rejected"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, -1));
+			Test.TestNull(TEXT("Non-finite origin rejected"), Registry->FindNearestEnemy(FVector(std::numeric_limits<double>::quiet_NaN(), 0, 0), EFactionID::Rome, 1000));
+			Source->Tick(0.01f);
+			Test.TestTrue(TEXT("Actual idle Tick acquires the registry enemy"), ObjectQuery(Test, Source, TEXT("GetAttackTarget")) == Near);
+			Command(Test, Source, TEXT("CommandHold"));
+			Source->Tick(0.01f);
+			Test.TestNull(TEXT("Hold still prevents auto-acquisition"), ObjectQuery(Test, Source, TEXT("GetAttackTarget")));
+			const TArray<AUnitBase*> OldSnapshot = Registry->GetUnitsForFaction(EFactionID::Carthage);
+			SetOwner(Test, Near, EFactionID::Rome);
+			Test.TestTrue(TEXT("Snapshot is independent of later index changes"), SnapshotContains(OldSnapshot, Near));
+			Test.TestFalse(TEXT("Changed owner removed from old bucket"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::Carthage), Near));
+			Test.TestTrue(TEXT("Changed owner appears in new bucket"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::Rome), Near));
+			APlayerController* Controller = World->GetFirstPlayerController();
+			ULocalPlayer* LocalPlayer = Controller ? Controller->GetLocalPlayer() : nullptr;
+			UGameViewportClient* ViewportClient = LocalPlayer ? LocalPlayer->ViewportClient : nullptr;
+			APawn* CameraPawn = Controller ? Controller->GetPawn() : nullptr;
+			if (!Test.TestTrue(TEXT("Rectangle fixture has actual local player and camera"), ViewportClient && CameraPawn && Controller->PlayerCameraManager)) return true;
+			FSceneViewport* OriginalViewport = ViewportClient->Viewport;
+			const FIntPoint OriginalSize = OriginalViewport ? OriginalViewport->GetSizeXY() : FIntPoint::ZeroValue;
+			Test.AddInfo(FString::Printf(TEXT("Original rectangle viewport: %d x %d"), OriginalSize.X, OriginalSize.Y));
+			TUniquePtr<FRegistryProjectionViewport> ProjectionViewport;
+			if (OriginalSize.X == 0 || OriginalSize.Y == 0)
+			{
+				ProjectionViewport = MakeUnique<FRegistryProjectionViewport>();
+				ViewportClient->Viewport = ProjectionViewport.Get();
+			}
+			const FTransform OriginalCameraTransform = CameraPawn->GetActorTransform();
+			USpringArmComponent* CameraArm = CameraPawn->FindComponentByClass<USpringArmComponent>();
+			ON_SCOPE_EXIT
+			{
+				ViewportClient->Viewport = OriginalViewport;
+				CameraPawn->SetActorTransform(OriginalCameraTransform);
+				if (CameraArm) CameraArm->TickComponent(0.0f, LEVELTICK_All, nullptr);
+				Controller->PlayerCameraManager->UpdateCamera(0.01f);
+			};
+			CameraPawn->SetActorLocation(FVector(Origin.X, Origin.Y, CameraPawn->GetActorLocation().Z));
+			if (CameraArm) CameraArm->TickComponent(0.0f, LEVELTICK_All, nullptr);
+			Controller->PlayerCameraManager->UpdateCamera(0.01f);
+			FVector2D SourceScreen = FVector2D::ZeroVector, NearScreen = FVector2D::ZeroVector, FarScreen = FVector2D::ZeroVector;
+			if (!Test.TestTrue(TEXT("Real controller projects rectangle fixture"), Controller &&
+				Controller->ProjectWorldLocationToScreen(Source->GetActorLocation(), SourceScreen) &&
+				Controller->ProjectWorldLocationToScreen(Near->GetActorLocation(), NearScreen) &&
+				Controller->ProjectWorldLocationToScreen(Far->GetActorLocation(), FarScreen))) return true;
+			const FVector2D RectStart(FMath::Min3(SourceScreen.X, NearScreen.X, FarScreen.X) - 2,
+				FMath::Min3(SourceScreen.Y, NearScreen.Y, FarScreen.Y) - 2);
+			const FVector2D RectEnd(FMath::Max3(SourceScreen.X, NearScreen.X, FarScreen.X) + 2,
+				FMath::Max3(SourceScreen.Y, NearScreen.Y, FarScreen.Y) + 2);
+			auto SelectRect = [&](const FVector2D& Start, const FVector2D& End)
+			{
+				FCall Call(Test, Controller, TEXT("SelectUnitsInScreenRect"), 2);
+				for (const auto& Pair : { TPair<FName, FVector2D>(TEXT("Start"), Start), TPair<FName, FVector2D>(TEXT("End"), End) })
+				{
+					FStructProperty* Prop = Call.Property<FStructProperty>(Pair.Key);
+					if (!Test.TestTrue(TEXT("Rectangle command takes FVector2D"), Prop && Prop->Struct == TBaseStructure<FVector2D>::Get())) return;
+					Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Pair.Value);
+				}
+				Call.Execute();
+			};
+			SelectRect(RectEnd, RectStart); // Reverse drag is normalized by production code.
+			const TArray<AActor*> BoxSelection = SelectedActors(Test, Controller);
+			Test.TestTrue(TEXT("Real screen rectangle selects indexed owned actors"), BoxSelection.Contains(Source) && BoxSelection.Contains(Near));
+			Test.TestFalse(TEXT("Real screen rectangle excludes enemy inside bounds"), BoxSelection.Contains(Far));
+			SelectRect(FVector2D(std::numeric_limits<double>::quiet_NaN(), 0), RectEnd);
+			Test.TestTrue(TEXT("Invalid rectangle leaves selection unchanged"), SelectedActors(Test, Controller) == BoxSelection);
+			SetOwner(Test, Near, EFactionID::Carthage);
+			SelectRect(RectStart, RectEnd);
+			Test.TestFalse(TEXT("Rectangle query observes ownership reindex"), SelectedActors(Test, Controller).Contains(Near));
+			SetOwner(Test, Near, EFactionID::Rome);
+			Command(Test, Controller, TEXT("ClearSelection"));
+			Test.TestTrue(TEXT("Nearest search follows owner change"), SameActor(Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000), Far));
+			SetOwner(Test, Far, EFactionID::None);
+			Test.TestTrue(TEXT("Unowned living actor remains indexed"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::None), Far));
+			Test.TestNull(TEXT("Unowned actor is not auto-acquired"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000));
+			SetOwner(Test, Near, EFactionID::Carthage);
+			SetOwner(Test, Far, EFactionID::Carthage);
+			Far->SetActorLocation(Origin + FVector(-500, 0, 0));
+			ACharacter* TieWinner = Near->GetFName().LexicalLess(Far->GetFName()) ? Near : Far;
+			Test.TestTrue(TEXT("Equal distance uses explicit lexical tie-break"), SameActor(Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000), TieWinner));
+			Far->SetActorLocation(Origin + FVector(900, 0, 0));
+			Health(Test, Near, 0);
+			Test.TestEqual(TEXT("Death immediately removes indexed record"), Registry->GetRegisteredUnitCount(), Baseline + 2);
+			Test.TestTrue(TEXT("Nearest search excludes corpses"), SameActor(Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000), Far));
+			TWeakObjectPtr<AActor> WeakFar(Far);
+			Far->Destroy();
+			Test.TestEqual(TEXT("Destroy immediately removes indexed record"), Registry->GetRegisteredUnitCount(), Baseline + 1);
+			CollectGarbage(RF_NoFlags);
+			// Threadsafe serial/index check deliberately ignores garbage flags: pending
+			// destruction alone must not masquerade as actual collection.
+			Test.TestFalse(TEXT("Registry does not retain destroyed actors across GC"), WeakFar.IsValid(true, true));
+			Test.TestNull(TEXT("No stale target after destruction and GC"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000));
+
+			for (EUnitControllerProbeAction Action : { EUnitControllerProbeAction::ChangeOwner, EUnitControllerProbeAction::Kill, EUnitControllerProbeAction::Destroy })
+			{
+				ACharacter* Nested = Spawn(EFactionID::Rome, 1600);
+				if (!Nested) return true;
+				TStrongObjectPtr<UUnitLifecycleProbe> Probe(NewObject<UUnitLifecycleProbe>());
+				Probe->Test = &Test; Probe->ObservedUnit = Nested; Probe->RegistryAction = Action;
+				Probe->RegistryExpectedLiveCount = Registry->GetRegisteredUnitCount();
+				if (!BindProbe(Test, Nested, TEXT("OnOwnerFactionChanged"), Probe.Get(), TEXT("HandleRegistryOwner")) ||
+					!BindProbe(Test, Nested, TEXT("OnUnitDied"), Probe.Get(), TEXT("HandleRegistryDeath"))) return true;
+				SetOwner(Test, Nested, EFactionID::Carthage);
+				Test.TestEqual(TEXT("Real owner callbacks executed"), Probe->RegistryOwnerEvents, Action == EUnitControllerProbeAction::ChangeOwner ? 2 : 1);
+				Test.TestEqual(TEXT("Only combat death broadcasts death"), Probe->RegistryDeathEvents, Action == EUnitControllerProbeAction::Kill ? 1 : 0);
+				if (Action == EUnitControllerProbeAction::ChangeOwner)
+				{
+					Test.TestTrue(TEXT("Nested owner wins without stale outer reindex"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::Rome), Nested));
+					Test.TestFalse(TEXT("Superseded faction has no nested actor"), SnapshotContains(Registry->GetUnitsForFaction(EFactionID::Carthage), Nested));
+				}
+				else Test.TestEqual(TEXT("Nested termination cannot re-register actor"), Registry->GetRegisteredUnitCount(), Probe->RegistryExpectedLiveCount - 1);
+				if (IsValid(Nested)) Nested->Destroy();
+			}
+
+			UWorld* ForeignWorld = UWorld::CreateWorld(EWorldType::Game, false);
+			if (!Test.TestNotNull(TEXT("Second world exists"), ForeignWorld)) return true;
+			GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(ForeignWorld);
+			URomanUnitRegistrySubsystem* ForeignRegistry = ForeignWorld->GetSubsystem<URomanUnitRegistrySubsystem>();
+			ON_SCOPE_EXIT
+			{
+				ForeignWorld->DestroyWorld(false);
+				if (ForeignRegistry)
+				{
+					Test.TestEqual(TEXT("World teardown clears registry records"), ForeignRegistry->GetRegisteredUnitCount(), 0);
+					Test.TestTrue(TEXT("World teardown clears faction index"), ForeignRegistry->GetUnitsForFaction(EFactionID::Carthage).IsEmpty());
+				}
+				GEngine->DestroyWorldContext(ForeignWorld);
+				CollectGarbage(RF_NoFlags);
+			};
+			ForeignWorld->SetGameInstance(World->GetGameInstance());
+			ForeignWorld->InitializeActorsForPlay(FURL());
+			if (!Test.TestNotNull(TEXT("Second world has its own registry"), ForeignRegistry)) return true;
+			Test.TestTrue(TEXT("Registry instance is world scoped"), ForeignRegistry != Registry);
+			Test.TestEqual(TEXT("Second registry starts empty"), ForeignRegistry->GetRegisteredUnitCount(), 0);
+			ACharacter* Foreign = Spawn(EFactionID::Carthage, 1, true, ForeignWorld);
+			if (!Foreign) return true;
+			Foreign->DispatchBeginPlay();
+			Test.TestTrue(TEXT("Foreign actor registers in its world"), ForeignRegistry->ContainsUnit(Foreign));
+			Test.TestFalse(TEXT("Foreign actor absent from main registry"), Registry->ContainsUnit(Foreign));
+			Test.TestFalse(TEXT("Main actor absent from foreign registry"), ForeignRegistry->ContainsUnit(Source));
+			Test.TestNull(TEXT("Main nearest search excludes closer foreign actor"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, 1000));
+			Source->Destroy();
+			Test.TestEqual(TEXT("Main fixture cleanup restores baseline"), Registry->GetRegisteredUnitCount(), Baseline);
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+	};
 	class FWaitForUnitPIEEnd : public IAutomationLatentCommand
 	{
 	public:
@@ -1129,6 +1368,38 @@ void UUnitLifecycleProbe::HandleControllerSelection(const TArray<AUnitBase*>& Un
 {
 	(void)Units; (void)Building;
 	RomanEmpireUnitTests::ApplyControllerProbe(this);
+}
+
+void UUnitLifecycleProbe::HandleRegistryOwner(AUnitBase* Unit)
+{
+	if (!Test || !ObservedUnit.IsValid()) return;
+	AActor* Actor = ObservedUnit.Get();
+	Test->TestTrue(TEXT("Registry owner payload identifies observed unit"), static_cast<const void*>(Unit) == static_cast<const void*>(Actor));
+	URomanUnitRegistrySubsystem* Registry = Actor->GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
+	if (!Test->TestNotNull(TEXT("Registry exists during owner notification"), Registry)) return;
+	++RegistryOwnerEvents;
+	const EFactionID Owner = RomanEmpireUnitTests::FInitializationSnapshot(*Test, Actor).Owner;
+	Test->TestEqual(TEXT("Owner observer sees committed record count"), Registry->GetRegisteredUnitCount(), RegistryExpectedLiveCount);
+	for (EFactionID Faction : { EFactionID::None, EFactionID::Rome, EFactionID::Carthage })
+		Test->TestEqual(TEXT("Owner observer sees exactly the canonical faction bucket"),
+			RomanEmpireUnitTests::SnapshotContains(Registry->GetUnitsForFaction(Faction), Actor), Faction == Owner);
+	if (bRegistryReentered) return;
+	bRegistryReentered = true;
+	if (RegistryAction == EUnitControllerProbeAction::ChangeOwner) RomanEmpireUnitTests::SetOwner(*Test, Actor, EFactionID::Rome);
+	else if (RegistryAction == EUnitControllerProbeAction::Kill) RomanEmpireUnitTests::Health(*Test, Actor, 0);
+	else if (RegistryAction == EUnitControllerProbeAction::Destroy) Actor->Destroy();
+}
+
+void UUnitLifecycleProbe::HandleRegistryDeath(AUnitBase* Unit)
+{
+	(void)Unit;
+	if (!Test || !ObservedUnit.IsValid()) return;
+	++RegistryDeathEvents;
+	AActor* Actor = ObservedUnit.Get();
+	URomanUnitRegistrySubsystem* Registry = Actor->GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
+	if (!Test->TestNotNull(TEXT("Registry exists during death notification"), Registry)) return;
+	Test->TestEqual(TEXT("Death observer sees record already removed"), Registry->GetRegisteredUnitCount(), RegistryExpectedLiveCount - 1);
+	Test->TestFalse(TEXT("Death observer cannot find corpse in registry"), Registry->ContainsUnit(Actor));
 }
 
 void UUnitLifecycleProbe::HandleVitals(AUnitBase* Unit)
@@ -1233,6 +1504,21 @@ bool FUnitOwnershipTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseOwnership(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitRegistryTest, "RomanEmpireGame.Units.LiveRegistryPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitRegistryTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitRegistry(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

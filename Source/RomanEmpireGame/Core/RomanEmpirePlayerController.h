@@ -85,6 +85,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Selection")
 	void SelectUnits(const TArray<AUnitBase*>& Units);
 
+	/** Screen-space rectangle command shared by drag selection and deterministic checks. */
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End);
+
 	/** Ownership/lifecycle eligibility, independent of the current input mode. */
 	UFUNCTION(BlueprintPure, Category = "Selection")
 	bool IsPlayerUnitEligible(const AUnitBase* Unit) const;

@@ -55,4 +55,13 @@ public:
 	void HandleControllerCameraDeactivated(UActorComponent* Component);
 	UFUNCTION()
 	void HandleControllerSelection(const TArray<AUnitBase*>& Units, ABuildingBase* Building);
+	int32 RegistryExpectedLiveCount = 0;
+	int32 RegistryOwnerEvents = 0;
+	int32 RegistryDeathEvents = 0;
+	bool bRegistryReentered = false;
+	EUnitControllerProbeAction RegistryAction = EUnitControllerProbeAction::ChangeOwner;
+	UFUNCTION()
+	void HandleRegistryOwner(AUnitBase* Unit);
+	UFUNCTION()
+	void HandleRegistryDeath(AUnitBase* Unit);
 };

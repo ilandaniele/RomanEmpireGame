@@ -66,6 +66,10 @@ For the M3.2a ownership build, pass its archive explicitly. `-LoseOwnership` tra
 
 The exact formerly selected actor must also be observed as Carthage after exit. This changes only the temporary player session, not saved assets. Parser coverage totals 4 positive fixtures and 20 expected rejections. Current package evidence and limitations: `M3_OWNERSHIP_REVIEW.md`.
 
+## Live-unit registry regression
+
+The M3.2b live-unit registry regression uses the same helper, unchanged, with `-ArchiveDirectory Artifacts/Packages/M3_Registry` and fresh output directories. Both explicit-return and `-LoseOwnership` scenarios passed with six inspected captures. See `M3_UNIT_REGISTRY_REVIEW.md` for the exact binary hash, native rectangle-projection coverage and remaining limits. The default archive above remains historical; explicitly select the build being tested.
+
 ## Optional Fab module failure on the audited host
 
 The engine's external Fab 0.0.17 update is rejected by Windows Code Integrity on this workstation. The offline prototype has no Fab dependency. Use `BuildProject.ps1 -Action Test -DisableFab` or `-Action Package -DisableFab` (also supported for `Cook`) to omit only the optional Fab Editor browser for that automation process. The switch is rejected for other actions to avoid silently ineffective options. It does not change `.uproject`, engine files, Windows policy or the packaged player's launch arguments. Do not disable application control or modify the rejected DLL. For a manual Editor-hosted diagnostic, append `Fab` to its `-DisablePlugins` list until a trusted installation is available. Exact failure and passing-run evidence lives in `M2_EXIT_REVIEW.md`.

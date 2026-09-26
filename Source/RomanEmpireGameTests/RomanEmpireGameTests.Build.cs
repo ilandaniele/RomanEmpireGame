@@ -18,6 +18,7 @@ public class RomanEmpireGameTests : ModuleRules
 			"UMG",
 			"Slate",
 			"SlateCore",
+			"RenderCore", // Headless projection viewport fixture; Editor-only module.
 			"InputCore",
 			"ApplicationCore",
 			"EnhancedInput",

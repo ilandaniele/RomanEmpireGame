@@ -1,6 +1,6 @@
 # UE Project Context
 
-*Last updated: 2026-09-21*
+*Last updated: 2026-09-26*
 *Audit baseline: `89d8d66e5051d303dea9c965317cdb961d8a52f6`*
 *M1 baseline: `0b74ad1566306d7487629812de68bc6abd7f0594`*
 *Status: M0–M2 complete; M1 clean-clone proven; M3.2a verified; M3.1 routed policy and remaining M3 work open*
@@ -44,7 +44,7 @@
 
 - Public: `Core`, `CoreUObject`, `Engine`, `EnhancedInput`, `UMG`.
 - Private: `InputCore`, `Slate`, `SlateCore`, `HTTP`, `Json`, `ProceduralMeshComponent`.
-- Test module private: `Core`, `CoreUObject`, `Engine`, `RomanEmpireGame`, `UMG`, `Slate`, `SlateCore`, `InputCore`, `ApplicationCore`, `EnhancedInput`, `UnrealEd`.
+- Test module private: `Core`, `CoreUObject`, `Engine`, `RomanEmpireGame`, `UMG`, `Slate`, `SlateCore`, `RenderCore`, `InputCore`, `ApplicationCore`, `EnhancedInput`, `UnrealEd`. `RenderCore` supports the transient scene-viewport projection fixture; runtime dependencies are unchanged.
 - Both modules explicitly set UE 5.8's current `IWYUSupport.Full` policy. `BuildProject.ps1 -Action IWYU` performs the strict non-unity/no-PCH Editor build once the toolchain is installed.
 - No general-purpose editor/developer module exists. Automation Driver remains disabled and has no dependency from either current module.
 
@@ -115,6 +115,7 @@
 |---|---|---|
 | `USupabaseSubsystem` | `UGameInstanceSubsystem` | Prototype HTTP persistence/leaderboard client; explicitly disabled for the offline slice |
 | `URomanContentRegistrySubsystem` | `UGameInstanceSubsystem` | Loads and cross-validates faction, unit, building, and territory Primary Data Assets; provides canonical stable-ID/factory/menu lookups |
+| `URomanUnitRegistrySubsystem` | `UWorldSubsystem` | Game/PIE-only live units with weak references and derived faction buckets; actor lifecycle/ownership remain canonical. Registers after successful BeginPlay, removes before death notifications/EndPlay, reindexes before owner notifications and clears on teardown. Supplies idle enemy acquisition and player rectangle selection without world enumeration; no squad/save/spatial contract yet. |
 
 **Current actor-managed systems:**
 
@@ -154,8 +155,12 @@
 
 **Current tests:**
 
+**Latest live-unit registry package (2026-09-26):** Development package UAT exit 0; 559 cooked packages plus 7 platform skips. Actual player SHA256 `a4bcce2cdda660d1e183a073a7d5c1fd8b9648072b5aafb5e1d25ec8e51b074d` passes explicit and ownership-loss return (both exit 0), with six inspected captures. Known player rendering warnings remain unchanged. `M3_UNIT_REGISTRY_REVIEW.md` records commands, logs and limitations; no physical-drag or performance gate is claimed. The live-unit portion supersedes the pending registry item in the historical M3.2a entry; squad identity/membership remains open.
+
+- M3.2b adds the twenty-third test, `LiveRegistryPIE`: lifecycle/reindex/reentry, true weak-reference GC, world isolation/teardown, real idle acquisition and controller rectangle projection. Headless zero-size viewports get transient dimensions, not a fabricated projection matrix; no physical drag claim. Restored targeted run passes 1/1 (`Artifacts/Automation/M3_Registry_Restored_Targeted`); final suite passes 23/23 (`20260926_203959_234`), both with zero result warnings/failures/pending. Strict IWYU (60 actions) and Shipping pass. Historical Sept22 audio notices did not recur; no host settings changed. Both deliberate lifecycle mutations failed and were restored. Package evidence: `M3_UNIT_REGISTRY_REVIEW.md`.
+
 - The broken Python/pytest Remote Control scenarios were retired; `scripts/README.md` records why and names their replacements.
-- One Editor-only native automation module with twenty-two tests: required content paths/map/framework defaults, zero-default resources, atomic typed resource transactions, exact campaign turn order, canonical gameplay-mode/zoom boundaries, territory ownership/definition invariants, diplomacy symmetry/legal transitions, Primary Data Asset discovery/canonical values, cross-content validation failures, event-driven UMG integration in live PIE, input-config negative contracts, saved input defaults/modifiers, physical-key/mode lifecycle integration in PIE, real definition-change propagation with atomic/reentrant placement, safe public GameState reads/relays/teardown, and nested objective notifications. Live Slate TRAIN asserts all six costs and no-charge promotion/funds/queue rejection. Two unit tests add pure vital-state boundaries and real-PIE component/GC/initialization/selection/camera/death/reentry/cleanup coverage. Post-Destroy assertions inspect retained reflected state rather than calling rejected script functions. OrderState and CombatState add finite/atomic transition, weak-target Destroy/GC and single-clock boundary checks; OrdersCombatPIE adds persistent Hold, pursuit/target retirement, derived activity, exact AI/direct recovery cadence and nested damage/vitals/camera callbacks. PlayerOwnershipPIE adds real controller eligibility, mixed selection, preserved enemy AI orders, unit/player-faction changes, actual camera callback interruption, nested selection observer ordering and EndPlay unbinding. Its auxiliary world is collected before subsequent Slate input dispatch. All fixtures are transient and do not save assets.
+- One Editor-only native automation module with twenty-three tests (LiveRegistryPIE described above): required content paths/map/framework defaults, zero-default resources, atomic typed resource transactions, exact campaign turn order, canonical gameplay-mode/zoom boundaries, territory ownership/definition invariants, diplomacy symmetry/legal transitions, Primary Data Asset discovery/canonical values, cross-content validation failures, event-driven UMG integration in live PIE, input-config negative contracts, saved input defaults/modifiers, physical-key/mode lifecycle integration in PIE, real definition-change propagation with atomic/reentrant placement, safe public GameState reads/relays/teardown, and nested objective notifications. Live Slate TRAIN asserts all six costs and no-charge promotion/funds/queue rejection. Two unit tests add pure vital-state boundaries and real-PIE component/GC/initialization/selection/camera/death/reentry/cleanup coverage. Post-Destroy assertions inspect retained reflected state rather than calling rejected script functions. OrderState and CombatState add finite/atomic transition, weak-target Destroy/GC and single-clock boundary checks; OrdersCombatPIE adds persistent Hold, pursuit/target retirement, derived activity, exact AI/direct recovery cadence and nested damage/vitals/camera callbacks. PlayerOwnershipPIE adds real controller eligibility, mixed selection, preserved enemy AI orders, unit/player-faction changes, actual camera callback interruption, nested selection observer ordering and EndPlay unbinding. Its auxiliary world is collected before subsequent Slate input dispatch. All fixtures are transient and do not save assets.
 - `L_Testbed` is the deterministic world/PIE test map; dedicated Functional Test actors and scenarios remain planned.
 - The retired Python/Remote Control files remain recoverable from Git history but are not part of the supported test path.
 

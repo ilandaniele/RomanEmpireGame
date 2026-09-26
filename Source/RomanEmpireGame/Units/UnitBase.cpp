@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "UnitBase.h"
+#include "Units/RomanUnitRegistry.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "CollisionQueryParams.h"
@@ -14,7 +15,6 @@
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -310,6 +310,10 @@ void AUnitBase::BeginPlay()
 		GetCharacterMovement()->bUseRVOAvoidance = true;
 		GetCharacterMovement()->AvoidanceWeight = 0.5f;
 	}
+	if (URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>())
+	{
+		Registry->SynchronizeUnit(this);
+	}
 }
 
 bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
@@ -357,6 +361,7 @@ EUnitActivity AUnitBase::GetActivity() const
 void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Vitals.EndLife();
+	if (URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>()) Registry->RemoveUnit(this);
 	SetLifeSpan(0.0f);
 	StopAllActions();
 	SetActorEnableCollision(false);
@@ -436,21 +441,11 @@ void AUnitBase::Tick(float DeltaSeconds)
 		}
 		else if (Orders.GetOrderType() == EUnitOrderType::None)
 		{
-			// Auto-detect nearest enemy within 5000
-			AUnitBase* ClosestEnemy = nullptr;
-			float ClosestDist = 5000.0f;
-			TArray<AActor*> AllActors;
-			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AUnitBase::StaticClass(), AllActors);
-			for (AActor* Actor : AllActors)
+			// Query the live faction index; never enumerate the world from a unit tick.
+			if (const URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>())
 			{
-				AUnitBase* Other = Cast<AUnitBase>(Actor);
-				if (!Other || Other == this || !Other->CanAcceptCommands()) continue;
-				if (Other->GetOwnerFaction() == OwnerFaction) continue;
-				if (Other->GetOwnerFaction() == EFactionID::None) continue;
-				float D = FVector::Dist2D(GetActorLocation(), Other->GetActorLocation());
-				if (D < ClosestDist) { ClosestDist = D; ClosestEnemy = Other; }
+				if (AUnitBase* Enemy = Registry->FindNearestEnemy(GetActorLocation(), OwnerFaction, 5000.0)) CommandAttack(Enemy);
 			}
-			if (ClosestEnemy) CommandAttack(ClosestEnemy);
 		}
 
 		// === MOVEMENT (inside bIsPossessedByPlayer check) ===
@@ -528,6 +523,11 @@ void AUnitBase::SetOwnerFaction(EFactionID NewOwner)
 {
 	if (OwnerFaction == NewOwner || IsActorBeingDestroyed() || GetLifeState() == EUnitLifeState::Ended) return;
 	OwnerFaction = NewOwner;
+	// Reindex before observers can query or issue nested ownership/lifecycle commands.
+	if (UWorld* World = GetWorld())
+	{
+		if (URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>()) Registry->SynchronizeUnit(this);
+	}
 	ApplyFactionColor();
 	OnOwnerFactionChanged.Broadcast(this);
 }
@@ -882,6 +882,7 @@ void AUnitBase::OnDeath()
 {
 	if (GetLifeState() != EUnitLifeState::Dead || bDeathNotified) return;
 	bDeathNotified = true;
+	if (URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>()) Registry->RemoveUnit(this);
 	StopAllActions();
 	if (GetLifeState() != EUnitLifeState::Dead || IsActorBeingDestroyed()) return;
 	SetActorEnableCollision(false);
