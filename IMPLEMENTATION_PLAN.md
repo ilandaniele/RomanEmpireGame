@@ -537,7 +537,15 @@ Building-selection ownership boundary (implemented and verified 2026-09-27):
 - Strict IWYU (60 actions), Shipping (6 actions), repository validation and Git LFS pass. This native boundary change does not reuse a historical player package as evidence for the new executable.
 - Skills: `unreal-cpp-gameplay`, `ue-ui-umg-slate`, `ue-testing-debugging`, `ue-module-build-system`. No new assets, input mappings, dependencies or services; no new packaged/rendered gate claimed for this non-layout boundary change.
 
-Remaining M3.2 work: squad identity/membership contract, additive selection and invalid-target feedback. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract. M3.1 routed policy remains open. Production capture/queue/refund policies remain M3.5, not implied by selection eligibility.
+Additive selection and invalid-target feedback (implemented 2026-09-27; packaged-player gate pending):
+
+- Shift-click toggles eligible units, Shift-drag adds; plain gestures replace. The modifier is captured at gesture start. Empty additive gestures preserve selection; plain empty gestures clear it. Buildings remain exclusive and invalid actor clicks preserve existing selection with transient UMG feedback.
+- Replace/Add/Toggle reuse the controller's canonical commit path. Feedback is event-driven, expires after three seconds and unbinds/clears at widget teardown. The saved input config has 20 actions and Tactical has 18 mappings, including both Shift keys; existing mappings are preserved.
+- Targeted 6/6 and full 25/25 pass without result warnings/failures/pending, including a repaired synchronous focus-flush regression. Strict IWYU (60 actions), Shipping (6), repository validation and Git LFS pass. A fresh Development package passes UAT, but Windows Code Integrity blocks its unsigned player before startup (events 3077/3033). No security policy change or packaged runtime success is claimed. Evidence: [M3_ADDITIVE_SELECTION_REVIEW.md](M3_ADDITIVE_SELECTION_REVIEW.md).
+- Skills: `ue-input-system`, `unreal-cpp-gameplay`, `ue-ui-umg-slate`, `ue-testing-debugging`, `ue-module-build-system`, `unreal-packaging`, `unreal-mcp`, `ue-data-assets-tables`, `ue-project-context`. No new runtime dependencies or services.
+- Separate editor-game preview passes selection-state and reflected-feedback assertions; both 1920×1080 captures were inspected (15 selected units, rings, Shift help and warning). This is explicitly not packaged-player evidence. Preview-only Python/toolset startup incompatibility is avoided with `-DisablePython`; editor widget-factory/render warnings remain documented.
+
+Remaining M3.2 work: squad identity/membership contract and the fresh additive-selection packaged/rendered gate on a runner that trusts the binary. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract. M3.1 routed policy remains open. Production capture/queue/refund policies remain M3.5, not implied by selection eligibility.
 
 #### M3.3 Commands, navigation, and formations
 

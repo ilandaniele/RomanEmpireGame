@@ -6,8 +6,11 @@
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextBlock.h"
 #include "Content/RomanContentRegistry.h"
 #include "Core/RomanEmpireGameState.h"
+#include "Core/GameplayMode.h"
+#include "Core/SelectionOperation.h"
 #include "Editor.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -1073,6 +1076,147 @@ namespace RomanEmpireUnitTests
 		FAutomationTestBase& Test;
 		double StartedAt;
 	};
+	void ModifySelection(FAutomationTestBase& Test, UObject* Controller, const TArray<AActor*>& Units, EUnitSelectionOperation Operation)
+	{
+		FCall Call(Test, Controller, TEXT("ModifyUnitSelection"), 2);
+		FArrayProperty* Prop = Call.Property<FArrayProperty>(TEXT("Units"));
+		FObjectPropertyBase* Inner = Prop ? CastField<FObjectPropertyBase>(Prop->Inner) : nullptr;
+		FEnumProperty* Enum = Call.Property<FEnumProperty>(TEXT("Operation"));
+		if (!Test.TestTrue(TEXT("Modifier command has unit array and operation enum"), Inner && Enum)) return;
+		FScriptArrayHelper Array(Prop, Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()));
+		for (AActor* Unit : Units) Inner->SetObjectPropertyValue(Array.GetRawPtr(Array.AddValue()), Unit);
+		Enum->GetUnderlyingProperty()->SetIntPropertyValue(Enum->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Operation));
+		Call.Execute();
+	}
+	void ClickSelection(FAutomationTestBase& Test, UObject* Controller, AActor* Actor, bool bAdditive = false)
+	{
+		FCall Call(Test, Controller, TEXT("SelectActorFromInput"), 2);
+		if (FObjectPropertyBase* Prop = Call.Property<FObjectPropertyBase>(TEXT("Actor")))
+			Prop->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Actor);
+		Call.Set<FBoolProperty>(TEXT("bAdditive"), bAdditive);
+		Call.Execute();
+	}
+	class FExerciseAdditiveSelection : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseAdditiveSelection(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 40.0) { Test.AddError(TEXT("Additive selection PIE timed out")); return true; }
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Controller = World->GetFirstPlayerController();
+			if (!Controller || !Bool(Test, Controller, TEXT("CanIssueTacticalCommands"))) return false;
+			UUserWidget* Root = Cast<UUserWidget>(ObjectQuery(Test, Controller, TEXT("GetMainWidget")));
+			UTextBlock* Feedback = Root ? Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("InteractionFeedbackText"))) : nullptr;
+			if (!Test.TestTrue(TEXT("Additive fixture has production UMG feedback"), Root && Feedback)) return true;
+			if (bWaitingForFeedback)
+			{
+				if (World->GetTimeSeconds() - FeedbackStarted < 3.2f) return false;
+				Test.TestTrue(TEXT("Feedback expires through real world timer"), Feedback->GetText().IsEmpty());
+				Test.TestEqual(TEXT("Expired feedback collapses"), Feedback->GetVisibility(), ESlateVisibility::Collapsed);
+				ClickSelection(Test, Controller, Enemy.Get());
+				Root->RemoveFromParent();
+				Test.TestFalse(TEXT("Widget destruction unbinds feedback observer"), HasListener(Test, Controller,
+					TEXT("OnInteractionFeedback"), Root, TEXT("HandleInteractionFeedback")));
+				Test.TestTrue(TEXT("Widget destruction clears pending feedback"), Feedback->GetText().IsEmpty());
+				ClickSelection(Test, Controller, Enemy.Get());
+				Test.TestTrue(TEXT("Detached widget receives no later feedback"), Feedback->GetText().IsEmpty());
+				return true;
+			}
+			UClass* UnitClass = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestNotNull(TEXT("Additive unit class exists"), UnitClass)) return true;
+			int32 Index = 0;
+			auto Spawn = [&](EFactionID Owner)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Unit = World->SpawnActor<ACharacter>(UnitClass, FTransform(FVector(190000 + 2000 * Index++, 170000, 300)), Params);
+				if (!Test.TestNotNull(TEXT("Additive transient unit spawned"), Unit)) return Unit;
+				Test.TestTrue(TEXT("Additive fixture initialized"), Initialize(Test, Unit, TEXT("Legionary"), Owner));
+				Unit->FinishSpawning(Unit->GetActorTransform());
+				Unit->SetActorTickEnabled(false);
+				for (UActorComponent* Part : Unit->GetComponents()) if (Part) Part->SetComponentTickEnabled(false);
+				return Unit;
+			};
+			ACharacter* First = Spawn(EFactionID::Rome);
+			ACharacter* Second = Spawn(EFactionID::Rome);
+			Enemy = Spawn(EFactionID::Carthage);
+			if (!First || !Second || !Enemy.IsValid()) return true;
+			ModifySelection(Test, Controller, { First, First, Enemy.Get(), nullptr }, EUnitSelectionOperation::Replace);
+			Test.TestTrue(TEXT("Replace filters and deduplicates"), SelectedActors(Test, Controller) == TArray<AActor*>({ First }));
+			ModifySelection(Test, Controller, { First, Second, Second }, EUnitSelectionOperation::Add);
+			Test.TestTrue(TEXT("Add appends eligible unique units"), SelectedActors(Test, Controller) == TArray<AActor*>({ First, Second }));
+			ModifySelection(Test, Controller, { First, First }, EUnitSelectionOperation::Toggle);
+			Test.TestTrue(TEXT("Duplicate toggle removes once"), SelectedActors(Test, Controller) == TArray<AActor*>({ Second }));
+			Test.TestFalse(TEXT("Toggle removal clears presentation"), Bool(Test, First, TEXT("IsSelected")));
+			Test.TestFalse(TEXT("Toggle removal releases ownership observer"), HasListener(Test, First, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
+			for (EUnitSelectionOperation Operation : { EUnitSelectionOperation::Add, EUnitSelectionOperation::Toggle })
+			{
+				ModifySelection(Test, Controller, { Enemy.Get(), nullptr }, Operation);
+				ModifySelection(Test, Controller, {}, Operation);
+				Test.TestTrue(TEXT("No eligible modifier input preserves selection"), SelectedActors(Test, Controller) == TArray<AActor*>({ Second }));
+			}
+			ClickSelection(Test, Controller, First, true);
+			Test.TestTrue(TEXT("Additive click toggles unselected unit on"), SelectedActors(Test, Controller) == TArray<AActor*>({ Second, First }));
+			ClickSelection(Test, Controller, nullptr, true);
+			ClickSelection(Test, Controller, Controller->GetPawn(), true);
+			Test.TestEqual(TEXT("Additive empty and terrain clicks preserve selection"), SelectedActors(Test, Controller).Num(), 2);
+			ClickSelection(Test, Controller, Enemy.Get());
+			Test.TestEqual(TEXT("Rejected enemy click preserves selection"), SelectedActors(Test, Controller).Num(), 2);
+			Test.TestFalse(TEXT("Rejected click produces visible message"), Feedback->GetText().IsEmpty());
+			Test.TestTrue(TEXT("Feedback is drawn"), Feedback->IsVisible());
+			ClickSelection(Test, Controller, First);
+			Test.TestTrue(TEXT("Ordinary unit click replaces selection"), SelectedActors(Test, Controller) == TArray<AActor*>({ First }));
+			Test.TestTrue(TEXT("Valid selection clears rejection feedback"), Feedback->GetText().IsEmpty());
+			ClickSelection(Test, Controller, First, true);
+			Test.TestTrue(TEXT("Additive click toggles selected unit off"), SelectedActors(Test, Controller).IsEmpty());
+			ClickSelection(Test, Controller, First);
+			ClickSelection(Test, Controller, nullptr);
+			Test.TestTrue(TEXT("Plain empty click clears selection"), SelectedActors(Test, Controller).IsEmpty());
+			ClickSelection(Test, Controller, First);
+			auto SetMode = [&](EGameplayMode Mode)
+			{
+				FCall Call(Test, World->GetAuthGameMode(), TEXT("SetGameplayMode"), 1);
+				if (FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("NewMode")))
+					Prop->GetUnderlyingProperty()->SetIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Mode));
+				Call.Execute();
+			};
+			SetMode(EGameplayMode::Strategic);
+			const TArray<AActor*> StrategicSelection = SelectedActors(Test, Controller);
+			ModifySelection(Test, Controller, { Second }, EUnitSelectionOperation::Add);
+			ClickSelection(Test, Controller, Second, true);
+			Test.TestTrue(TEXT("Selection commands reject strategic mode"), SelectedActors(Test, Controller) == StrategicSelection);
+			SetMode(EGameplayMode::Tactical);
+			ClickSelection(Test, Controller, First);
+			ModifySelection(Test, Controller, { Second }, EUnitSelectionOperation::Add);
+			SetOwner(Test, Second, EFactionID::Carthage);
+			Test.TestTrue(TEXT("Ownership cleanup prunes additive member"), SelectedActors(Test, Controller) == TArray<AActor*>({ First }));
+			Test.TestFalse(TEXT("Ownership cleanup clears added member ring"), Bool(Test, Second, TEXT("IsSelected")));
+			ModifySelection(Test, Controller, {}, EUnitSelectionOperation::Replace);
+			Test.TestTrue(TEXT("Empty replace clears"), SelectedActors(Test, Controller).IsEmpty());
+			TStrongObjectPtr<UUnitLifecycleProbe> Probe(NewObject<UUnitLifecycleProbe>());
+			Probe->Test = &Test; Probe->ObservedController = Controller; Probe->ObservedUnit = First;
+			Probe->ControllerAction = EUnitControllerProbeAction::ChangeOwner;
+			if (!BindProbe(Test, Controller, TEXT("OnSelectionChanged"), Probe.Get(), TEXT("HandleControllerSelection"))) return true;
+			ModifySelection(Test, Controller, { First }, EUnitSelectionOperation::Add);
+			Test.TestTrue(TEXT("Add notification tolerates nested ownership loss"), Probe->bHandledControllerAction && SelectedActors(Test, Controller).IsEmpty());
+			Test.TestFalse(TEXT("Nested ownership loss leaves no selected ring"), Bool(Test, First, TEXT("IsSelected")));
+			ClickSelection(Test, Controller, Enemy.Get(), true);
+			FeedbackStarted = World->GetTimeSeconds();
+			bWaitingForFeedback = true;
+			return false;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		float FeedbackStarted = 0;
+		bool bWaitingForFeedback = false;
+		TWeakObjectPtr<ACharacter> Enemy;
+	};
 	bool SnapshotContains(const TArray<AUnitBase*>& Snapshot, const AActor* Actor)
 	{
 		return Snapshot.ContainsByPredicate([Actor](const AUnitBase* Unit)
@@ -1206,9 +1350,10 @@ namespace RomanEmpireUnitTests
 				FMath::Min3(SourceScreen.Y, NearScreen.Y, FarScreen.Y) - 2);
 			const FVector2D RectEnd(FMath::Max3(SourceScreen.X, NearScreen.X, FarScreen.X) + 2,
 				FMath::Max3(SourceScreen.Y, NearScreen.Y, FarScreen.Y) + 2);
-			auto SelectRect = [&](const FVector2D& Start, const FVector2D& End)
+			auto SelectRect = [&](const FVector2D& Start, const FVector2D& End, bool bAdditive = false)
 			{
-				FCall Call(Test, Controller, TEXT("SelectUnitsInScreenRect"), 2);
+				FCall Call(Test, Controller, TEXT("SelectUnitsInScreenRect"), 3);
+				Call.Set<FBoolProperty>(TEXT("bAdditive"), bAdditive);
 				for (const auto& Pair : { TPair<FName, FVector2D>(TEXT("Start"), Start), TPair<FName, FVector2D>(TEXT("End"), End) })
 				{
 					FStructProperty* Prop = Call.Property<FStructProperty>(Pair.Key);
@@ -1221,6 +1366,18 @@ namespace RomanEmpireUnitTests
 			const TArray<AActor*> BoxSelection = SelectedActors(Test, Controller);
 			Test.TestTrue(TEXT("Real screen rectangle selects indexed owned actors"), BoxSelection.Contains(Source) && BoxSelection.Contains(Near));
 			Test.TestFalse(TEXT("Real screen rectangle excludes enemy inside bounds"), BoxSelection.Contains(Far));
+			SelectMany(Test, Controller, { Near });
+			SelectRect(SourceScreen - FVector2D(1, 1), SourceScreen + FVector2D(1, 1), true);
+			Test.TestTrue(TEXT("Additive rectangle retains prior unit and adds projected unit"),
+				SelectedActors(Test, Controller) == TArray<AActor*>({ Near, Source }));
+			SelectRect(SourceScreen - FVector2D(1, 1), SourceScreen + FVector2D(1, 1), true);
+			Test.TestEqual(TEXT("Repeated additive rectangle does not duplicate or toggle units"), SelectedActors(Test, Controller).Num(), 2);
+			const FVector2D EmptyStart(-10000, -10000), EmptyEnd(-9999, -9999);
+			SelectRect(EmptyStart, EmptyEnd, true);
+			Test.TestEqual(TEXT("Empty additive rectangle preserves selection"), SelectedActors(Test, Controller).Num(), 2);
+			SelectRect(EmptyStart, EmptyEnd);
+			Test.TestTrue(TEXT("Empty replacement rectangle clears selection"), SelectedActors(Test, Controller).IsEmpty());
+			SelectRect(RectStart, RectEnd);
 			SelectRect(FVector2D(std::numeric_limits<double>::quiet_NaN(), 0), RectEnd);
 			Test.TestTrue(TEXT("Invalid rectangle leaves selection unchanged"), SelectedActors(Test, Controller) == BoxSelection);
 			SetOwner(Test, Near, EFactionID::Carthage);
@@ -1504,6 +1661,21 @@ bool FUnitOwnershipTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseOwnership(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitAdditiveSelectionTest, "RomanEmpireGame.Units.AdditiveSelectionPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitAdditiveSelectionTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseAdditiveSelection(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

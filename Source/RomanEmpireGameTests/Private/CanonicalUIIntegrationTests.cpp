@@ -1247,6 +1247,25 @@ namespace RomanEmpireUITests
 			Deferred->SetActorTickEnabled(false);
 			Test.TestTrue(TEXT("Normal BeginPlay makes deferred own construction selectable"), Eligible(Deferred));
 			FCall(Test, Own, TEXT("StartConstruction"), 0).Execute();
+			const auto Click = [&](AActor* Actor, bool bAdditive)
+			{
+				FCall Call(Test, Controller, TEXT("SelectActorFromInput"), 2);
+				Call.SetObject(TEXT("Actor"), Actor);
+				Call.SetBool(TEXT("bAdditive"), bAdditive);
+				Call.Execute();
+			};
+			Click(Own, true);
+			Test.TestEqual(TEXT("Additive building click selects an eligible building"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
+			Click(Own, true);
+			Test.TestEqual(TEXT("Additive building click does not toggle buildings"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
+			Click(Other, false);
+			Test.TestEqual(TEXT("Enemy building click preserves existing eligible selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
+			UTextBlock* Feedback = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("InteractionFeedbackText")));
+			Test.TestTrue(TEXT("Enemy building click reports visible feedback"), Feedback && Feedback->IsVisible() && !Feedback->GetText().IsEmpty());
+			Click(nullptr, true);
+			Test.TestEqual(TEXT("Additive empty click preserves building selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
+			Click(nullptr, false);
+			Test.TestNull(TEXT("Plain empty click clears building selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")));
 			Select(Own);
 			Test.TestEqual(TEXT("Own constructing building is canonical selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
 			Test.TestTrue(TEXT("Own constructing building sets selected presentation"), ReadBool(Test, Own, TEXT("IsSelected")));

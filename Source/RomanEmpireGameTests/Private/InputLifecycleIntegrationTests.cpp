@@ -197,6 +197,7 @@ namespace RomanInputPIETests
 			{
 			case 1:
 				CheckContexts(EGameplayMode::Tactical);
+				CheckShiftPressAndRelease();
 				Test.TestTrue(TEXT("Ready Tactical permits commands"), Boolean(Test, Controller.Get(), TEXT("CanIssueTacticalCommands")));
 				Test.TestTrue(TEXT("Ready Tactical permits one turn request"), Boolean(Test, Controller.Get(), TEXT("CanEndTurn")));
 				Test.TestTrue(TEXT("Selected completed producer is initially trainable in Tactical"), TrainButton->GetIsEnabled());
@@ -205,8 +206,12 @@ namespace RomanInputPIETests
 				Test.TestFalse(TEXT("Physical 1 also respects the closed-menu gate"), Boolean(Test, Placement, TEXT("IsPlacing")));
 				Tap(EKeys::B);
 				Test.TestTrue(TEXT("Physical B opens the Tactical construction menu"), Boolean(Test, Root, TEXT("IsBuildingMenuVisible")));
+				Key(EKeys::LeftShift, IE_Pressed);
+				Test.TestFalse(TEXT("Construction menu suppresses the selection modifier"), SelectionModifier());
 				Tap(EKeys::One);
 				Test.TestTrue(TEXT("Physical 1 starts the authored first building preview"), Boolean(Test, Placement, TEXT("IsPlacing")));
+				Test.TestFalse(TEXT("Placement suppresses the selection modifier"), SelectionModifier());
+				Key(EKeys::LeftShift, IE_Released);
 				Test.TestFalse(TEXT("Choosing a quick slot closes the menu"), Boolean(Test, Root, TEXT("IsBuildingMenuVisible")));
 				{
 					FCall Call(Test, Placement, TEXT("GetCurrentBuildingID"), 1);
@@ -352,10 +357,42 @@ namespace RomanInputPIETests
 				Test.TestTrue(TEXT("Canonical death restores the camera"), Controller->GetPawn() == Camera);
 				break;
 
-			default:
+			case 10:
 				CheckContexts(EGameplayMode::Tactical);
 				Key(EKeys::RightMouseButton, IE_Released);
 				Test.TestFalse(TEXT("Death does not leave a phantom possession mode"), Boolean(Test, Controller.Get(), TEXT("IsInFirstPersonMode")));
+				Key(EKeys::LeftShift, IE_Pressed);
+				Test.TestTrue(TEXT("Shift is active before a mode boundary"), SelectionModifier());
+				SetMode(EGameplayMode::Strategic);
+				Test.TestFalse(TEXT("Mode boundary synchronously rejects the held selection modifier"), SelectionModifier());
+				break;
+
+			case 11:
+				CheckContexts(EGameplayMode::Strategic);
+				Pump();
+				Test.TestFalse(TEXT("Strategic does not evaluate Tactical Shift"), SelectionModifier());
+				SetMode(EGameplayMode::Tactical);
+				break;
+
+			case 12:
+				CheckContexts(EGameplayMode::Tactical);
+				Pump();
+				Test.TestFalse(TEXT("Held Shift is ignored when Tactical is reactivated"), SelectionModifier());
+				Key(EKeys::LeftShift, IE_Released);
+				Key(EKeys::LeftShift, IE_Pressed);
+				Test.TestTrue(TEXT("Fresh Shift activates after the mode boundary"), SelectionModifier());
+				Controller->FlushPressedKeys();
+				Test.TestFalse(TEXT("Viewport focus flush synchronously clears the selection modifier"), SelectionModifier());
+				Pump();
+				Test.TestFalse(TEXT("Modifier remains cleared after flushed input is processed"), SelectionModifier());
+				Key(EKeys::LeftShift, IE_Released);
+				Key(EKeys::RightShift, IE_Pressed);
+				Test.TestTrue(TEXT("Fresh other Shift activates after focus flush"), SelectionModifier());
+				Key(EKeys::RightShift, IE_Released);
+				Test.TestFalse(TEXT("Fresh Shift release clears the modifier after focus flush"), SelectionModifier());
+				break;
+
+			default:
 				Test.TestTrue(TEXT("Mode changes preserve a separately owned input context"), Subsystem->HasMappingContext(ForeignContext.Get()));
 				Cleanup();
 				return true;
@@ -501,6 +538,32 @@ namespace RomanInputPIETests
 		{
 			Key(KeyCode, IE_Pressed);
 			Key(KeyCode, IE_Released);
+		}
+
+		bool SelectionModifier()
+		{
+			return Boolean(Test, Controller.Get(), TEXT("IsSelectionModifierActive"));
+		}
+
+		void CheckShiftPressAndRelease()
+		{
+			Test.TestFalse(TEXT("Selection modifier starts inactive"), SelectionModifier());
+			for (const FKey& ShiftKey : { EKeys::LeftShift, EKeys::RightShift })
+			{
+				Key(ShiftKey, IE_Pressed);
+				Test.TestTrue(TEXT("Each physical Shift activates the selection modifier"), SelectionModifier());
+				Key(ShiftKey, IE_Released);
+				Test.TestFalse(TEXT("Each physical Shift release clears the selection modifier"), SelectionModifier());
+			}
+			Key(EKeys::LeftShift, IE_Pressed);
+			Key(EKeys::RightShift, IE_Pressed);
+			Key(EKeys::LeftShift, IE_Released);
+			Test.TestTrue(TEXT("Releasing left Shift preserves held right Shift"), SelectionModifier());
+			Key(EKeys::LeftShift, IE_Pressed);
+			Key(EKeys::RightShift, IE_Released);
+			Test.TestTrue(TEXT("Releasing right Shift preserves held left Shift"), SelectionModifier());
+			Key(EKeys::LeftShift, IE_Released);
+			Test.TestFalse(TEXT("Releasing both Shifts clears the modifier"), SelectionModifier());
 		}
 
 		void Cleanup()

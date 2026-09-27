@@ -41,6 +41,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Tactical")
 	TObjectPtr<UInputAction> Select;
 
+	/** Held Boolean action used to choose additive selection at gesture start. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Tactical")
+	TObjectPtr<UInputAction> SelectionModifier;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Tactical")
 	TObjectPtr<UInputAction> Command;
 

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Camera/ZoomConfiguration.h"
 #include "Core/GameplayMode.h"
+#include "Core/SelectionOperation.h"
 #include "Faction/FactionData.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
@@ -87,7 +88,22 @@ public:
 
 	/** Screen-space rectangle command shared by drag selection and deterministic checks. */
 	UFUNCTION(BlueprintCallable, Category = "Selection")
-	void SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End);
+	void SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End, bool bAdditive = false);
+
+	/** User selection command; duplicate candidates are applied only once. */
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void ModifyUnitSelection(const TArray<AUnitBase*>& Units, EUnitSelectionOperation Operation);
+
+	/** Additive clicks toggle units; buildings remain an exclusive selection. */
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void SelectActorFromInput(AActor* Actor, bool bAdditive = false);
+
+	UFUNCTION(BlueprintPure, Category = "Selection")
+	bool IsSelectionModifierActive() const;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractionFeedback, FText, Message);
+	UPROPERTY(BlueprintAssignable, Category = "UI")
+	FOnInteractionFeedback OnInteractionFeedback;
 
 	/** Ownership/lifecycle eligibility, independent of the current input mode. */
 	UFUNCTION(BlueprintPure, Category = "Selection")
@@ -265,7 +281,10 @@ private:
 	void ReconcileUnitOwnership();
 	bool bExitingPossession = false;
 	bool bControllerEndingPlay = false;
-	void PerformBoxSelect();
+	void PerformBoxSelect(bool bAdditive);
+	UPROPERTY(Transient)
+	bool bAdditiveSelectionGesture = false;
+	void ReportInteractionFeedback(const FText& Message);
 	void ClearSelectedActors();
 	void BroadcastSelectionChanged();
 

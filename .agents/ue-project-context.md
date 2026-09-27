@@ -50,6 +50,8 @@
 
 **Source organization:** One runtime module organized by domain. Cross-module contracts live under `Public` (`Building`, `Camera`, `Campaign`, `Content`, `Core`, `Faction`, `Input`, and `Units`); the module root is a private include path so runtime implementations remain internal. New cross-module contracts must go under `Public`, while implementation-only code remains private.
 
+**M3 selection additions (2026-09-27):** `Public/Core/SelectionOperation.h` defines Replace/Add/Toggle for controller commands. Building ownership and additive-selection changes add no module/plugin dependencies; the existing Editor-only test module covers them.
+
 ## Plugin Dependencies
 
 **Currently enabled engine plugins:**
@@ -107,6 +109,7 @@
 - Default Pawn: `ASeamlessZoomCamera`.
 - Unit base: `AUnitBase`; current concrete unit: `ALegionary`. Private `FUnitVitalState` is the single owner of live health/stamina/morale and `Uninitialized/Alive/Dead/InitializationFailed/Ended`. Actor commands coordinate world effects and notifications; initialized deferred actors wait for BeginPlay before acting. Death quiesces actions/collision/movement before notification; bounded engine lifespan and EndPlay own cleanup. `FUnitOrderState` now owns None/Move/Attack/Hold intent, destination and weak target. `FUnitCombatState` owns the single recovery clock and orthogonal blocking; `FUnitSelectionPresentation` owns local indicators/material, while the controller owns the selected set. `GetActivity()` is derived, never separately mutable. Routed policy remains M3.1 work; actual-player rendered selection/possession/return is now verified.
 - Building base: `ABuildingBase`; current functional building subclass: `ABarracks`.
+- Selection update (2026-09-27): the controller shares live/placed/same-world/player-faction building eligibility with TRAIN and UMG, and retires selection on ownership/state/EndPlay changes. Additive unit commands feed the same canonical selected set; buildings remain exclusive. Invalid input produces a controller feedback event consumed by a three-second UMG timer, cleared on valid selection and teardown, without a second gameplay owner.
 - Production UI: controller-owned native `URomanEmpireMainWidget` and registry-driven `UBuildingMenuWidget`; no Widget Blueprint required. `ARomanEmpireHUD` is an opt-in Canvas diagnostic overlay only, disabled by default.
 
 **Current subsystem classes:**
@@ -154,6 +157,10 @@
 **Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output. This workstation can also reject newly generated unsigned player executables even after a successful package; release candidates therefore require signing or execution on a controlled runner whose application-control policy trusts the build output.
 
 **Current tests:**
+
+**Latest building/additive-selection verification (2026-09-27):** Building ownership baseline `e5825e5` passed 24/24. The subsequent additive-selection changes pass 6/6 targeted tests (`Artifacts/Automation/M3_Additive_Fixed_Targeted`) and 25/25 full regression, zero result warnings/failures/pending (`20260927_142020_752`), strict IWYU (60 actions) and Shipping (6). The initial targeted run caught a cached Enhanced Input action surviving `FlushPressedKeys` until the next processing pass; the controller now checks held resolved mappings as well as the evaluated action, and the synchronous assertion passes. Saved input configuration now has 20 actions and Tactical has 18 mappings, superseding the historical 19-action input description above. Both Shift keys, mode/menu/placement/focus guards, Add/Toggle/Replace deduplication, rectangle projection, building input clicks and feedback expiry/destruct are covered. Fresh package/rendered evidence is pending for this revision; no earlier package is claimed as proof.
+
+**Additive package/preview result:** The fresh Development archive passes UAT (567 packages processed), but Windows Code Integrity events 3077/3033 block its unsigned executable before launch. Packaged runtime remains pending. Separately, `Tools/verify_additive_selection.ps1 -EditorPreview` passes assertions and exits 0 with two inspected 1920×1080 captures showing 15-unit selection/rings, Shift help and invalid-target feedback. This uses the installed Editor with process-only `-DisablePython` to avoid editor-toolset Python initialization in game mode; editor widget-factory/render warnings remain. No security/default plugin settings changed. Details: `M3_ADDITIVE_SELECTION_REVIEW.md`.
 
 **Latest live-unit registry package (2026-09-26):** Development package UAT exit 0; 559 cooked packages plus 7 platform skips. Actual player SHA256 `a4bcce2cdda660d1e183a073a7d5c1fd8b9648072b5aafb5e1d25ec8e51b074d` passes explicit and ownership-loss return (both exit 0), with six inspected captures. Known player rendering warnings remain unchanged. `M3_UNIT_REGISTRY_REVIEW.md` records commands, logs and limitations; no physical-drag or performance gate is claimed. The live-unit portion supersedes the pending registry item in the historical M3.2a entry; squad identity/membership remains open.
 

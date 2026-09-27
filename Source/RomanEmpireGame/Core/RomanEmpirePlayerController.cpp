@@ -17,6 +17,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
+#include "EnhancedPlayerInput.h"
 #include "EnhancedInputSubsystems.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "InputAction.h"
@@ -179,6 +180,7 @@ void ARomanEmpirePlayerController::SetupInputComponent()
 	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Started, this, &ThisClass::OnSelectPressed);
 	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Completed, this, &ThisClass::OnSelectReleased);
 	EIC->BindAction(InputConfiguration->Select, ETriggerEvent::Canceled, this, &ThisClass::OnSelectCanceled);
+	EIC->BindActionValue(InputConfiguration->SelectionModifier);
 	EIC->BindAction(InputConfiguration->Command, ETriggerEvent::Started, this, &ThisClass::OnCommandPressed);
 	EIC->BindAction(InputConfiguration->CameraPan, ETriggerEvent::Triggered, this, &ThisClass::OnCameraPanInput);
 	EIC->BindAction(InputConfiguration->Zoom, ETriggerEvent::Triggered, this, &ThisClass::OnZoomInput);
@@ -348,6 +350,7 @@ void ARomanEmpirePlayerController::HandleGameplayModeChanged(EGameplayMode OldMo
 void ARomanEmpirePlayerController::CancelTransientInput()
 {
 	bIsBoxSelecting = false;
+	bAdditiveSelectionGesture = false;
 	OnBlockReleased();
 	CancelBuildingPlacement();
 	if (MainWidget)
@@ -403,6 +406,7 @@ bool ARomanEmpirePlayerController::InputKey(const FInputKeyEventArgs& Params)
 void ARomanEmpirePlayerController::OnSelectCanceled()
 {
 	bIsBoxSelecting = false;
+	bAdditiveSelectionGesture = false;
 }
 
 void ARomanEmpirePlayerController::OnCancelPressed()
@@ -544,6 +548,67 @@ void ARomanEmpirePlayerController::SelectUnits(const TArray<AUnitBase*>& Units)
 	BroadcastSelectionChanged();
 }
 
+bool ARomanEmpirePlayerController::IsSelectionModifierActive() const
+{
+	const UEnhancedPlayerInput* EnhancedInput = Cast<UEnhancedPlayerInput>(PlayerInput);
+	if (!CanIssueTacticalCommands() || CurrentSelectionMode == ERomanSelectionMode::BuildingPlacement ||
+		(MainWidget && MainWidget->IsBuildingMenuVisible()) || !InputConfiguration || !EnhancedInput ||
+		!EnhancedInput->GetActionValue(InputConfiguration->SelectionModifier).Get<bool>()) return false;
+	// Enhanced Input retains the evaluated action until its next processing pass after
+	// FlushPressedKeys. Require a still-held resolved mapping to reject that stale value.
+	// Reading the live mappings preserves remaps and supports either/both modifier keys.
+	for (const FEnhancedActionKeyMapping& Mapping : EnhancedInput->GetEnhancedActionMappingsView())
+	{
+		if (Mapping.Action == InputConfiguration->SelectionModifier && IsInputKeyDown(Mapping.Key)) return true;
+	}
+	return false;
+}
+
+void ARomanEmpirePlayerController::ReportInteractionFeedback(const FText& Message)
+{
+	if (!bControllerEndingPlay) OnInteractionFeedback.Broadcast(Message);
+}
+
+void ARomanEmpirePlayerController::ModifyUnitSelection(const TArray<AUnitBase*>& Units, EUnitSelectionOperation Operation)
+{
+	if (!CanIssueTacticalCommands()) return;
+	if (Operation != EUnitSelectionOperation::Replace && Operation != EUnitSelectionOperation::Add &&
+		Operation != EUnitSelectionOperation::Toggle) return;
+	TArray<AUnitBase*> Candidates;
+	for (AUnitBase* Unit : Units) if (IsPlayerUnitEligible(Unit)) Candidates.AddUnique(Unit);
+	if (Operation != EUnitSelectionOperation::Replace && Candidates.IsEmpty()) return;
+	TArray<AUnitBase*> Result = Operation == EUnitSelectionOperation::Replace ? TArray<AUnitBase*>() : SelectedUnits;
+	for (AUnitBase* Unit : Candidates)
+	{
+		if (Operation == EUnitSelectionOperation::Toggle && Result.Contains(Unit)) Result.Remove(Unit);
+		else Result.AddUnique(Unit);
+	}
+	SelectUnits(Result); // One canonical commit path owns filtering, presentation and observers.
+}
+
+void ARomanEmpirePlayerController::SelectActorFromInput(AActor* Actor, bool bAdditive)
+{
+	if (!CanIssueTacticalCommands()) return;
+	if (AUnitBase* Unit = Cast<AUnitBase>(Actor))
+	{
+		if (IsPlayerUnitEligible(Unit))
+		{
+			ModifyUnitSelection({ Unit }, bAdditive ? EUnitSelectionOperation::Toggle : EUnitSelectionOperation::Replace);
+			return;
+		}
+	}
+	else if (ABuildingBase* Building = Cast<ABuildingBase>(Actor))
+	{
+		if (IsPlayerBuildingEligible(Building)) { SelectBuilding(Building); return; }
+	}
+	else
+	{
+		if (!bAdditive) ClearSelection();
+		return;
+	}
+	ReportInteractionFeedback(NSLOCTEXT("RomanSelection", "UnavailableActor", "Select an available unit or placed building owned by your faction."));
+}
+
 void ARomanEmpirePlayerController::ClearSelection()
 {
 	ClearSelectedActors();
@@ -613,8 +678,13 @@ void ARomanEmpirePlayerController::CommandSelectedUnitsMove(const FVector& Desti
 
 void ARomanEmpirePlayerController::CommandSelectedUnitsAttack(AUnitBase* Target)
 {
-	if (!CanIssueTacticalCommands() || !IsValid(Target) || Target->GetWorld() != GetWorld() ||
-		!Target->IsAlive() || Target->GetOwnerFaction() == PublicGameState->GetPlayerFaction()) return;
+	if (!CanIssueTacticalCommands()) return;
+	if (!IsValid(Target) || Target->GetWorld() != GetWorld() ||
+		!Target->IsAlive() || Target->GetOwnerFaction() == PublicGameState->GetPlayerFaction())
+	{
+		ReportInteractionFeedback(NSLOCTEXT("RomanSelection", "InvalidAttackTarget", "Choose a living enemy unit to attack."));
+		return;
+	}
 	const TArray<AUnitBase*> Snapshot = SelectedUnits;
 	for (AUnitBase* Unit : Snapshot)
 	{
@@ -842,16 +912,19 @@ void ARomanEmpirePlayerController::OnSelectPressed()
 	}
 	
 	bIsBoxSelecting = GetMousePosition(BoxSelectStart.X, BoxSelectStart.Y);
+	bAdditiveSelectionGesture = bIsBoxSelecting && IsSelectionModifierActive();
 }
 
 void ARomanEmpirePlayerController::OnSelectReleased()
 {
 	const bool bShouldSelect = bIsBoxSelecting && CanIssueTacticalCommands() &&
 		(!MainWidget || !MainWidget->IsBuildingMenuVisible());
+	const bool bAdditive = bAdditiveSelectionGesture;
 	bIsBoxSelecting = false;
+	bAdditiveSelectionGesture = false;
 	if (bShouldSelect)
 	{
-		PerformBoxSelect();
+		PerformBoxSelect(bAdditive);
 	}
 }
 
@@ -1002,6 +1075,7 @@ void ARomanEmpirePlayerController::OnBuildMenuPressed()
 	if (CanIssueTacticalCommands() && MainWidget)
 	{
 		bIsBoxSelecting = false;
+		bAdditiveSelectionGesture = false;
 		CancelBuildingPlacement();
 		MainWidget->ToggleBuildingMenu();
 	}
@@ -1118,7 +1192,7 @@ void ARomanEmpirePlayerController::HandleCameraZoomLevelChanged(
 		static_cast<int32>(OldLevel), static_cast<int32>(NewLevel));
 }
 
-void ARomanEmpirePlayerController::SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End)
+void ARomanEmpirePlayerController::SelectUnitsInScreenRect(const FVector2D& Start, const FVector2D& End, bool bAdditive)
 {
 	if (!CanIssueTacticalCommands() || Start.ContainsNaN() || End.ContainsNaN()) return;
 	const URomanUnitRegistrySubsystem* Registry = GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
@@ -1138,11 +1212,11 @@ void ARomanEmpirePlayerController::SelectUnitsInScreenRect(const FVector2D& Star
 			UnitsInBox.Add(Unit);
 		}
 	}
-	SelectUnits(UnitsInBox);
+	ModifyUnitSelection(UnitsInBox, bAdditive ? EUnitSelectionOperation::Add : EUnitSelectionOperation::Replace);
 	UE_LOG(LogRomanEmpire, Log, TEXT("Box selected %d units"), SelectedUnits.Num());
 }
 
-void ARomanEmpirePlayerController::PerformBoxSelect()
+void ARomanEmpirePlayerController::PerformBoxSelect(bool bAdditive)
 {
 	FVector2D CurrentMousePos = FVector2D::ZeroVector;
 	if (!GetMousePosition(CurrentMousePos.X, CurrentMousePos.Y)) return;
@@ -1151,27 +1225,11 @@ void ARomanEmpirePlayerController::PerformBoxSelect()
 	
 	if (Distance < 10.0f)
 	{
-		// Single click selection — check unit first, then building
-		AActor* HitActor = GetActorUnderCursor();
-		if (AUnitBase* Unit = Cast<AUnitBase>(HitActor))
-		{
-			SelectUnit(Unit);
-		}
-		else if (ABuildingBase* Building = Cast<ABuildingBase>(HitActor))
-		{
-			// Building clicked - UMG observes this canonical selection event.
-			SelectBuilding(Building);
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::White,
-				FString::Printf(TEXT("Selected building: %s"), *Building->GetName()));
-		}
-		else
-		{
-			ClearSelection();
-		}
+		SelectActorFromInput(GetActorUnderCursor(), bAdditive);
 	}
 	else
 	{
-		SelectUnitsInScreenRect(BoxSelectStart, CurrentMousePos);
+		SelectUnitsInScreenRect(BoxSelectStart, CurrentMousePos, bAdditive);
 	}
 }
 

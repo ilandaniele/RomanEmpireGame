@@ -84,6 +84,7 @@ void URomanEmpireMainWidget::NativeConstruct()
 
 void URomanEmpireMainWidget::NativeDestruct()
 {
+	ClearInteractionFeedback();
 	HideBuildingMenu();
 	UnbindCanonicalEvents();
 	Super::NativeDestruct();
@@ -190,6 +191,16 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	PlaceFixed(RootCanvas, SelectionPanel, FAnchors(0.5f, 1.0f), FVector2D(0.5f, 1.0f),
 		FVector2D(0.0f, -12.0f), FVector2D(650.0f, 140.0f));
 
+	InteractionFeedbackPanel = CreatePanel(WidgetTree, TEXT("InteractionFeedbackPanel"),
+		FLinearColor(0.025f, 0.03f, 0.055f, 0.95f));
+	InteractionFeedbackText = CreateTextBlock(WidgetTree, TEXT("InteractionFeedbackText"), 16,
+		FLinearColor(1.0f, 0.85f, 0.35f));
+	InteractionFeedbackText->SetJustification(ETextJustify::Center);
+	InteractionFeedbackPanel->SetContent(InteractionFeedbackText);
+	PlaceFixed(RootCanvas, InteractionFeedbackPanel, FAnchors(0.5f, 1.0f), FVector2D(0.5f, 1.0f),
+		FVector2D(0.0f, -164.0f), FVector2D(650.0f, 70.0f));
+	ClearInteractionFeedback();
+
 	PossessionText = CreateTextBlock(WidgetTree, TEXT("PossessionText"), 19, FLinearColor::White);
 	PossessionText->SetJustification(ETextJustify::Center);
 	PossessionText->SetVisibility(ESlateVisibility::Collapsed);
@@ -259,6 +270,8 @@ void URomanEmpireMainWidget::BindCanonicalEvents()
 
 	CachedController->OnSelectionChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleSelectionChanged);
+	CachedController->OnInteractionFeedback.AddUniqueDynamic(
+		this, &URomanEmpireMainWidget::HandleInteractionFeedback);
 	CachedController->OnPossessedUnitChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandlePossessedUnitChanged);
 	CachedGameState->OnFactionResourcesChanged.AddUniqueDynamic(
@@ -288,6 +301,8 @@ void URomanEmpireMainWidget::UnbindCanonicalEvents()
 	{
 		CachedController->OnSelectionChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleSelectionChanged);
+		CachedController->OnInteractionFeedback.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandleInteractionFeedback);
 		CachedController->OnPossessedUnitChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandlePossessedUnitChanged);
 	}
@@ -439,7 +454,7 @@ void URomanEmpireMainWidget::RefreshCommands()
 	}
 	if (ControlsText)
 	{
-		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nRight click: order | F: possess unit\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
+		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nShift + click: toggle | + drag: add\nRight click: order | F: possess unit\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
 		if (Mode == EGameplayMode::Possessed)
 		{
 			Help = TEXT("SOLDIER CONTROLS\nWASD: move | Mouse: look\nLeft click: attack | Hold right click: block\nF / Esc: return to camera");
@@ -699,10 +714,33 @@ void URomanEmpireMainWidget::SetDiagnosticVisible(bool bVisible)
 	}
 }
 
+void URomanEmpireMainWidget::ClearInteractionFeedback()
+{
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(InteractionFeedbackTimer);
+	if (InteractionFeedbackPanel) InteractionFeedbackPanel->SetVisibility(ESlateVisibility::Collapsed);
+	if (InteractionFeedbackText)
+	{
+		InteractionFeedbackText->SetText(FText::GetEmpty());
+		InteractionFeedbackText->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void URomanEmpireMainWidget::HandleInteractionFeedback(FText Message)
+{
+	ClearInteractionFeedback();
+	if (Message.IsEmpty() || !InteractionFeedbackText || !InteractionFeedbackPanel || !GetWorld()) return;
+	InteractionFeedbackText->SetText(Message);
+	InteractionFeedbackText->SetVisibility(ESlateVisibility::HitTestInvisible);
+	InteractionFeedbackPanel->SetVisibility(ESlateVisibility::HitTestInvisible);
+	GetWorld()->GetTimerManager().SetTimer(InteractionFeedbackTimer, this,
+		&URomanEmpireMainWidget::ClearInteractionFeedback, 3.0f, false);
+}
+
 void URomanEmpireMainWidget::HandleSelectionChanged(
 	const TArray<AUnitBase*>& Units,
 	ABuildingBase* Building)
 {
+	ClearInteractionFeedback();
 	(void)Units;
 	(void)Building;
 	// A preceding observer can commit another selection before this callback runs.

@@ -32,6 +32,7 @@ namespace RomanInputConfigurationTests
 		Config->CameraPan = Action(TEXT("CameraPan"), EInputActionValueType::Axis2D);
 		Config->Zoom = Action(TEXT("Zoom"), EInputActionValueType::Axis1D);
 		Config->Select = Action(TEXT("Select"), EInputActionValueType::Boolean);
+		Config->SelectionModifier = Action(TEXT("SelectionModifier"), EInputActionValueType::Boolean);
 		Config->Command = Action(TEXT("Command"), EInputActionValueType::Boolean);
 		Config->EnterPossession = Action(TEXT("EnterPossession"), EInputActionValueType::Boolean);
 		Config->SoldierMove = Action(TEXT("SoldierMove"), EInputActionValueType::Axis2D);
@@ -53,6 +54,8 @@ namespace RomanInputConfigurationTests
 			Context->MapKey(Config->EndTurn, EKeys::T);
 		}
 		Config->TacticalContext->MapKey(Config->Select, EKeys::LeftMouseButton);
+		Config->TacticalContext->MapKey(Config->SelectionModifier, EKeys::LeftShift);
+		Config->TacticalContext->MapKey(Config->SelectionModifier, EKeys::RightShift);
 		Config->TacticalContext->MapKey(Config->Command, EKeys::RightMouseButton);
 		Config->TacticalContext->MapKey(Config->EnterPossession, EKeys::F);
 		Config->TacticalContext->MapKey(Config->BuildMenu, EKeys::B);
@@ -150,6 +153,25 @@ bool FRomanInputConfigurationValidationTest::RunTest(const FString& Parameters)
 	Config->Block = nullptr;
 	ExpectInvalid(*this, Config, TEXT("Missing logical action is rejected"));
 	Config = MakeValidConfiguration();
+	Config->SelectionModifier = nullptr;
+	ExpectInvalid(*this, Config, TEXT("Selection modifier is required"));
+	Config = MakeValidConfiguration();
+	Config->SelectionModifier->ValueType = EInputActionValueType::Axis1D;
+	ExpectInvalid(*this, Config, TEXT("Selection modifier must be Boolean"));
+	Config = MakeValidConfiguration();
+	Config->SelectionModifier = Config->Select;
+	ExpectInvalid(*this, Config, TEXT("Selection modifier cannot alias selection"));
+	Config = MakeValidConfiguration();
+	Config->TacticalContext->UnmapAllKeysFromAction(Config->SelectionModifier);
+	ExpectInvalid(*this, Config, TEXT("Tactical must map the selection modifier"));
+	for (int32 ContextIndex = 0; ContextIndex < 3; ++ContextIndex)
+	{
+		Config = MakeValidConfiguration();
+		UInputMappingContext* OtherContexts[] = { Config->StrategicContext, Config->PossessionContext, Config->SharedContext };
+		OtherContexts[ContextIndex]->MapKey(Config->SelectionModifier, EKeys::LeftShift);
+		ExpectInvalid(*this, Config, TEXT("Selection modifier belongs exclusively to Tactical"));
+	}
+	Config = MakeValidConfiguration();
 	Config->ExitPossession = Config->EnterPossession;
 	ExpectInvalid(*this, Config, TEXT("Enter/exit possession must not share an action identity"));
 	Config = MakeValidConfiguration();
@@ -232,8 +254,16 @@ bool FRomanAuthoredInputAssetsTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("Asset Manager discovers the cookable input configuration"),
 		UAssetManager::Get().GetPrimaryAssetPath(Config->GetPrimaryAssetId()), FSoftObjectPath(Config));
+	TSet<const UInputAction*> AuthoredActions = {
+		Config->CameraPan.Get(), Config->Zoom.Get(), Config->Select.Get(), Config->SelectionModifier.Get(),
+		Config->Command.Get(), Config->EnterPossession.Get(), Config->SoldierMove.Get(), Config->Look.Get(),
+		Config->Attack.Get(), Config->Block.Get(), Config->ExitPossession.Get(), Config->BuildMenu.Get(),
+		Config->EndTurn.Get(), Config->Cancel.Get()
+	};
+	for (const TObjectPtr<UInputAction>& Slot : Config->BuildingSlots) AuthoredActions.Add(Slot.Get());
+	TestEqual(TEXT("Saved configuration has twenty distinct logical actions"), AuthoredActions.Num(), 20);
 	TestEqual(TEXT("Strategic has WASD, zoom, turn and nothing else"), Config->StrategicContext->GetMappings().Num(), 6);
-	TestEqual(TEXT("Tactical has WASD, zoom, selection, command, possession, building menu, turn, and six slots"), Config->TacticalContext->GetMappings().Num(), 16);
+	TestEqual(TEXT("Tactical has exploration, selection with both Shifts, commands, and six slots"), Config->TacticalContext->GetMappings().Num(), 18);
 	TestEqual(TEXT("Possession has WASD, mouse look, attack, block, and exit"), Config->PossessionContext->GetMappings().Num(), 8);
 	TestEqual(TEXT("Shared contains only cancellation"), Config->SharedContext->GetMappings().Num(), 1);
 	CheckWASD(*this, Config->StrategicContext, Config->CameraPan);
@@ -245,6 +275,25 @@ bool FRomanAuthoredInputAssetsTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Exploration turn uses T"), HasMapping(Context, Config->EndTurn, EKeys::T));
 	}
 	TestTrue(TEXT("Tactical LMB selects"), HasMapping(Config->TacticalContext, Config->Select, EKeys::LeftMouseButton));
+	TestEqual(TEXT("Selection modifier uses its canonical authored identity"), Config->SelectionModifier->GetPathName(),
+		FString(TEXT("/Game/Input/Actions/IA_SelectionModifier.IA_SelectionModifier")));
+	TestEqual(TEXT("Selection modifier remains a held Boolean action"), Config->SelectionModifier->ValueType, EInputActionValueType::Boolean);
+	TestEqual(TEXT("Either held Shift keeps the Boolean modifier active"), Config->SelectionModifier->AccumulationBehavior,
+		EInputActionAccumulationBehavior::TakeHighestAbsoluteValue);
+	TestEqual(TEXT("Selection modifier has no custom action triggers"), Config->SelectionModifier->Triggers.Num(), 0);
+	TestEqual(TEXT("Selection modifier has no action modifiers"), Config->SelectionModifier->Modifiers.Num(), 0);
+	for (const FKey& ShiftKey : { EKeys::LeftShift, EKeys::RightShift })
+	{
+		TestTrue(TEXT("Tactical maps each Shift to additive selection"), HasMapping(Config->TacticalContext, Config->SelectionModifier, ShiftKey));
+		for (const FEnhancedActionKeyMapping& Mapping : Config->TacticalContext->GetMappings())
+		{
+			if (Mapping.Action == Config->SelectionModifier && Mapping.Key == ShiftKey)
+			{
+				TestEqual(TEXT("Shift mapping has no custom triggers"), Mapping.Triggers.Num(), 0);
+				TestEqual(TEXT("Shift mapping has no modifiers"), Mapping.Modifiers.Num(), 0);
+			}
+		}
+	}
 	TestTrue(TEXT("Tactical RMB commands"), HasMapping(Config->TacticalContext, Config->Command, EKeys::RightMouseButton));
 	TestTrue(TEXT("Tactical F enters possession"), HasMapping(Config->TacticalContext, Config->EnterPossession, EKeys::F));
 	TestTrue(TEXT("Tactical B opens construction"), HasMapping(Config->TacticalContext, Config->BuildMenu, EKeys::B));

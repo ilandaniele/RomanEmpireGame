@@ -122,6 +122,7 @@ bool URomanInputConfig::ValidateConfiguration(TArray<FText>& OutErrors) const
 		{ TEXT("CameraPan"), CameraPan.Get(), EInputActionValueType::Axis2D },
 		{ TEXT("Zoom"), Zoom.Get(), EInputActionValueType::Axis1D },
 		{ TEXT("Select"), Select.Get(), EInputActionValueType::Boolean },
+		{ TEXT("SelectionModifier"), SelectionModifier.Get(), EInputActionValueType::Boolean },
 		{ TEXT("Command"), Command.Get(), EInputActionValueType::Boolean },
 		{ TEXT("EnterPossession"), EnterPossession.Get(), EInputActionValueType::Boolean },
 		{ TEXT("SoldierMove"), SoldierMove.Get(), EInputActionValueType::Axis2D },
@@ -165,7 +166,7 @@ bool URomanInputConfig::ValidateConfiguration(TArray<FText>& OutErrors) const
 	}
 
 	TArray<const UInputAction*> TacticalActions = {
-		CameraPan.Get(), Zoom.Get(), Select.Get(), Command.Get(), EnterPossession.Get(), BuildMenu.Get(), EndTurn.Get()
+		CameraPan.Get(), Zoom.Get(), Select.Get(), SelectionModifier.Get(), Command.Get(), EnterPossession.Get(), BuildMenu.Get(), EndTurn.Get()
 	};
 	for (const TObjectPtr<UInputAction>& Slot : BuildingSlots)
 	{

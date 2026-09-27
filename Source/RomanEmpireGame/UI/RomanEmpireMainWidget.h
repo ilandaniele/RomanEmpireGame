@@ -9,6 +9,7 @@
 #include "Campaign/CampaignTurn.h"
 #include "Core/GameplayMode.h"
 #include "Faction/FactionData.h"
+#include "TimerManager.h"
 #include "RomanEmpireMainWidget.generated.h"
 
 class ABuildingBase;
@@ -91,6 +92,17 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> ControlsText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> InteractionFeedbackText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> InteractionFeedbackPanel;
+
+	FTimerHandle InteractionFeedbackTimer;
+	void ClearInteractionFeedback();
+	UFUNCTION()
+	void HandleInteractionFeedback(FText Message);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBorder> BuildMenuPanel;
