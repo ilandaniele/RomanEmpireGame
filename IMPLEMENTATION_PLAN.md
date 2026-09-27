@@ -529,7 +529,15 @@ M3.2b live-unit registry package (implemented and verified 2026-09-26; squad reg
 - Fresh Development package passes UAT/cook (559 cooked + 7 platform skips). Both actual-player possession/return scenarios pass with exit 0, including automatic ownership-loss cleanup; all six captures inspected. Two known player rendering warnings remain. No physical-drag, Shipping-player or performance claim.
 - Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-module-build-system`, `unreal-packaging`, `ue-project-context`. No assets, plugins, Windows settings or runtime dependencies changed.
 
-Remaining M3.2 work: squad identity/membership contract, additive selection, invalid-target feedback and building-selection ownership. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract. M3.1 routed policy remains open.
+Building-selection ownership boundary (implemented and verified 2026-09-27):
+
+- Share canonical player-faction, same-world and live/placed readiness across building selection, player TRAIN and UMG. Own constructing/damaged buildings remain selectable; previews, deferred/failed/ended/destroyed actors and enemies do not. Direct enemy training is preserved.
+- Observe committed building-state and player-faction notifications. Ownership loss, placement reentry and EndPlay retire selection immediately, including outside Tactical and during nested selection callbacks. Old building observers and controller teardown are cleaned up.
+- The new `Buildings.PlayerSelectionPIE` uses real Slate TRAIN and verifies no spending or production changes from queued UI callbacks after invalidation. A missing-faction-check mutation fails before restoration. Targeted 1/1 and full regression 24/24 pass without result warnings/failures/pending. Evidence and limits: [M3_BUILDING_SELECTION_REVIEW.md](M3_BUILDING_SELECTION_REVIEW.md).
+- Strict IWYU (60 actions), Shipping (6 actions), repository validation and Git LFS pass. This native boundary change does not reuse a historical player package as evidence for the new executable.
+- Skills: `unreal-cpp-gameplay`, `ue-ui-umg-slate`, `ue-testing-debugging`, `ue-module-build-system`. No new assets, input mappings, dependencies or services; no new packaged/rendered gate claimed for this non-layout boundary change.
+
+Remaining M3.2 work: squad identity/membership contract, additive selection and invalid-target feedback. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract. M3.1 routed policy remains open. Production capture/queue/refund policies remain M3.5, not implied by selection eligibility.
 
 #### M3.3 Commands, navigation, and formations
 

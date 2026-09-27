@@ -291,10 +291,20 @@ bool ARomanEmpirePlayerController::IsPlayerUnitEligible(const AUnitBase* Unit) c
 		Unit->GetOwnerFaction() == PublicGameState->GetPlayerFaction();
 }
 
+bool ARomanEmpirePlayerController::IsPlayerBuildingEligible(const ABuildingBase* Building) const
+{
+	return !bControllerEndingPlay && IsValid(PublicGameState) && PublicGameState->IsGameplayInitialized() &&
+		PublicGameState->GetPlayerFaction() != EFactionID::None && IsValid(Building) &&
+		Building->GetWorld() == GetWorld() && Building->IsSelectionReady() &&
+		Building->GetOwnerFaction() == PublicGameState->GetPlayerFaction();
+}
+
 void ARomanEmpirePlayerController::HandlePlayerFactionChanged(EFactionID NewFaction)
 {
 	(void)NewFaction;
 	ReconcileUnitOwnership();
+	// Unit callbacks may have replaced the selection: re-query the current building.
+	if (SelectedBuilding && !IsPlayerBuildingEligible(SelectedBuilding)) ClearSelection();
 }
 
 void ARomanEmpirePlayerController::HandleSelectedUnitOwnerChanged(AUnitBase* Unit)
@@ -543,12 +553,14 @@ void ARomanEmpirePlayerController::ClearSelection()
 void ARomanEmpirePlayerController::SelectBuilding(ABuildingBase* Building)
 {
 	ClearSelectedActors();
-	SelectedBuilding = IsValid(Building) && Building->GetBuildingState() != EBuildingState::Destroyed ? Building : nullptr;
+	SelectedBuilding = IsPlayerBuildingEligible(Building) ? Building : nullptr;
 	if (SelectedBuilding)
 	{
 		SelectedBuilding->SetSelected(true);
 		SelectedBuilding->OnBuildingDestroyed.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed);
+		SelectedBuilding->OnBuildingStateChanged.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedBuildingStateChanged);
 		SelectedBuilding->AActor::OnDestroyed.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 		UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected building: %s"), *SelectedBuilding->GetName());
@@ -574,6 +586,8 @@ void ARomanEmpirePlayerController::ClearSelectedActors()
 		SelectedBuilding->SetSelected(false);
 		SelectedBuilding->OnBuildingDestroyed.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed);
+		SelectedBuilding->OnBuildingStateChanged.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleSelectedBuildingStateChanged);
 		SelectedBuilding->AActor::OnDestroyed.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 	}
@@ -616,6 +630,13 @@ void ARomanEmpirePlayerController::HandleSelectedUnitDied(AUnitBase* Unit)
 void ARomanEmpirePlayerController::HandleSelectedBuildingDestroyed(ABuildingBase* Building)
 {
 	HandleSelectedActorDestroyed(Building);
+}
+
+void ARomanEmpirePlayerController::HandleSelectedBuildingStateChanged(ABuildingBase* Building)
+{
+	// State notifications include ownership and EndPlay; cleanup is legal in any mode.
+	(void)Building;
+	if (SelectedBuilding && !IsPlayerBuildingEligible(SelectedBuilding)) ClearSelection();
 }
 
 void ARomanEmpirePlayerController::HandleSelectedActorDestroyed(AActor* Actor)
@@ -1173,9 +1194,7 @@ AActor* ARomanEmpirePlayerController::GetActorUnderCursor() const
 bool ARomanEmpirePlayerController::OnTrainButtonClicked()
 {
 	ABarracks* Barracks = Cast<ABarracks>(SelectedBuilding);
-	if (!IsValid(Barracks) || !PublicGameState || !PublicGameState->IsCampaignActive() ||
-		!CanIssueTacticalCommands() ||
-		Barracks->GetOwnerFaction() != PublicGameState->GetPlayerFaction())
+	if (!IsPlayerBuildingEligible(Barracks) || !CanIssueTacticalCommands())
 	{
 		return false;
 	}

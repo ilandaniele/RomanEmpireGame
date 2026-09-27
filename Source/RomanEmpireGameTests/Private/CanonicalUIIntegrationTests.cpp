@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "PlacementTransactionProbe.h"
+#include "BuildingSelectionProbe.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
@@ -11,10 +12,12 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/ActorComponent.h"
+#include "Components/Widget.h"
 #include "Content/RomanContentRegistry.h"
 #include "Core/GameplayMode.h"
 #include "Core/RomanEmpireGameState.h"
 #include "Editor.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Faction/FactionData.h"
@@ -1120,6 +1123,285 @@ bool FDefinitionPlacementIntegrationTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FWaitForOwnedPIEToEnd(this));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FRestoreDefinition(this, Definition));
+	return true;
+}
+
+void UBuildingSelectionProbe::OnSelection(const TArray<AUnitBase*>& Units, ABuildingBase* Building)
+{
+	(void)Units;
+	if (!Test || !bArmed || reinterpret_cast<UObject*>(Building) != Target.Get()) return;
+	bArmed = false; // Nested clear-selection notification must not recurse.
+	++Interventions;
+	RomanEmpireUITests::FCall Owner(*Test, Target.Get(), TEXT("SetOwnerFaction"), 1);
+	Owner.SetEnum(TEXT("NewOwner"), EFactionID::None);
+	Owner.Execute();
+}
+
+namespace RomanEmpireUITests
+{
+	class FExercisePlayerBuildingSelection : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExercisePlayerBuildingSelection(FAutomationTestBase* InTest) : Test(*InTest) {}
+		virtual bool Update() override
+		{
+			if (StartedAt == 0.0) StartedAt = FPlatformTime::Seconds();
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			APlayerController* Controller = World ? World->GetFirstPlayerController() : nullptr;
+			if (!World || !World->HasBegunPlay() || !Controller)
+			{
+				if (FPlatformTime::Seconds() - StartedAt < 30.0) return false;
+				Test.AddError(TEXT("Building selection regression did not reach PIE startup within 30 seconds"));
+				return true;
+			}
+			if (!bTacticalRequested)
+			{
+				Controller->SetActorTickEnabled(false);
+				FCall Mode(Test, World->GetAuthGameMode(), TEXT("SetGameplayMode"), 1);
+				Mode.SetEnum(TEXT("NewMode"), EGameplayMode::Tactical);
+				Mode.Execute();
+				bTacticalRequested = true;
+				return false;
+			}
+			Exercise(World, Controller);
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt = 0.0;
+		bool bTacticalRequested = false;
+
+		void Exercise(UWorld* World, APlayerController* Controller)
+		{
+			UUserWidget* Root = Cast<UUserWidget>(ReadObject(Test, Controller, TEXT("GetMainWidget")));
+			UButton* Train = Root ? Cast<UButton>(Root->GetWidgetFromName(TEXT("TrainButton"))) : nullptr;
+			UTextBlock* Selection = Root ? Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("SelectionText"))) : nullptr;
+			UWidget* Panel = Root ? Root->GetWidgetFromName(TEXT("SelectionPanel")) : nullptr;
+			UObject* Manager = ReadObject(Test, World->GetAuthGameMode(), TEXT("GetFactionManager"));
+			UClass* BarracksClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.Barracks")).TryLoadClass<AActor>();
+			if (!Test.TestTrue(TEXT("Normal controller, UI and content authority are ready"), Root && Train && Selection && Panel && Manager && BarracksClass)) return;
+			FCall Player(Test, Manager, TEXT("GetPlayerFaction"), 1);
+			Player.Execute();
+			const EFactionID PlayerFaction = Player.ReadEnum<EFactionID>();
+			if (!Test.TestEqual(TEXT("Committed testbed uses Rome as canonical player faction"), PlayerFaction, EFactionID::Rome)) return;
+			const auto Owner = [&](AActor* Building, EFactionID Faction)
+			{
+				FCall Call(Test, Building, TEXT("SetOwnerFaction"), 1);
+				Call.SetEnum(TEXT("NewOwner"), Faction);
+				Call.Execute();
+			};
+			const auto Select = [&](AActor* Building)
+			{
+				FCall Call(Test, Controller, TEXT("SelectBuilding"), 1);
+				Call.SetObject(TEXT("Building"), Building);
+				Call.Execute();
+			};
+			const auto Eligible = [&](AActor* Building)
+			{
+				FCall Call(Test, Controller, TEXT("IsPlayerBuildingEligible"), 2);
+				Call.SetObject(TEXT("Building"), Building);
+				Call.Execute();
+				return Call.ReadBool();
+			};
+			int32 SpawnIndex = 0;
+			const auto Spawn = [&]() -> AActor*
+			{
+				FActorSpawnParameters Parameters;
+				Parameters.ObjectFlags |= RF_Transient;
+				Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				AActor* Actor = World->SpawnActor<AActor>(BarracksClass,
+					FVector(60000.0 + 1000.0 * SpawnIndex++, 60000.0, 300.0), FRotator::ZeroRotator, Parameters);
+				if (Actor) Actor->SetActorTickEnabled(false);
+				return Actor;
+			};
+			AActor* Own = Spawn();
+			AActor* Other = Spawn();
+			if (!Test.TestTrue(TEXT("Transient normal-BeginPlay building fixtures spawned"), Own && Other)) return;
+			Owner(Own, PlayerFaction);
+			FCall(Test, Other, TEXT("StartConstruction"), 0).Execute();
+			const auto Rejected = [&](const TCHAR* Label, AActor* Building)
+			{
+				Test.PushContext(Label);
+				Test.TestFalse(TEXT("Public player eligibility rejects building"), Eligible(Building));
+				Select(Building);
+				Test.TestNull(TEXT("Rejected building does not become canonical selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")));
+				if (IsValid(Building)) Test.TestFalse(TEXT("Rejected building has no selected presentation"), ReadBool(Test, Building, TEXT("IsSelected")));
+				Test.TestFalse(TEXT("Rejected building has no visible selection/TRAIN panel"), Panel->IsVisible());
+				Test.PopContext();
+			};
+			Rejected(TEXT("Own placing building"), Own);
+			Rejected(TEXT("No owner"), Other);
+			Owner(Other, EFactionID::Carthage);
+			Rejected(TEXT("Enemy constructing building"), Other);
+			const FTransform DeferredTransform(FVector(65000.0, 60000.0, 300.0));
+			AActor* Deferred = World->SpawnActorDeferred<AActor>(BarracksClass, DeferredTransform, nullptr, nullptr,
+				ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			if (!Test.TestNotNull(TEXT("Deferred building fixture exists"), Deferred)) return;
+			// Default owner is authored input to normal BeginPlay, not a forged readiness flag.
+			FEnumProperty* OwnerProperty = FindFProperty<FEnumProperty>(Deferred->GetClass(), TEXT("OwnerFaction"));
+			if (!Test.TestNotNull(TEXT("Deferred owner is reflected"), OwnerProperty)) { Deferred->Destroy(); return; }
+			OwnerProperty->GetUnderlyingProperty()->SetIntPropertyValue(OwnerProperty->ContainerPtrToValuePtr<void>(Deferred), static_cast<int64>(PlayerFaction));
+			FCall(Test, Deferred, TEXT("StartConstruction"), 0).Execute();
+			Rejected(TEXT("Deferred actor before initialization and BeginPlay"), Deferred);
+			Deferred->FinishSpawning(DeferredTransform);
+			Deferred->SetActorTickEnabled(false);
+			Test.TestTrue(TEXT("Normal BeginPlay makes deferred own construction selectable"), Eligible(Deferred));
+			FCall(Test, Own, TEXT("StartConstruction"), 0).Execute();
+			Select(Own);
+			Test.TestEqual(TEXT("Own constructing building is canonical selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Own));
+			Test.TestTrue(TEXT("Own constructing building sets selected presentation"), ReadBool(Test, Own, TEXT("IsSelected")));
+			Test.TestFalse(TEXT("Construction has no TRAIN affordance"), Train->IsVisible());
+			FCall Data(Test, Own, TEXT("GetBuildingData"), 1);
+			Data.Execute();
+			const FBuildingData Definition = Data.ReadStruct<FBuildingData>();
+			Own->Tick(Definition.ConstructionTime + 0.1f);
+			Test.TestTrue(TEXT("Own completed producer is eligible"), Eligible(Own));
+			Test.TestTrue(TEXT("Completion event exposes TRAIN"), Train->IsVisible());
+			const FFactionResourceAmounts BeforeTrain = ReadResources(Test, Manager);
+			ClickThroughSlate(Test, Root, Train);
+			Test.TestTrue(TEXT("Live Slate TRAIN starts the selected own producer"), ReadBool(Test, Own, TEXT("IsTraining")));
+			Test.TestTrue(TEXT("Authorized training spends canonical resources"), ReadResources(Test, Manager).Gold < BeforeTrain.Gold);
+
+			const auto Cleared = [&](const TCHAR* Label, AActor* Building)
+			{
+				Test.PushContext(Label);
+				Test.TestNull(TEXT("Committed invalidation clears selection synchronously"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")));
+				Test.TestFalse(TEXT("Invalidation clears selected presentation"), ReadBool(Test, Building, TEXT("IsSelected")));
+				Test.TestFalse(TEXT("Invalidation removes selection/TRAIN panel synchronously"), Panel->IsVisible());
+				const FFactionResourceAmounts Before = ReadResources(Test, Manager);
+				const int32 PendingBefore = ReadInt(Test, Building, TEXT("GetPendingOrderCount"));
+				const bool bTrainingBefore = ReadBool(Test, Building, TEXT("IsTraining"));
+				// Simulate a previously queued UI callback after the visible affordance disappears.
+				FCall(Test, Root, TEXT("HandleTrainClicked"), 0).Execute();
+				const FFactionResourceAmounts After = ReadResources(Test, Manager);
+				Test.TestTrue(TEXT("Stale TRAIN callback spends no wallet fields"), FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&Before, &After, 0));
+				Test.TestEqual(TEXT("Stale TRAIN callback preserves pending orders"), ReadInt(Test, Building, TEXT("GetPendingOrderCount")), PendingBefore);
+				Test.TestEqual(TEXT("Stale TRAIN callback preserves active training"), ReadBool(Test, Building, TEXT("IsTraining")), bTrainingBefore);
+				Test.PopContext();
+			};
+			Owner(Own, EFactionID::Carthage);
+			Cleared(TEXT("Owner loss"), Own);
+			Other->Tick(Definition.ConstructionTime + 0.1f);
+			if (Test.TestFalse(TEXT("Authored producer has at least one trainable unit"), Definition.TrainableUnits.IsEmpty()))
+			{
+				FCall DirectTraining(Test, Other, TEXT("TrainUnit"), 2);
+				DirectTraining.SetName(TEXT("UnitID"), Definition.TrainableUnits[0]);
+				DirectTraining.Execute();
+				Test.TestTrue(TEXT("Enemy simulation still accepts direct training independent of player selection"), DirectTraining.ReadBool());
+			}
+			Owner(Own, PlayerFaction);
+			Select(Own);
+			FCall PlayerLoss(Test, Manager, TEXT("SetPlayerFaction"), 1);
+			PlayerLoss.SetEnum(TEXT("NewFaction"), EFactionID::Carthage);
+			PlayerLoss.Execute();
+			FCall ChangedPlayer(Test, Manager, TEXT("GetPlayerFaction"), 1);
+			ChangedPlayer.Execute();
+			Test.TestEqual(TEXT("Canonical player faction switch commits"), ChangedPlayer.ReadEnum<EFactionID>(), EFactionID::Carthage);
+			Cleared(TEXT("Canonical player faction loss"), Own);
+			Rejected(TEXT("Building no longer belongs to canonical player faction"), Own);
+			FCall PlayerRestore(Test, Manager, TEXT("SetPlayerFaction"), 1);
+			PlayerRestore.SetEnum(TEXT("NewFaction"), PlayerFaction);
+			PlayerRestore.Execute();
+			Select(Own);
+			Select(Deferred);
+			Owner(Own, EFactionID::None);
+			Test.TestEqual(TEXT("Old building event preserves new canonical selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Deferred));
+			Test.TestEqual(TEXT("Controller releases old building observer"), ListenerCount(Test, Own, TEXT("OnBuildingStateChanged"), Controller), 0);
+			FCall Placing(Test, Deferred, TEXT("SetPlacementMode"), 2);
+			Placing.SetBool(TEXT("bPlacing"), true);
+			Placing.SetBool(TEXT("bValidPlacement"), true);
+			Placing.Execute();
+			Cleared(TEXT("Selected building returns to placement"), Deferred);
+
+			// Reorder the real UI listener after the adversarial listener without changing its handler.
+			TStrongObjectPtr<UBuildingSelectionProbe> Probe(NewObject<UBuildingSelectionProbe>());
+			Probe->Test = &Test;
+			Probe->Target = Own;
+			Probe->bArmed = true;
+			FMulticastDelegateProperty* Event = FindFProperty<FMulticastDelegateProperty>(Controller->GetClass(), TEXT("OnSelectionChanged"));
+			FScriptDelegate Listener;
+			Listener.BindUFunction(Probe.Get(), TEXT("OnSelection"));
+			if (!Test.TestTrue(TEXT("Nested building probe matches selection signature"), Event && Event->SignatureFunction->IsSignatureCompatibleWith(Probe->FindFunction(TEXT("OnSelection"))))) return;
+			FScriptDelegate UIListener;
+			UIListener.BindUFunction(Root, TEXT("HandleSelectionChanged"));
+			Event->RemoveDelegate(UIListener, Controller);
+			Event->AddDelegate(Listener, Controller);
+			Event->AddDelegate(UIListener, Controller);
+			Owner(Own, PlayerFaction);
+			Select(Own);
+			Test.TestEqual(TEXT("Ownership changes inside one selection notification"), Probe->Interventions, 1);
+			Cleared(TEXT("Nested selection owner loss uses final canonical state"), Own);
+			Event->RemoveDelegate(Listener, Controller);
+
+			// The auxiliary actor receives real content and BeginPlay, but belongs to another world.
+			UWorld* ForeignWorld = UWorld::CreateWorld(EWorldType::Game, false);
+			if (!Test.TestNotNull(TEXT("Foreign building world created"), ForeignWorld)) return;
+			GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(ForeignWorld);
+			ForeignWorld->SetGameInstance(World->GetGameInstance());
+			ForeignWorld->InitializeActorsForPlay(FURL());
+			FActorSpawnParameters ForeignParameters;
+			ForeignParameters.ObjectFlags |= RF_Transient;
+			ForeignParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AActor* Foreign = ForeignWorld->SpawnActor<AActor>(BarracksClass, FVector::ZeroVector, FRotator::ZeroRotator, ForeignParameters);
+			if (Test.TestNotNull(TEXT("Foreign building spawned"), Foreign))
+			{
+				Owner(Foreign, PlayerFaction);
+				Foreign->DispatchBeginPlay();
+				FCall(Test, Foreign, TEXT("StartConstruction"), 0).Execute();
+				Test.TestTrue(TEXT("Foreign building is independently selection-ready"), ReadBool(Test, Foreign, TEXT("IsSelectionReady")));
+				Rejected(TEXT("Foreign-world own building"), Foreign);
+			}
+			ForeignWorld->DestroyWorld(false);
+			GEngine->DestroyWorldContext(ForeignWorld);
+			CollectGarbage(RF_NoFlags); // Remove deinitialized subsystems before later input tests.
+
+			Owner(Own, PlayerFaction);
+			Select(Own);
+			Own->RouteEndPlay(EEndPlayReason::RemovedFromWorld);
+			Test.TestTrue(TEXT("Routed EndPlay fixture remains a valid actor"), IsValid(Own));
+			Cleared(TEXT("Still-valid actor EndPlay"), Own);
+			Rejected(TEXT("Ended actor cannot be selected again"), Own);
+			Owner(Other, PlayerFaction);
+			Select(Other);
+			FCall Damage(Test, Other, TEXT("ApplyBuildingDamage"), 2);
+			Damage.SetFloat(TEXT("Damage"), 100000.0f);
+			Damage.SetObject(TEXT("DamageSource"), nullptr);
+			Damage.Execute();
+			Test.TestNull(TEXT("Destroyed building immediately clears canonical selection"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")));
+			Rejected(TEXT("Destroyed building"), Other);
+			FCall(Test, Deferred, TEXT("StartConstruction"), 0).Execute();
+			FCall Strategic(Test, World->GetAuthGameMode(), TEXT("SetGameplayMode"), 1);
+			Strategic.SetEnum(TEXT("NewMode"), EGameplayMode::Strategic);
+			Strategic.Execute();
+			Select(Deferred);
+			Test.TestEqual(TEXT("Own building selection remains eligible in Strategic mode"), ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(Deferred));
+			Owner(Deferred, EFactionID::None);
+			Cleared(TEXT("Strategic ownership-loss cleanup"), Deferred);
+			Owner(Deferred, PlayerFaction);
+			Select(Deferred);
+			Test.TestEqual(TEXT("Controller observes current building before shutdown"), ListenerCount(Test, Deferred, TEXT("OnBuildingStateChanged"), Controller), 1);
+			Controller->RouteEndPlay(EEndPlayReason::RemovedFromWorld);
+			Test.TestEqual(TEXT("Controller EndPlay removes building observer"), ListenerCount(Test, Deferred, TEXT("OnBuildingStateChanged"), Controller), 0);
+		}
+	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPlayerBuildingSelectionPIETest,
+	"RomanEmpireGame.Buildings.PlayerSelectionPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FPlayerBuildingSelectionPIETest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	if (!TestNotNull(TEXT("Building selection test requires an editor"), GEditor) ||
+		!TestNull(TEXT("Building selection test owns a new PIE session"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loads"), EditorWorld && EditorWorld->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FExercisePlayerBuildingSelection(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUITests::FWaitForOwnedPIEToEnd(this));
 	return true;
 }
 

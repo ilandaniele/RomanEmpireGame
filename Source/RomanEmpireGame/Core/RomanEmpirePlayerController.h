@@ -93,6 +93,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Selection")
 	bool IsPlayerUnitEligible(const AUnitBase* Unit) const;
 
+	UFUNCTION(BlueprintPure, Category = "Selection")
+	bool IsPlayerBuildingEligible(const ABuildingBase* Building) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Selection")
 	void CommandSelectedUnitsMove(const FVector& Destination);
 
@@ -271,6 +274,9 @@ private:
 
 	UFUNCTION()
 	void HandleSelectedBuildingDestroyed(ABuildingBase* Building);
+
+	UFUNCTION()
+	void HandleSelectedBuildingStateChanged(ABuildingBase* Building);
 
 	UFUNCTION()
 	void HandleSelectedActorDestroyed(AActor* Actor);

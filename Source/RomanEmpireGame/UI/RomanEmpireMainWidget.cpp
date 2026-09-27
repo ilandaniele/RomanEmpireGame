@@ -523,7 +523,7 @@ void URomanEmpireMainWidget::RefreshSelection()
 		return;
 	}
 
-	if (!Building)
+	if (!CachedController || !CachedController->IsPlayerBuildingEligible(Building))
 	{
 		SelectionPanel->SetVisibility(ESlateVisibility::Collapsed);
 		return;
@@ -565,7 +565,7 @@ void URomanEmpireMainWidget::RefreshSelection()
 
 	const bool bCanTrain = Building->IsComplete() && CachedController &&
 		CachedController->CanIssueTacticalCommands() &&
-		CachedGameState && Building->GetOwnerFaction() == CachedGameState->GetPlayerFaction() &&
+		CachedController->IsPlayerBuildingEligible(Building) &&
 		!Data.TrainableUnits.IsEmpty();
 	TrainButton->SetVisibility(bCanTrain ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	if (bCanTrain && TrainButtonText)

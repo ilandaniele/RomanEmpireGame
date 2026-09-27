@@ -26,6 +26,7 @@ public:
 	ABuildingBase();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	// Building info
@@ -76,6 +77,10 @@ public:
 	virtual bool CanPlaceAt(const FVector& Location) const;
 
 	// Selection
+	/** Live placed actor readiness; ownership eligibility belongs to the controller. */
+	UFUNCTION(BlueprintPure, Category = "Building|Selection")
+	bool IsSelectionReady() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Building|Selection")
 	void SetSelected(bool bNewSelected);
 
@@ -162,6 +167,7 @@ protected:
 
 private:
 	bool bBuildingInitialized = false;
+	bool bBuildingEndingPlay = false;
 	void ApplyDefinitionPresentation();
 	void UpdateVisuals();
 };

@@ -73,6 +73,22 @@ void ABuildingBase::BeginPlay()
 	UpdateVisuals();
 }
 
+void ABuildingBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	bBuildingEndingPlay = true;
+	bIsSelected = false;
+	// Remove local selection even for level removal, which need not fire OnDestroyed.
+	OnBuildingStateChanged.Broadcast(this);
+	Super::EndPlay(EndPlayReason);
+}
+
+bool ABuildingBase::IsSelectionReady() const
+{
+	return bBuildingInitialized && !bBuildingEndingPlay && HasActorBegunPlay() &&
+		!IsActorBeingDestroyed() && CurrentHealth > 0 &&
+		CurrentState != EBuildingState::Placing && CurrentState != EBuildingState::Destroyed;
+}
+
 bool ABuildingBase::InitializeBuilding(FName DefinitionID, EFactionID NewOwner)
 {
 	if (bBuildingInitialized || !RomanEmpireContent::IsStableID(DefinitionID))
@@ -143,7 +159,7 @@ void ABuildingBase::OnConstruction(const FTransform& Transform)
 
 void ABuildingBase::SetOwnerFaction(EFactionID NewOwner)
 {
-	if (OwnerFaction == NewOwner)
+	if (OwnerFaction == NewOwner || bBuildingEndingPlay || IsActorBeingDestroyed() || CurrentState == EBuildingState::Destroyed)
 	{
 		return;
 	}
@@ -306,6 +322,8 @@ void ABuildingBase::SetSelected(bool bNewSelected)
 
 void ABuildingBase::SetPlacementMode(bool bPlacing, bool bValidPlacement)
 {
+	if (bBuildingEndingPlay || IsActorBeingDestroyed() || CurrentState == EBuildingState::Destroyed) return;
+	const EBuildingState PreviousState = CurrentState;
 	if (bPlacing)
 	{
 		CurrentState = EBuildingState::Placing;
@@ -326,6 +344,7 @@ void ABuildingBase::SetPlacementMode(bool bPlacing, bool bValidPlacement)
 		SetActorEnableCollision(true);
 		UpdateVisuals();
 	}
+	if (CurrentState != PreviousState) OnBuildingStateChanged.Broadcast(this);
 }
 
 void ABuildingBase::UpdateVisuals()
