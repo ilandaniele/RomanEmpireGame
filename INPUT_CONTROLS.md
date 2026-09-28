@@ -20,6 +20,8 @@ The controller loads `/Game/Input/DA_RomanInputConfig`. Exactly one gameplay con
 
 Tactical commands, construction, training, and turns require initialized gameplay and an active campaign. Training uses the selected eligible player-owned barracks through the TRAIN button; the keyboard does not search for an arbitrary producer. Numbered slots use building-definition IDs, not hard-coded building classes. There are no active jump, sprint, or gamepad bindings in this milestone.
 
+Right-clicking terrain with several units selected assigns separate formation destinations around the click. Only selected units move, including when they belong to a larger squad. If the formation cannot fit on the NavMesh, the command is rejected with feedback and previous orders are preserved. A single selected unit uses the exact clicked destination. Routes use collision-aware navigation; an unreachable route leaves that unit holding position.
+
 ## Lifecycle and mapping ownership
 
 - Actions live under `/Game/Input/Actions/IA_*`; mode contexts live under `/Game/Input/Contexts/IMC_*`. The config holds 20 distinct actions and four distinct contexts; Tactical has 18 mappings.

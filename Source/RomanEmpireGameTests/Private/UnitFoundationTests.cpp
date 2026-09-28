@@ -1106,6 +1106,10 @@ namespace RomanEmpireUnitTests
 			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Ownership PIE startup timed out")); return true; }
 			ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
 			if (!State || !State->IsGameplayInitialized()) return false;
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			FNavLocation MoveGoal;
+			if (!Nav || Nav->IsNavigationBuildInProgress() ||
+				!Nav->ProjectPointToNavigation(FVector(-1200, -3500, 0), MoveGoal, FVector(100, 100, 250))) return false;
 			APlayerController* Controller = World->GetFirstPlayerController();
 			if (!Controller || !Bool(Test, Controller, TEXT("CanIssueTacticalCommands"))) return false;
 			APawn* OriginalCamera = Controller->GetPawn();
@@ -1172,7 +1176,7 @@ namespace RomanEmpireUnitTests
 				FCall Call(Test, Controller, TEXT("CommandSelectedUnitsMove"), 1);
 				FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Destination"));
 				if (!Test.TestTrue(TEXT("Player move accepts FVector"), Prop && Prop->Struct == TBaseStructure<FVector>::Get())) return;
-				const FVector Destination(170000.0, 100000.0, 300.0);
+				const FVector Destination = MoveGoal.Location; // Multi-selection needs a navigable formation footprint.
 				Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
 				Call.Execute();
 			};
@@ -1713,6 +1717,142 @@ namespace RomanEmpireUnitTests
 		Call.Execute();
 		return *Result->ContainerPtrToValuePtr<FGuid>(Call.Params.GetStructMemory());
 	}
+	class FExerciseFormation : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseFormation(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 90)
+			{
+				Test.AddError(FString::Printf(TEXT("Formation PIE timed out in phase %d"), Phase)); return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Player = World->GetFirstPlayerController();
+			if (!Player || !Bool(Test, Player, TEXT("CanIssueTacticalCommands"))) return false;
+			auto PlayerMove = [&](const FVector& Destination)
+			{
+				FCall Call(Test, Player, TEXT("CommandSelectedUnitsMove"), 1);
+				if (FStructProperty* Property = Call.Property<FStructProperty>(TEXT("Destination")))
+					Property->CopyCompleteValue(Property->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
+				Call.Execute();
+			};
+			if (Phase == 0)
+			{
+				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+				FNavLocation Point;
+				if (!Nav || Nav->IsNavigationBuildInProgress() ||
+					!Nav->ProjectPointToNavigation(FVector(1000, -3500, 0), Point, FVector(100, 100, 250))) return false;
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				for (int32 Index = 0; Index < 4; ++Index)
+				{
+					FActorSpawnParameters Params;
+					Params.bDeferConstruction = true;
+					Params.ObjectFlags |= RF_Transient;
+					Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					ACharacter* Unit = World->SpawnActor<ACharacter>(Class, FTransform(FVector(-1400, -3740 + 240 * Index, 100)), Params);
+					if (!Test.TestNotNull(TEXT("Formation member spawned"), Unit)) return true;
+					Members.Add(Unit);
+					if (!Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome)) return true;
+					Unit->FinishSpawning(Unit->GetActorTransform());
+					Command(Test, Unit, TEXT("CommandHold"));
+				}
+				URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+				Squad = CreateSquad(Test, Registry, { Members[0].Get(), Members[1].Get(), Members[2].Get(), Members[3].Get() });
+				Test.TestTrue(TEXT("Real squad created for partial-selection test"), Squad.IsValid());
+				SelectMany(Test, Player, { Members[0].Get(), Members[1].Get(), Members[2].Get() });
+				PlayerMove(Point.Location);
+				Test.TestEqual(TEXT("Unselected squad member receives no move"), Order(Test, Members[3].Get()), EUnitOrderType::Hold);
+				TArray<FVector> Destinations;
+				for (int32 Index = 0; Index < 3; ++Index)
+				{
+					Test.TestEqual(TEXT("Selected member receives Move"), Order(Test, Members[Index].Get()), EUnitOrderType::Move);
+					Destinations.Add(StoredState<FUnitOrderState>(Test, Members[Index].Get(), TEXT("Orders")).GetDestination());
+				}
+				for (int32 A = 0; A < 3; ++A)
+					for (int32 B = A + 1; B < 3; ++B)
+						Test.TestTrue(TEXT("Projected formation slots remain separated"), FVector::Dist2D(Destinations[A], Destinations[B]) > 100);
+				PlayerMove(FVector(100000, 0, 0));
+				for (int32 Index = 0; Index < 3; ++Index)
+					Test.TestEqual(TEXT("Invalid footprint preserves every prior destination"), StoredState<FUnitOrderState>(Test, Members[Index].Get(), TEXT("Orders")).GetDestination(), Destinations[Index]);
+				UUserWidget* Root = Cast<UUserWidget>(ObjectQuery(Test, Player, TEXT("GetMainWidget")));
+				UTextBlock* Feedback = Root ? Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("InteractionFeedbackText"))) : nullptr;
+				Test.TestTrue(TEXT("Invalid formation reports user-visible feedback"), Feedback && !Feedback->GetText().IsEmpty());
+				Phase = 1;
+				return false;
+			}
+			for (const auto& Unit : Members)
+				if (!Test.TestTrue(TEXT("Formation member stays valid"), Unit.IsValid())) return true;
+			if (Phase == 1)
+			{
+				for (int32 Index = 0; Index < 3; ++Index)
+					if (NavigationResult(Test, Members[Index].Get()) != EUnitNavigationResult::Moving) return false;
+				AAIController* AI = Cast<AAIController>(Members[0]->GetController());
+				if (!Test.TestNotNull(TEXT("Formation member has live path follower"), AI)) return true;
+				bool bNested = false;
+				const FDelegateHandle Handle = AI->GetPathFollowingComponent()->OnRequestFinished.AddLambda(
+					[&](FAIRequestID, const FPathFollowingResult&)
+					{
+						if (bNested) return;
+						bNested = true;
+						PlayerMove(FVector(1200, -4500, 0));
+						for (int32 Index = 0; Index < 3; ++Index)
+							Goals.Add(StoredState<FUnitOrderState>(Test, Members[Index].Get(), TEXT("Orders")).GetDestination());
+					});
+				PlayerMove(FVector(-1000, -4000, 0));
+				AI->GetPathFollowingComponent()->OnRequestFinished.Remove(Handle);
+				Test.TestTrue(TEXT("Real path abort issues a nested group order"), bNested);
+				UUserWidget* Root = Cast<UUserWidget>(ObjectQuery(Test, Player, TEXT("GetMainWidget")));
+				UTextBlock* Feedback = Root ? Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("InteractionFeedbackText"))) : nullptr;
+				Test.TestTrue(TEXT("Valid formation clears obsolete feedback"), Feedback && Feedback->GetText().IsEmpty());
+				if (!Test.TestEqual(TEXT("Nested order has every member"), Goals.Num(), 3)) return true;
+				for (int32 Index = 0; Index < 3; ++Index)
+					Test.TestEqual(TEXT("Outer batch cannot overwrite newer formation"), StoredState<FUnitOrderState>(Test, Members[Index].Get(), TEXT("Orders")).GetDestination(), Goals[Index]);
+				Arrived.Init(false, 3);
+				Phase = 2;
+				return false;
+			}
+			bool bAllArrived = true;
+			for (int32 Index = 0; Index < 3; ++Index)
+			{
+				if (Arrived[Index]) continue;
+				const EUnitNavigationResult Result = NavigationResult(Test, Members[Index].Get());
+				if (Result == EUnitNavigationResult::Unreachable)
+				{
+					Test.AddError(FString::Printf(TEXT("Formation member %d failed its real path"), Index)); return true;
+				}
+				if (Result != EUnitNavigationResult::Arrived) { bAllArrived = false; continue; }
+				Test.TestTrue(TEXT("Member physically reaches its own assigned slot"), FVector::Dist2D(Members[Index]->GetActorLocation(), Goals[Index]) < 60);
+				Arrived[Index] = true;
+				Command(Test, Members[Index].Get(), TEXT("CommandHold"));
+			}
+			if (!bAllArrived) return false;
+			URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			for (const auto& Unit : Members)
+				Test.TestEqual(TEXT("Formation movement does not replace squad identity"), UnitSquad(Test, Registry, Unit.Get()), Squad);
+			Test.TestEqual(TEXT("Unselected squad member stays on Hold"), Order(Test, Members[3].Get()), EUnitOrderType::Hold);
+			SelectMany(Test, Player, { Members[0].Get() });
+			const FVector SingleGoal(1200, -5000, 0);
+			PlayerMove(SingleGoal);
+			Test.TestEqual(TEXT("Single selection keeps exact destination without offset"), StoredState<FUnitOrderState>(Test, Members[0].Get(), TEXT("Orders")).GetDestination(), SingleGoal);
+			Command(Test, Player, TEXT("ClearSelection"));
+			for (const auto& Unit : Members) Unit->Destroy();
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		int32 Phase = 0;
+		FGuid Squad;
+		TArray<TWeakObjectPtr<ACharacter>> Members;
+		TArray<FVector> Goals;
+		TArray<bool> Arrived;
+	};
+
 	class FExerciseSquadRegistry : public IAutomationLatentCommand
 	{
 	public:
@@ -2139,6 +2279,18 @@ bool FSquadRegistryTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseSquadRegistry(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitFormationTest, "RomanEmpireGame.Units.FormationPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitFormationTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseFormation(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

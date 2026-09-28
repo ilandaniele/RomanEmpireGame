@@ -6,6 +6,9 @@
 #include "RomanEmpireGame.h"
 #include "Content/RomanContentRegistry.h"
 #include "Units/RomanUnitRegistry.h"
+#include "Units/RomanFormationLayout.h"
+#include "NavigationSystem.h"
+#include "Components/CapsuleComponent.h"
 #include "Units/UnitBase.h"
 #include "Building/BuildingBase.h"
 #include "Building/Barracks.h"
@@ -669,10 +672,42 @@ void ARomanEmpirePlayerController::BroadcastSelectionChanged()
 void ARomanEmpirePlayerController::CommandSelectedUnitsMove(const FVector& Destination)
 {
 	if (!CanIssueTacticalCommands()) return;
-	const TArray<AUnitBase*> Snapshot = SelectedUnits;
-	for (AUnitBase* Unit : Snapshot)
+	TArray<TWeakObjectPtr<AUnitBase>> Snapshot;
+	TArray<FVector> Locations;
+	double MaxRadius = 0;
+	for (AUnitBase* Unit : SelectedUnits)
 	{
-		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandMoveTo(Destination);
+		if (!IsPlayerUnitEligible(Unit)) continue;
+		Snapshot.Add(Unit);
+		Locations.Add(Unit->GetActorLocation());
+		MaxRadius = FMath::Max(MaxRadius, static_cast<double>(Unit->GetCapsuleComponent()->GetScaledCapsuleRadius()));
+	}
+	TArray<FVector> Destinations;
+	if (!FRomanFormationLayout::Build(Locations, Destination, FMath::Max(160.0, 2 * MaxRadius + 64), Destinations)) return;
+	if (Snapshot.Num() > 1)
+	{
+		UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+		for (int32 Index = 0; Index < Snapshot.Num(); ++Index)
+		{
+			FNavLocation Projected;
+			// Tight projection preserves distinct slots; do not collapse a formation
+			// onto the nearest edge or issue half a batch when the footprint cannot fit.
+			if (!Nav || !Nav->ProjectPointToNavigation(Destinations[Index], Projected, FVector(16, 16, 250),
+				&Snapshot[Index]->GetNavAgentPropertiesRef()))
+			{
+				ReportInteractionFeedback(NSLOCTEXT("RomanSelection", "FormationNoRoom", "Not enough navigable space for this formation."));
+				return;
+			}
+			Destinations[Index] = Projected.Location;
+		}
+	}
+	const uint64 Revision = ++TacticalCommandRevision;
+	ReportInteractionFeedback(FText::GetEmpty());
+	for (int32 Index = 0; Index < Snapshot.Num(); ++Index)
+	{
+		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands()) return;
+		AUnitBase* Unit = Snapshot[Index].Get();
+		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandMoveTo(Destinations[Index]);
 	}
 }
 
@@ -685,10 +720,17 @@ void ARomanEmpirePlayerController::CommandSelectedUnitsAttack(AUnitBase* Target)
 		ReportInteractionFeedback(NSLOCTEXT("RomanSelection", "InvalidAttackTarget", "Choose a living enemy unit to attack."));
 		return;
 	}
-	const TArray<AUnitBase*> Snapshot = SelectedUnits;
-	for (AUnitBase* Unit : Snapshot)
+	TArray<TWeakObjectPtr<AUnitBase>> Snapshot;
+	for (AUnitBase* Unit : SelectedUnits) Snapshot.Add(Unit);
+	if (Snapshot.IsEmpty()) return;
+	const TWeakObjectPtr<AUnitBase> TargetHandle(Target);
+	const uint64 Revision = ++TacticalCommandRevision;
+	ReportInteractionFeedback(FText::GetEmpty());
+	for (const TWeakObjectPtr<AUnitBase>& Member : Snapshot)
 	{
-		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandAttack(Target);
+		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands() || !TargetHandle.IsValid()) return;
+		AUnitBase* Unit = Member.Get();
+		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandAttack(TargetHandle.Get());
 	}
 }
 

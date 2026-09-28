@@ -281,6 +281,8 @@ private:
 	void ReconcileUnitOwnership();
 	bool bExitingPossession = false;
 	bool bControllerEndingPlay = false;
+	// Invalidates an outer dispatch if a path-completion observer issues a newer command.
+	uint64 TacticalCommandRevision = 0;
 	void PerformBoxSelect(bool bAdditive);
 	UPROPERTY(Transient)
 	bool bAdditiveSelectionGesture = false;

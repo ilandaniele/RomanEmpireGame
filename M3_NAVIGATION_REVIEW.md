@@ -1,6 +1,8 @@
 # M3.3 navigation foundation
 
-Status: navigation foundation implemented; targeted PIE, full regression, strict IWYU and Shipping compilation pass. M3.3 remains open for formation destinations and broader movement validation.
+Status at the navigation-foundation revision: targeted PIE, full regression, strict IWYU and Shipping compilation pass. M3.3 remained open for formation destinations and broader movement validation.
+
+Subsequent formation implementation and its separate evidence are tracked in [M3_FORMATION_REVIEW.md](M3_FORMATION_REVIEW.md); the results below remain specific to the navigation-foundation revision.
 
 ## Implemented
 
