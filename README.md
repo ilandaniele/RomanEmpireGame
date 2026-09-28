@@ -84,7 +84,9 @@ M1 and M2 are complete: canonical resources/turns/territories/diplomacy, Primary
 
 Shift-click toggle, Shift-drag add and transient invalid-target feedback are implemented. Current regression passes 25/25 without result warnings, plus strict IWYU, Shipping compilation and Development packaging. Windows Code Integrity blocks the new unsigned packaged executable before startup, so its actual-player gate remains open; no security policy was changed. See [M3_ADDITIVE_SELECTION_REVIEW.md](M3_ADDITIVE_SELECTION_REVIEW.md) for revision-specific evidence and limits. Automation uses process-only `-DisableFab`. [INPUT_CONTROLS.md](INPUT_CONTROLS.md) documents defaults; [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) tracks remaining squad, routing, navigation, combat and full-game work. Art remains placeholder and the vertical slice is not finished.
 
-Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. Its subsequent regression passes 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; navigation/formations and campaign mapping remain later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
+Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. That baseline passes 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; formations and campaign mapping remain later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
+
+Navigation now uses AIController, CharacterMovement and dynamic NavMesh in both maps. A real-PIE obstacle/pursuit test also covers cancellation, possession reuse and lifecycle cleanup. The latest regression passes 27/27, plus strict IWYU and Shipping compilation. Formation destinations and rendered/package validation remain open; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md) records evidence and host audio warnings.
 
 ### M1 baseline evidence
 

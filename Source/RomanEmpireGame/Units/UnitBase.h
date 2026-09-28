@@ -10,6 +10,7 @@
 #include "Units/UnitCombatState.h"
 #include "Units/UnitSelectionPresentation.h"
 #include "Units/UnitActivity.h"
+#include "Units/UnitNavigationResult.h"
 #include "Faction/FactionData.h"
 #include "UnitBase.generated.h"
 
@@ -19,6 +20,7 @@ class UStaticMeshComponent;
 class UCameraComponent;
 class USpringArmComponent;
 class UDecalComponent;
+class ARomanUnitAIController;
 
 /**
  * Base class for all military units in the game
@@ -36,6 +38,10 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	/** Restore the parked controller after direct control, or create the initial controller. */
+	void RestoreTacticalController();
+	UFUNCTION(BlueprintPure, Category = "Unit|Navigation")
+	EUnitNavigationResult GetNavigationResult() const { return NavigationResult; }
 
 	// Unit info
 	UFUNCTION(BlueprintPure, Category = "Unit")
@@ -279,6 +285,13 @@ protected:
 	float CalculateDamageReduction(float RawDamage, bool bIsRanged) const;
 
 private:
+	friend class ARomanUnitAIController;
+	void StopNavigation();
+	void CompleteNavigation(uint64 Revision, bool bSuccess);
+	UPROPERTY(Transient)
+	TObjectPtr<ARomanUnitAIController> TacticalController;
+	UPROPERTY(VisibleAnywhere, Category = "Unit|Navigation")
+	EUnitNavigationResult NavigationResult = EUnitNavigationResult::None;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit|State", meta=(AllowPrivateAccess="true"))
 	FUnitVitalState Vitals;
 

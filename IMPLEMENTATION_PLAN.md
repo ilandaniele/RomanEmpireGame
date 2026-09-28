@@ -563,6 +563,8 @@ Squad implementation evidence (2026-09-28):
 
 #### M3.3 Commands, navigation, and formations
 
+Navigation foundation implemented (2026-09-28); M3.3 remains in progress. `ARomanUnitAIController` executes canonical orders with CharacterMovement and dynamic NavMesh. Both maps persist 42/192 cm agents; paths must be complete, unreachable orders settle in Hold, request/revision guards protect replacement commands, and possession reuses the cached controller. The new real-PIE test verifies an obstacle detour, moving-target pursuit, cancellation/reentry, possession and lifecycle cleanup. Formation destinations, congestion/performance, rendered and fresh packaged validation remain open. Evidence and current gate status: [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md). Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-module-build-system`, `unreal-mcp`.
+
 - Replace direct `SetActorLocation` movement with AIController/Character Movement/NavMesh path following.
 - Implement move, attack, attack-move if selected for the slice, stop, and hold with explicit command state.
 - Ensure an attack command does not clear its target while establishing movement.

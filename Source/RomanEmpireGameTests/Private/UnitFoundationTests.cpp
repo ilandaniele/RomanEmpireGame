@@ -1,5 +1,13 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 #include "UnitLifecycleProbe.h"
+#include "AIController.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
+#include "Units/UnitNavigationResult.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Blueprint/UserWidget.h"
@@ -109,6 +117,14 @@ namespace RomanEmpireUnitTests
 		if (!Test.TestTrue(TEXT("Activity query uses the public enum"), Prop && Prop->GetEnum() == StaticEnum<EUnitActivity>())) return EUnitActivity::Unavailable;
 		Call.Execute();
 		return static_cast<EUnitActivity>(Prop->GetUnderlyingProperty()->GetSignedIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory())));
+	}
+	EUnitNavigationResult NavigationResult(FAutomationTestBase& Test, UObject* Unit)
+	{
+		FCall Call(Test, Unit, TEXT("GetNavigationResult"), 1);
+		FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Navigation query uses public enum"), Prop && Prop->GetEnum() == StaticEnum<EUnitNavigationResult>())) return EUnitNavigationResult::None;
+		Call.Execute();
+		return static_cast<EUnitNavigationResult>(Prop->GetUnderlyingProperty()->GetSignedIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory())));
 	}
 	EUnitLifeState Life(FAutomationTestBase& Test, UObject* Unit)
 	{
@@ -332,6 +348,212 @@ namespace RomanEmpireUnitTests
 		if (Camera) Test.TestFalse(TEXT("Camera inactive"), Camera->IsActive());
 	}
 
+	void ObjectCommand(FAutomationTestBase& Test, UObject* Target, FName Function, FName Param, UObject* Value);
+
+	class FExerciseNavigation : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseNavigation(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 90.0)
+			{
+				Test.AddError(FString::Printf(TEXT("Navigation PIE timeout in phase %d; unit %s"), Phase,
+					Unit.IsValid() ? *Unit->GetActorLocation().ToString() : TEXT("not spawned")));
+				return true;
+			}
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			if (!Nav) return false;
+			if (Phase == 0)
+			{
+				// Keep bootstrap troops from interfering; do not disable world, movement,
+				// navigation or AI ticks. All geometry here is transient PIE-only.
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				FActorSpawnParameters Params;
+				Params.ObjectFlags |= RF_Transient;
+				AStaticMeshActor* Wall = World->SpawnActor<AStaticMeshActor>(FVector(0, -3500, 240), FRotator::ZeroRotator, Params);
+				if (!Test.TestNotNull(TEXT("Transient navigation obstacle"), Wall)) return true;
+				Obstacle = Wall;
+				UStaticMeshComponent* Mesh = Wall->GetStaticMeshComponent();
+				Mesh->SetMobility(EComponentMobility::Movable);
+				Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+				Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+				Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+				Wall->SetActorScale3D(FVector(3, 10, 5));
+				Phase = 1;
+				return false;
+			}
+			if (Phase == 1)
+			{
+				if (Nav->IsNavigationBuildInProgress()) return false;
+				FNavLocation StartPoint, EndPoint;
+				if (!Nav->ProjectPointToNavigation(FVector(-1200, -3500, 0), StartPoint, FVector(100, 100, 300)) ||
+					!Nav->ProjectPointToNavigation(FVector(1200, -3500, 0), EndPoint, FVector(100, 100, 300))) return false;
+				UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, StartPoint.Location, EndPoint.Location);
+				if (!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num() < 3) return false;
+				const ANavigationData* Data = Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+				if (!Test.TestNotNull(TEXT("Runtime NavMesh exists"), Data)) return true;
+				Test.TestEqual(TEXT("Navigation radius matches unit capsule"), Data->GetConfig().AgentRadius, 42.0f);
+				Test.TestEqual(TEXT("Navigation height matches unit capsule"), Data->GetConfig().AgentHeight, 192.0f);
+				Test.AddInfo(FString::Printf(TEXT("Full obstacle route has %d corners"), Path->PathPoints.Num()));
+				Start = StartPoint.Location + FVector(0, 0, 100);
+				Goal = EndPoint.Location;
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				ACharacter* Spawned = World->SpawnActor<ACharacter>(Class, FTransform(Start), Params);
+				if (!Test.TestNotNull(TEXT("Navigation fixture unit"), Spawned)) return true;
+				Unit = Spawned;
+				if (!Initialize(Test, Spawned, TEXT("Legionary"), EFactionID::Rome)) return true;
+				Spawned->FinishSpawning(Spawned->GetActorTransform());
+				AI = Cast<AAIController>(Spawned->GetController());
+				if (!Test.TestTrue(TEXT("Unit owns tactical AI controller"), AI.IsValid() && AI->GetClass()->GetFName() == TEXT("RomanUnitAIController"))) return true;
+				Move(Test, Spawned, Goal);
+				Phase = 2;
+				return false;
+			}
+			if (!Test.TestTrue(TEXT("Navigation fixture remains alive"), Unit.IsValid() && AI.IsValid())) return true;
+			ACharacter* Actor = Unit.Get();
+			if (Phase == 2)
+			{
+				const FVector Location = Actor->GetActorLocation();
+				bMovedWithVelocity |= Actor->GetVelocity().Size2D() > 1.0;
+				MaxDetour = FMath::Max(MaxDetour, FMath::Abs(Location.Y - Start.Y));
+				if (FMath::Abs(Location.X) < 150 && FMath::Abs(Location.Y + 3500) < 500)
+				{
+					Test.AddError(TEXT("Character crossed blocking obstacle")); return true;
+				}
+				const EUnitNavigationResult Result = NavigationResult(Test, Actor);
+				if (Result == EUnitNavigationResult::Unreachable) { Test.AddError(TEXT("Valid obstacle route failed during execution")); return true; }
+				if (Result != EUnitNavigationResult::Arrived) return false;
+				Test.TestTrue(TEXT("Actual CharacterMovement produced velocity"), bMovedWithVelocity);
+				Test.TestTrue(TEXT("Unit walked around obstacle"), MaxDetour > 500);
+				Test.TestTrue(TEXT("Unit reached requested goal"), FVector::Dist2D(Location, Goal) < 60);
+				Test.TestEqual(TEXT("Arrival consumes Move order"), Order(Test, Actor), EUnitOrderType::None);
+				Move(Test, Actor, Start);
+				Phase = 3;
+				return false;
+			}
+			if (Phase == 3)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Moving) return false;
+				const FVector ReplacementGoal = Goal + FVector(0, -700, 0);
+				UPathFollowingComponent* Following = AI->GetPathFollowingComponent();
+				bool bObservedCommittedHold = false;
+				const FDelegateHandle Handle = Following->OnRequestFinished.AddLambda(
+					[&](FAIRequestID, const FPathFollowingResult&)
+					{
+						bObservedCommittedHold = Order(Test, Actor) == EUnitOrderType::Hold;
+						Move(Test, Actor, ReplacementGoal);
+					});
+				Command(Test, Actor, TEXT("CommandHold"));
+				Following->OnRequestFinished.Remove(Handle);
+				Test.TestTrue(TEXT("Abort observer sees committed Hold"), bObservedCommittedHold);
+				Test.TestEqual(TEXT("Hold cannot overwrite observer replacement"), Order(Test, Actor), EUnitOrderType::Move);
+				Test.TestEqual(TEXT("Observer replacement destination survives"), StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders")).GetDestination(), ReplacementGoal);
+				Move(Test, Actor, Goal + FVector(0, -700, 0));
+				Test.TestEqual(TEXT("Abort completion cannot erase replacement Move"), Order(Test, Actor), EUnitOrderType::Move);
+				Command(Test, Actor, TEXT("CommandHold"));
+				Test.TestEqual(TEXT("Hold cancels path following"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+				Test.TestTrue(TEXT("Hold cancels movement velocity"), Actor->GetVelocity().IsNearlyZero());
+				Move(Test, Actor, FVector(100000, -3500, 0));
+				Phase = 4;
+				return false;
+			}
+			if (Phase == 4)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Unreachable) return false;
+				Test.TestEqual(TEXT("Unreachable goal leaves Hold without retry"), Order(Test, Actor), EUnitOrderType::Hold);
+				Test.TestEqual(TEXT("Failed route leaves idle path follower"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+				Test.TestTrue(TEXT("Unreachable goal did not teleport unit"), Actor->GetActorLocation().X < 2000);
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Spawned = World->SpawnActor<ACharacter>(Actor->GetClass(), FTransform(Goal + FVector(0, -1300, 100)), Params);
+				if (!Test.TestNotNull(TEXT("Pursuit target spawned"), Spawned)) return true;
+				Enemy = Spawned;
+				if (!Initialize(Test, Spawned, TEXT("Legionary"), EFactionID::Carthage)) return true;
+				Spawned->FinishSpawning(Spawned->GetActorTransform());
+				Command(Test, Spawned, TEXT("CommandHold"));
+				Attack(Test, Actor, Spawned);
+				Phase = 5;
+				return false;
+			}
+			if (!Test.TestTrue(TEXT("Pursuit target remains alive"), Enemy.IsValid())) return true;
+			if (Phase == 5)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Moving) return false;
+				Test.TestTrue(TEXT("Path submission retains attack target"), StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders")).GetTarget() == Enemy.Get());
+				PursuitRevision = StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders")).GetRevision();
+				Enemy->SetActorLocation(Enemy->GetActorLocation() + FVector(700, 0, 0));
+				Phase = 6;
+				return false;
+			}
+			if (Phase == 6)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Arrived) return false;
+				const FUnitOrderState Orders = StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders"));
+				Test.TestTrue(TEXT("Pursuit reaches moved target, not its old location"),
+					FVector::Dist2D(Actor->GetActorLocation(), Enemy->GetActorLocation()) <= StoredState<FUnitData>(Test, Actor, TEXT("UnitData")).AttackRange);
+				Test.TestEqual(TEXT("Moving target keeps original Attack revision"), Orders.GetRevision(), PursuitRevision);
+				Test.TestEqual(TEXT("Pursuit follows current target location"), Orders.GetDestination(), Enemy->GetActorLocation());
+				Test.TestTrue(TEXT("Moving pursuit retains target identity"), Orders.GetTarget() == Enemy.Get());
+				Test.TestEqual(TEXT("Arrival in attack range stops path following"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+				Move(Test, Actor, Goal);
+				Phase = 8;
+				return false;
+			}
+			if (Phase == 8)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Moving) return false;
+				APlayerController* Player = World->GetFirstPlayerController();
+				APawn* Camera = Player->GetPawn();
+				for (int32 Cycle = 0; Cycle < 2; ++Cycle)
+				{
+					ObjectCommand(Test, Player, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Actor);
+					Test.TestTrue(TEXT("Real player possession replaces AI"), Actor->GetController() == Player);
+					Test.TestNull(TEXT("Cached tactical controller is parked"), AI->GetPawn());
+					Test.TestEqual(TEXT("Possession cancels path"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+					Command(Test, Player, TEXT("ExitFirstPersonMode"));
+					Test.TestTrue(TEXT("Exit reuses the same tactical controller"), Actor->GetController() == AI.Get());
+					Test.TestTrue(TEXT("Exit restores actual tactical camera"), Player->GetPawn() == Camera);
+				}
+				Move(Test, Actor, Goal);
+				Phase = 7;
+				return false;
+			}
+			if (NavigationResult(Test, Actor) != EUnitNavigationResult::Moving) return false;
+			Health(Test, Actor, 0);
+			Test.TestEqual(TEXT("Death cancels active path"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+			Test.TestTrue(TEXT("Death clears movement velocity"), Actor->GetVelocity().IsNearlyZero());
+			Actor->Destroy();
+			Test.TestFalse(TEXT("EndPlay destroys cached tactical controller"), AI.IsValid());
+			Enemy->Destroy();
+			if (Obstacle.IsValid()) Obstacle->Destroy();
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		int32 Phase = 0;
+		TWeakObjectPtr<ACharacter> Unit;
+		TWeakObjectPtr<ACharacter> Enemy;
+		TWeakObjectPtr<AAIController> AI;
+		TWeakObjectPtr<AStaticMeshActor> Obstacle;
+		FVector Start = FVector::ZeroVector;
+		FVector Goal = FVector::ZeroVector;
+		double MaxDetour = 0;
+		bool bMovedWithVelocity = false;
+		uint64 PursuitRevision = 0;
+	};
+
 	class FExerciseUnitOrders : public IAutomationLatentCommand
 	{
 	public:
@@ -399,10 +621,10 @@ namespace RomanEmpireUnitTests
 			CheckTarget(Unit, Enemy);
 			Enemy->SetActorLocation(Origin + FVector(1200.0, 200.0, 0.0));
 			Unit->Tick(0.125f);
-			CheckTarget(Unit, Enemy);
-			Test.TestEqual(TEXT("Pursuit updates destination without replacing attack"), Order(Test, Unit), EUnitOrderType::Attack);
-			Test.TestEqual(TEXT("Pursuit follows target's current location"), StoredState<FUnitOrderState>(Test, Unit, TEXT("Orders")).GetDestination(), Enemy->GetActorLocation());
-			Test.TestFalse(TEXT("Pursuit actually advances position"), Unit->GetActorLocation().Equals(Origin));
+			CheckTarget(Unit, nullptr);
+			Test.TestEqual(TEXT("Off-nav pursuit settles in Hold"), Order(Test, Unit), EUnitOrderType::Hold);
+			Test.TestEqual(TEXT("Off-nav pursuit reports failure"), NavigationResult(Test, Unit), EUnitNavigationResult::Unreachable);
+			Test.TestEqual(TEXT("Off-nav pursuit never bypasses navigation by teleporting"), Unit->GetActorLocation(), Origin);
 			Move(Test, Unit, Origin + FVector(0.0, 1000.0, 0.0));
 			Test.TestEqual(TEXT("Move replaces attack order"), Order(Test, Unit), EUnitOrderType::Move);
 			CheckTarget(Unit, nullptr);
@@ -1306,8 +1528,12 @@ namespace RomanEmpireUnitTests
 			Test.TestNull(TEXT("Invalid radius rejected"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, std::numeric_limits<double>::infinity()));
 			Test.TestNull(TEXT("Negative radius rejected"), Registry->FindNearestEnemy(Origin, EFactionID::Rome, -1));
 			Test.TestNull(TEXT("Non-finite origin rejected"), Registry->FindNearestEnemy(FVector(std::numeric_limits<double>::quiet_NaN(), 0, 0), EFactionID::Rome, 1000));
+			// This isolated index fixture has no NavMesh. Acquire within melee range;
+			// the navigation scenario separately exercises pursuit over real paths.
+			Source->SetActorLocation(Near->GetActorLocation() - FVector(50, 0, 0));
 			Source->Tick(0.01f);
 			Test.TestTrue(TEXT("Actual idle Tick acquires the registry enemy"), ObjectQuery(Test, Source, TEXT("GetAttackTarget")) == Near);
+			Source->SetActorLocation(Origin);
 			Command(Test, Source, TEXT("CommandHold"));
 			Source->Tick(0.01f);
 			Test.TestNull(TEXT("Hold still prevents auto-acquisition"), ObjectQuery(Test, Source, TEXT("GetAttackTarget")));
@@ -1842,6 +2068,18 @@ bool FUnitOrdersCombatTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitOrders(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitNavigationTest, "RomanEmpireGame.Units.NavigationPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitNavigationTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseNavigation(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

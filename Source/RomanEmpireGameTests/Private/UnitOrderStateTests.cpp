@@ -70,7 +70,10 @@ bool FUnitOrderStateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("NaN move rejected"), State.IssueMove(NotFinite));
 	TestFalse(TEXT("Infinite move rejected"), State.IssueMove(Infinite));
 	TestEqual(TEXT("Rejected move preserves empty state"), State.GetOrderType(), EUnitOrderType::None);
+	TestEqual(TEXT("Rejected commands do not create revisions"), State.GetRevision(), uint64(0));
 	TestTrue(TEXT("Finite move accepted"), State.IssueMove(FirstDestination));
+	const uint64 MoveRevision = State.GetRevision();
+	TestTrue(TEXT("Accepted command advances revision"), MoveRevision > 0);
 	TestEqual(TEXT("Move type"), State.GetOrderType(), EUnitOrderType::Move);
 	TestEqual(TEXT("Move destination"), State.GetDestination(), FirstDestination);
 	TestTrue(TEXT("Move is active"), State.HasMoveCommand());
@@ -78,6 +81,7 @@ bool FUnitOrderStateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Null attack rejects atomically"), State.IssueAttack(nullptr, SecondDestination));
 	TestEqual(TEXT("Invalid attack preserves Move"), State.GetOrderType(), EUnitOrderType::Move);
 	TestEqual(TEXT("Invalid attack preserves destination"), State.GetDestination(), FirstDestination);
+	TestEqual(TEXT("Rejected replacement preserves revision"), State.GetRevision(), MoveRevision);
 	State.StopMovement();
 	TestEqual(TEXT("Completed move becomes None"), State.GetOrderType(), EUnitOrderType::None);
 	TestEqual(TEXT("Completed move clears destination"), State.GetDestination(), FVector::ZeroVector);
@@ -94,6 +98,8 @@ bool FUnitOrderStateTest::RunTest(const FString& Parameters)
 		!TestNotNull(TEXT("Second real spawned target"), SecondTarget)) return false;
 
 	TestTrue(TEXT("Attack accepted"), State.IssueAttack(FirstTarget, FirstDestination));
+	const uint64 AttackRevision = State.GetRevision();
+	TestTrue(TEXT("Attack advances revision"), AttackRevision > MoveRevision);
 	TestEqual(TEXT("Attack type"), State.GetOrderType(), EUnitOrderType::Attack);
 	TestTrue(TEXT("Attack starts pursuit"), State.HasMoveCommand());
 	TestEqual(TEXT("Attack retains target"), State.GetTarget(), FirstTarget);
@@ -127,6 +133,7 @@ bool FUnitOrderStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Pursuit keeps Attack type"), State.GetOrderType(), EUnitOrderType::Attack);
 	TestEqual(TEXT("Pursuit keeps original target"), State.GetTarget(), FirstTarget);
 	TestEqual(TEXT("Pursuit has new destination"), State.GetDestination(), SecondDestination);
+	TestEqual(TEXT("Pursuit tracking preserves command revision"), State.GetRevision(), AttackRevision);
 	State.StopMovement();
 	State.StopMovement();
 	TestFalse(TEXT("Attack pursuit can stop repeatedly"), State.HasMoveCommand());
@@ -136,6 +143,7 @@ bool FUnitOrderStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Pursuit resumes without replacing target"), State.UpdatePursuitDestination(FirstDestination));
 	TestTrue(TEXT("Resumed pursuit moves"), State.HasMoveCommand());
 	TestTrue(TEXT("Attack replaces target"), State.IssueAttack(SecondTarget, SecondDestination));
+	TestTrue(TEXT("Retarget invalidates old completion revision"), State.GetRevision() > AttackRevision);
 	TestEqual(TEXT("Replaced attack target"), State.GetTarget(), SecondTarget);
 	TestTrue(TEXT("Move replaces Attack"), State.IssueMove(FirstDestination));
 	TestNull(TEXT("Move clears attack target"), State.GetTarget());

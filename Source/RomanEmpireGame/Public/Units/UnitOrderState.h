@@ -42,6 +42,8 @@ struct ROMANEMPIREGAME_API FUnitOrderState
 	bool ClearInvalidTarget();
 
 	EUnitOrderType GetOrderType() const { return OrderType; }
+	/** Changes only on replacement/cancellation, not moving-target position updates. */
+	uint64 GetRevision() const { return Revision; }
 	/** Last requested destination; zero for None/Hold. */
 	FVector GetDestination() const { return Destination; }
 	AActor* GetTarget() const;
@@ -49,6 +51,7 @@ struct ROMANEMPIREGAME_API FUnitOrderState
 	bool HasMoveCommand() const;
 
 private:
+	uint64 Revision = 0;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Unit|Orders", meta=(AllowPrivateAccess="true"))
 	EUnitOrderType OrderType = EUnitOrderType::None;
 

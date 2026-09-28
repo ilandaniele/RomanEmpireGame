@@ -2,6 +2,7 @@
 
 #include "UnitBase.h"
 #include "Units/RomanUnitRegistry.h"
+#include "Units/RomanUnitAIController.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "CollisionQueryParams.h"
@@ -22,12 +23,16 @@
 AUnitBase::AUnitBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	AIControllerClass = ARomanUnitAIController::StaticClass();
+	// Initialize content/lifecycle before creating the tactical controller in BeginPlay.
+	AutoPossessAI = EAutoPossessAI::Disabled;
 
 	// Configure capsule (collision only, not visible in-game)
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
 	GetCapsuleComponent()->SetVisibility(false);
 	GetCapsuleComponent()->SetHiddenInGame(true);
 	GetCapsuleComponent()->SetCastShadow(false);
+	GetCapsuleComponent()->SetCanEverAffectNavigation(false);
 
 	// Hide default skeletal mesh (we use custom static meshes instead)
 	if (GetMesh())
@@ -314,6 +319,42 @@ void AUnitBase::BeginPlay()
 	{
 		Registry->SynchronizeUnit(this);
 	}
+	RestoreTacticalController();
+}
+
+void AUnitBase::RestoreTacticalController()
+{
+	if (!CanAcceptCommands() || bIsPossessedByPlayer || GetController()) return;
+	if (IsValid(TacticalController) && !TacticalController->GetPawn())
+	{
+		TacticalController->Possess(this);
+	}
+	else
+	{
+		SpawnDefaultController();
+		TacticalController = Cast<ARomanUnitAIController>(GetController());
+	}
+}
+
+void AUnitBase::StopNavigation()
+{
+	if (IsValid(TacticalController)) TacticalController->CancelOrderNavigation();
+}
+
+void AUnitBase::CompleteNavigation(uint64 Revision, bool bSuccess)
+{
+	if (!CanAcceptCommands() || bIsPossessedByPlayer || Orders.GetRevision() != Revision) return;
+	if (bSuccess)
+	{
+		Orders.StopMovement();
+		NavigationResult = EUnitNavigationResult::Arrived;
+	}
+	else
+	{
+		// Fail closed rather than walk directly through geometry or retry the same path each frame.
+		Orders.Hold();
+		NavigationResult = EUnitNavigationResult::Unreachable;
+	}
 }
 
 bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
@@ -366,6 +407,9 @@ void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	StopAllActions();
 	SetActorEnableCollision(false);
 	if (GetCharacterMovement()) GetCharacterMovement()->DisableMovement();
+	ARomanUnitAIController* RetiredTacticalController = TacticalController;
+	TacticalController = nullptr;
+	if (IsValid(RetiredTacticalController)) RetiredTacticalController->Destroy();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -388,7 +432,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 	Combat.Advance(DeltaSeconds);
 	if (!bIsPossessedByPlayer)
 	{
-		// Order state owns intent; this legacy executor is replaced by navigation in M3.3.
+		// Order state owns intent; the AI controller executes it through path following.
 		if (Orders.GetOrderType() == EUnitOrderType::Attack)
 		{
 			AUnitBase* Target = Cast<AUnitBase>(Orders.GetTarget());
@@ -399,6 +443,10 @@ void AUnitBase::Tick(float DeltaSeconds)
 				{
 					// Commit recovery before damage observers can reenter this unit.
 					Orders.StopMovement();
+					NavigationResult = EUnitNavigationResult::Arrived;
+					const uint64 Revision = Orders.GetRevision();
+					StopNavigation();
+					if (!CanAcceptCommands() || Orders.GetRevision() != Revision) return;
 					if (Combat.TryBeginAttack(GetAttackRecoveryDuration()))
 					{
 						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
@@ -448,37 +496,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 			}
 		}
 
-		// === MOVEMENT (inside bIsPossessedByPlayer check) ===
-		if (Orders.HasMoveCommand())
-		{
-			FVector CurrentLoc = GetActorLocation();
-			FVector Dir = Orders.GetDestination() - CurrentLoc;
-			Dir.Z = 0.0f;
-			float Dist = Dir.Size();
-
-			if (Dist > 80.0f)
-			{
-				Dir.Normalize();
-				float MoveSpeed = 300.0f;
-				if (GetCharacterMovement())
-				{
-					MoveSpeed = GetCharacterMovement()->MaxWalkSpeed;
-				}
-				float StepSize = MoveSpeed * DeltaSeconds;
-				if (StepSize > Dist) StepSize = Dist;
-
-				FVector NewLoc = CurrentLoc + Dir * StepSize;
-				NewLoc.Z = CurrentLoc.Z;
-				SetActorLocation(NewLoc, false);
-
-				FRotator TargetRot = Dir.Rotation();
-				SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaSeconds, 10.0f));
-			}
-			else
-			{
-				Orders.StopMovement();
-			}
-		}
+		if (ARomanUnitAIController* AI = Cast<ARomanUnitAIController>(GetController())) AI->SynchronizeOrder(this);
 	} // END if (!bIsPossessedByPlayer)
 
 	// Procedural walking animation (limb swinging)
@@ -620,7 +638,11 @@ void AUnitBase::SetSelected(bool bNewSelected)
 void AUnitBase::CommandMoveTo(const FVector& Destination)
 {
 	if (!CanAcceptCommands()) return;
-	Orders.IssueMove(Destination);
+	if (Orders.IssueMove(Destination))
+	{
+		NavigationResult = EUnitNavigationResult::None;
+		StopNavigation();
+	}
 }
 
 void AUnitBase::CommandAttack(AActor* Target)
@@ -628,21 +650,31 @@ void AUnitBase::CommandAttack(AActor* Target)
 	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld()) return;
 	const AUnitBase* TargetUnit = Cast<AUnitBase>(Target);
 	if (!TargetUnit || !TargetUnit->CanAcceptCommands() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
-	Orders.IssueAttack(Target, Target->GetActorLocation());
+	if (Orders.IssueAttack(Target, Target->GetActorLocation()))
+	{
+		NavigationResult = EUnitNavigationResult::None;
+		StopNavigation();
+	}
 }
 
 void AUnitBase::CommandStop()
 {
 	Orders.Clear();
+	NavigationResult = EUnitNavigationResult::None;
 	ConsumeMovementInputVector();
 	if (GetCharacterMovement()) GetCharacterMovement()->StopMovementImmediately();
+	// Completion observers may issue a new order. Publish the entire stop first.
+	StopNavigation();
 }
 
 void AUnitBase::CommandHold()
 {
 	if (!CanAcceptCommands()) return;
-	CommandStop();
 	Orders.Hold();
+	NavigationResult = EUnitNavigationResult::None;
+	ConsumeMovementInputVector();
+	if (GetCharacterMovement()) GetCharacterMovement()->StopMovementImmediately();
+	StopNavigation();
 }
 
 void AUnitBase::MoveInput(const FVector2D& InputVector)

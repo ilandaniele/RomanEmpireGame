@@ -844,7 +844,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 		}
 		if (IsValid(PreviousUnit) && PreviousUnit->IsAlive())
 		{
-			PreviousUnit->SpawnDefaultController();
+			PreviousUnit->RestoreTacticalController();
 		}
 
 		bShowMouseCursor = true;

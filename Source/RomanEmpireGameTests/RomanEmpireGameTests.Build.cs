@@ -14,6 +14,8 @@ public class RomanEmpireGameTests : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"AIModule",
+			"NavigationSystem",
 			"RomanEmpireGame",
 			"UMG",
 			"Slate",

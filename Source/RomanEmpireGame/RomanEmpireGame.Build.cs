@@ -19,6 +19,8 @@ public class RomanEmpireGame : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"AIModule",
+			"NavigationSystem",
 			"InputCore",
 			"Slate",
 			"SlateCore",

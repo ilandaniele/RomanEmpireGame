@@ -18,6 +18,7 @@ namespace
 bool FUnitOrderState::IssueMove(const FVector& NewDestination)
 {
 	if (!IsFiniteDestination(NewDestination)) return false;
+	++Revision;
 	OrderType = EUnitOrderType::Move;
 	Destination = NewDestination;
 	Target.Reset();
@@ -28,6 +29,7 @@ bool FUnitOrderState::IssueMove(const FVector& NewDestination)
 bool FUnitOrderState::IssueAttack(AActor* NewTarget, const FVector& InitialDestination)
 {
 	if (!IsUsableTarget(NewTarget) || !IsFiniteDestination(InitialDestination)) return false;
+	++Revision;
 	OrderType = EUnitOrderType::Attack;
 	Destination = InitialDestination;
 	Target = NewTarget;
@@ -63,6 +65,7 @@ void FUnitOrderState::Hold()
 
 void FUnitOrderState::Clear()
 {
+	++Revision;
 	OrderType = EUnitOrderType::None;
 	Destination = FVector::ZeroVector;
 	Target.Reset();
