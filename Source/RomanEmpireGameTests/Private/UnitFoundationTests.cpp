@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Blueprint/UserWidget.h"
+#include "Building/BuildingTypes.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -1463,6 +1464,178 @@ namespace RomanEmpireUnitTests
 		FAutomationTestBase& Test;
 		double StartedAt;
 	};
+	FGuid CreateSquad(FAutomationTestBase& Test, URomanUnitRegistrySubsystem* Registry, const TArray<AActor*>& Members)
+	{
+		FCall Call(Test, Registry, TEXT("CreateSquad"), 2);
+		FArrayProperty* Property = Call.Property<FArrayProperty>(TEXT("Members"));
+		FObjectPropertyBase* Inner = Property ? CastField<FObjectPropertyBase>(Property->Inner) : nullptr;
+		FStructProperty* Result = Call.Property<FStructProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Squad reflected input/output types"), Inner && Result && Result->Struct == TBaseStructure<FGuid>::Get())) return {};
+		FScriptArrayHelper Array(Property, Property->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()));
+		Array.Resize(Members.Num());
+		for (int32 Index = 0; Index < Members.Num(); ++Index) Inner->SetObjectPropertyValue(Array.GetRawPtr(Index), Members[Index]);
+		Call.Execute();
+		return *Result->ContainerPtrToValuePtr<FGuid>(Call.Params.GetStructMemory());
+	}
+	FGuid UnitSquad(FAutomationTestBase& Test, URomanUnitRegistrySubsystem* Registry, AActor* Unit)
+	{
+		FCall Call(Test, Registry, TEXT("GetUnitSquad"), 2);
+		if (FObjectPropertyBase* Property = Call.Property<FObjectPropertyBase>(TEXT("Unit")))
+			Property->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Unit);
+		FStructProperty* Result = Call.Property<FStructProperty>(TEXT("ReturnValue"), true);
+		if (!Test.TestTrue(TEXT("Squad handle type"), Result && Result->Struct == TBaseStructure<FGuid>::Get())) return {};
+		Call.Execute();
+		return *Result->ContainerPtrToValuePtr<FGuid>(Call.Params.GetStructMemory());
+	}
+	class FExerciseSquadRegistry : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseSquadRegistry(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Squad PIE startup timed out")); return true; }
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			UClass* UnitClass = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+			if (!Test.TestTrue(TEXT("Squad PIE dependencies ready"), Registry && UnitClass)) return true;
+			Test.TestEqual(TEXT("Bootstrap creates two tactical squads"), Registry->GetSquadCount(), 2);
+			for (EFactionID Faction : { EFactionID::Rome, EFactionID::Carthage })
+			{
+				const TArray<AUnitBase*> Units = Registry->GetUnitsForFaction(Faction);
+				if (!Test.TestFalse(TEXT("Bootstrap faction populated"), Units.IsEmpty())) return true;
+				const FGuid Squad = Registry->GetUnitSquad(Units[0]);
+				Test.TestTrue(TEXT("Bootstrap squad handle valid"), Squad.IsValid());
+				Test.TestEqual(TEXT("Bootstrap squad contains whole initial force"), Registry->GetSquadMembers(Squad).Num(), Units.Num());
+				for (AUnitBase* Unit : Units) Test.TestEqual(TEXT("Bootstrap membership consistent"), Registry->GetUnitSquad(Unit), Squad);
+			}
+			const int32 Baseline = Registry->GetSquadCount();
+			TArray<TWeakObjectPtr<AActor>> Fixtures;
+			ON_SCOPE_EXIT { for (const TWeakObjectPtr<AActor>& Actor : Fixtures) if (Actor.IsValid()) Actor->Destroy(); };
+			auto Spawn = [&](EFactionID Faction, bool bFinish = true, UWorld* InWorld = nullptr)
+			{
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true; Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Unit = (InWorld ? InWorld : World)->SpawnActor<ACharacter>(UnitClass,
+					FTransform(FVector(400000.0 + Fixtures.Num() * 500.0, 400000.0, 300.0)), Params);
+				if (!Test.TestNotNull(TEXT("Squad fixture spawned"), Unit)) return Unit;
+				Fixtures.Add(Unit);
+				Initialize(Test, Unit, TEXT("Legionary"), Faction);
+				if (bFinish) Unit->FinishSpawning(Unit->GetActorTransform());
+				Unit->SetActorTickEnabled(false);
+				for (UActorComponent* Part : Unit->GetComponents()) if (Part) Part->SetComponentTickEnabled(false);
+				return Unit;
+			};
+			ACharacter* First = Spawn(EFactionID::Rome);
+			ACharacter* Second = Spawn(EFactionID::Rome);
+			ACharacter* Enemy = Spawn(EFactionID::Carthage);
+			ACharacter* Deferred = Spawn(EFactionID::Rome, false);
+			if (!First || !Second || !Enemy || !Deferred) return true;
+			Test.TestFalse(TEXT("Empty group rejected"), CreateSquad(Test, Registry, {}).IsValid());
+			Test.TestFalse(TEXT("Invalid mixed request rejected atomically"), CreateSquad(Test, Registry, {First, Enemy}).IsValid());
+			Test.TestFalse(TEXT("Null mixed request rejected atomically"), CreateSquad(Test, Registry, {First, nullptr}).IsValid());
+			Test.TestFalse(TEXT("Deferred unit rejected"), CreateSquad(Test, Registry, {First, Deferred}).IsValid());
+			Test.TestFalse(TEXT("Invalid creation did not claim first member"), UnitSquad(Test, Registry, First).IsValid());
+			SetOwner(Test, Enemy, EFactionID::None);
+			Test.TestFalse(TEXT("Unowned unit rejected"), CreateSquad(Test, Registry, {Enemy}).IsValid());
+			SetOwner(Test, Enemy, EFactionID::Carthage);
+			const FGuid Squad = CreateSquad(Test, Registry, {Second, First, Second});
+			Test.TestTrue(TEXT("Valid group created"), Squad.IsValid());
+			const TArray<AUnitBase*> Ordered = Registry->GetSquadMembers(Squad);
+			Test.TestTrue(TEXT("Membership deduplicated in caller order"), Ordered.Num() == 2 &&
+				static_cast<const void*>(Ordered[0]) == Second && static_cast<const void*>(Ordered[1]) == First);
+			Test.TestEqual(TEXT("Squad derives canonical faction"), Registry->GetSquadFaction(Squad), EFactionID::Rome);
+			Test.TestFalse(TEXT("Existing membership cannot be silently reassigned"), CreateSquad(Test, Registry, {First}).IsValid());
+			Deferred->FinishSpawning(Deferred->GetActorTransform());
+			Test.TestFalse(TEXT("A later grouped member rejects the whole request"), CreateSquad(Test, Registry, {Deferred, First}).IsValid());
+			Test.TestFalse(TEXT("Atomic rejection did not claim an earlier ungrouped member"), UnitSquad(Test, Registry, Deferred).IsValid());
+			SetOwner(Test, First, EFactionID::Rome);
+			Test.TestEqual(TEXT("No-op ownership retains squad"), UnitSquad(Test, Registry, First), Squad);
+			Command(Test, First, TEXT("CommandHold"));
+			Test.TestTrue(TEXT("Disband succeeds"), Registry->DisbandSquad(Squad));
+			Test.TestFalse(TEXT("Disband is not repeat success"), Registry->DisbandSquad(Squad));
+			Test.TestEqual(TEXT("Disband does not change order"), Order(Test, First), EUnitOrderType::Hold);
+			Test.TestTrue(TEXT("Disband does not remove live unit"), Registry->ContainsUnit(First));
+			Test.TestFalse(TEXT("Disband clears reverse lookup"), UnitSquad(Test, Registry, First).IsValid());
+			const FGuid Next = CreateSquad(Test, Registry, {First, Second});
+			Test.TestTrue(TEXT("New group does not reuse previous handle"), Next.IsValid() && Next != Squad);
+			TStrongObjectPtr<UUnitLifecycleProbe> Probe(NewObject<UUnitLifecycleProbe>());
+			Probe->Test = &Test; Probe->ObservedUnit = First; Probe->SquadObserved = Next;
+			BindProbe(Test, First, TEXT("OnOwnerFactionChanged"), Probe.Get(), TEXT("HandleSquadOwner"));
+			SetOwner(Test, First, EFactionID::Carthage);
+			Test.TestEqual(TEXT("Owner callback creates exactly one new group after detach"), Probe->SquadOwnerEvents, 1);
+			const FGuid Reentered = UnitSquad(Test, Registry, First);
+			Test.TestTrue(TEXT("Reentrant regroup is committed"), Reentered.IsValid() && Reentered != Next);
+			Test.TestEqual(TEXT("Old group retains remaining member"), Registry->GetSquadMembers(Next).Num(), 1);
+			Probe->SquadObserved = Reentered;
+			BindProbe(Test, First, TEXT("OnUnitDied"), Probe.Get(), TEXT("HandleSquadDeath"));
+			Health(Test, First, 0);
+			Test.TestEqual(TEXT("Death observer saw retired singleton"), Probe->SquadDeathEvents, 1);
+			Test.TestFalse(TEXT("Dead member cannot recreate group"), CreateSquad(Test, Registry, {First}).IsValid());
+			TWeakObjectPtr<ACharacter> WeakSecond(Second);
+			Second->Destroy();
+			Test.TestTrue(TEXT("EndPlay empties final old group"), Registry->GetSquadMembers(Next).IsEmpty());
+			Test.TestEqual(TEXT("Ended group has no faction"), Registry->GetSquadFaction(Next), EFactionID::None);
+			CollectGarbage(RF_NoFlags);
+			Test.TestFalse(TEXT("Squad registry does not retain destroyed member through GC"), WeakSecond.IsValid(true, true));
+			Test.TestEqual(TEXT("Fixture squad cleanup restores baseline"), Registry->GetSquadCount(), Baseline);
+			const TArray<AUnitBase*> BeforeTraining = Registry->GetUnitsForFaction(EFactionID::Rome);
+			UClass* BarracksClass = LoadClass<AActor>(nullptr, TEXT("/Script/RomanEmpireGame.Barracks"));
+			if (!Test.TestNotNull(TEXT("Training fixture class"), BarracksClass)) return true;
+			FActorSpawnParameters BuildingParams;
+			BuildingParams.ObjectFlags |= RF_Transient;
+			BuildingParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AActor* Barracks = World->SpawnActor<AActor>(BarracksClass, FVector(450000.0, 450000.0, 300.0), FRotator::ZeroRotator, BuildingParams);
+			if (!Test.TestNotNull(TEXT("Training fixture spawned"), Barracks)) return true;
+			Fixtures.Add(Barracks); Barracks->SetActorTickEnabled(false);
+			SetOwner(Test, Barracks, EFactionID::Rome);
+			Command(Test, Barracks, TEXT("StartConstruction"));
+			FCall BuildingData(Test, Barracks, TEXT("GetBuildingData"), 1);
+			FStructProperty* Definition = BuildingData.Property<FStructProperty>(TEXT("ReturnValue"), true);
+			if (!Test.TestTrue(TEXT("Building data type"), Definition && Definition->Struct == FBuildingData::StaticStruct())) return true;
+			BuildingData.Execute();
+			Barracks->Tick(Definition->ContainerPtrToValuePtr<FBuildingData>(BuildingData.Params.GetStructMemory())->ConstructionTime + 0.1f);
+			FCall Train(Test, Barracks, TEXT("TrainUnit"), 2);
+			Train.Set<FNameProperty>(TEXT("UnitID"), FName(TEXT("Legionary"))); Train.Execute();
+			if (!Test.TestTrue(TEXT("Training starts through canonical producer"), Train.Read<FBoolProperty, bool>())) return true;
+			FCall Remaining(Test, Barracks, TEXT("GetTrainingTimeRemaining"), 1); Remaining.Execute();
+			Barracks->Tick(Remaining.Read<FFloatProperty, float>() + 0.1f);
+			const TArray<AUnitBase*> AfterTraining = Registry->GetUnitsForFaction(EFactionID::Rome);
+			Test.TestEqual(TEXT("Training registers exactly one new unit"), AfterTraining.Num(), BeforeTraining.Num() + 1);
+			for (AUnitBase* Unit : AfterTraining) if (!BeforeTraining.Contains(Unit))
+			{
+				const FGuid RecruitedSquad = Registry->GetUnitSquad(Unit);
+				Test.TestTrue(TEXT("Trained unit receives tactical membership"), RecruitedSquad.IsValid());
+				Test.TestEqual(TEXT("Recruit starts as a singleton"), Registry->GetSquadMembers(RecruitedSquad).Num(), 1);
+			}
+
+			UWorld* OtherWorld = UWorld::CreateWorld(EWorldType::Game, false);
+			if (!Test.TestNotNull(TEXT("Isolation world created"), OtherWorld)) return true;
+			GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(OtherWorld);
+			OtherWorld->SetGameInstance(World->GetGameInstance()); OtherWorld->InitializeActorsForPlay(FURL());
+			URomanUnitRegistrySubsystem* OtherRegistry = OtherWorld->GetSubsystem<URomanUnitRegistrySubsystem>();
+			bool bOtherWorldDestroyed = false;
+			ON_SCOPE_EXIT { if (!bOtherWorldDestroyed) OtherWorld->DestroyWorld(false); GEngine->DestroyWorldContext(OtherWorld); CollectGarbage(RF_NoFlags); };
+			ACharacter* Foreign = Spawn(EFactionID::Rome, true, OtherWorld);
+			if (!OtherRegistry || !Foreign) return true;
+			Foreign->DispatchBeginPlay();
+			Test.TestFalse(TEXT("Foreign world unit rejected"), CreateSquad(Test, Registry, {Foreign}).IsValid());
+			const FGuid ForeignSquad = CreateSquad(Test, OtherRegistry, {Foreign});
+			Test.TestTrue(TEXT("Own-world group created"), ForeignSquad.IsValid());
+			Test.TestTrue(TEXT("Squad handles cannot resolve in another world"), Registry->GetSquadMembers(ForeignSquad).IsEmpty());
+			OtherWorld->DestroyWorld(false);
+			bOtherWorldDestroyed = true;
+			Test.TestEqual(TEXT("Deinitialize clears group count"), OtherRegistry->GetSquadCount(), 0);
+			Test.TestTrue(TEXT("Deinitialize clears members"), OtherRegistry->GetSquadMembers(ForeignSquad).IsEmpty());
+			Test.TestFalse(TEXT("Deinitialized registry rejects writes"), CreateSquad(Test, OtherRegistry, {Foreign}).IsValid());
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+	};
 	class FWaitForUnitPIEEnd : public IAutomationLatentCommand
 	{
 	public:
@@ -1477,6 +1650,28 @@ namespace RomanEmpireUnitTests
 		FAutomationTestBase& Test;
 		double StartedAt;
 	};
+}
+
+void UUnitLifecycleProbe::HandleSquadOwner(AUnitBase* Unit)
+{
+	if (!Test || !ObservedUnit.IsValid()) return;
+	URomanUnitRegistrySubsystem* Registry = ObservedUnit->GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
+	if (!Test->TestNotNull(TEXT("Squad owner callback registry"), Registry)) return;
+	++SquadOwnerEvents;
+	Test->TestFalse(TEXT("Owner observer sees prior membership removed"), Registry->GetUnitSquad(Unit).IsValid());
+	Test->TestEqual(TEXT("Owner observer sees old group's remaining member"), Registry->GetSquadMembers(SquadObserved).Num(), 1);
+	Test->TestTrue(TEXT("Owner observer can regroup committed new ownership"), Registry->CreateSquad({ Unit }).IsValid());
+}
+
+void UUnitLifecycleProbe::HandleSquadDeath(AUnitBase* Unit)
+{
+	if (!Test || !ObservedUnit.IsValid()) return;
+	URomanUnitRegistrySubsystem* Registry = ObservedUnit->GetWorld()->GetSubsystem<URomanUnitRegistrySubsystem>();
+	if (!Test->TestNotNull(TEXT("Squad death callback registry"), Registry)) return;
+	++SquadDeathEvents;
+	Test->TestFalse(TEXT("Death observer sees reverse membership cleared"), Registry->GetUnitSquad(Unit).IsValid());
+	Test->TestTrue(TEXT("Death observer sees last-member group retired"), Registry->GetSquadMembers(SquadObserved).IsEmpty());
+	Test->TestFalse(TEXT("Death observer cannot recreate group with dying actor"), Registry->CreateSquad({ Unit }).IsValid());
 }
 
 void UUnitLifecycleProbe::HandleDeath(AUnitBase* Unit)
@@ -1691,6 +1886,21 @@ bool FUnitRegistryTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitRegistry(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadRegistryTest, "RomanEmpireGame.Units.SquadRegistryPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSquadRegistryTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	const UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseSquadRegistry(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

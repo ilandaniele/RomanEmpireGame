@@ -64,4 +64,11 @@ public:
 	void HandleRegistryOwner(AUnitBase* Unit);
 	UFUNCTION()
 	void HandleRegistryDeath(AUnitBase* Unit);
+	FGuid SquadObserved;
+	int32 SquadOwnerEvents = 0;
+	int32 SquadDeathEvents = 0;
+	UFUNCTION()
+	void HandleSquadOwner(AUnitBase* Unit);
+	UFUNCTION()
+	void HandleSquadDeath(AUnitBase* Unit);
 };

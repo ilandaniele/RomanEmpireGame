@@ -6,6 +6,7 @@
 #include "Core/RomanEmpireGameMode.h"
 #include "Faction/FactionManager.h"
 #include "Units/UnitBase.h"
+#include "Units/RomanUnitRegistry.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Templates/UnrealTemplate.h"
@@ -169,6 +170,10 @@ bool ABarracks::SpawnTrainedUnit()
 		UGameplayStatics::FinishSpawningActor(NewUnit, SpawnTransform);
 		if (IsValid(NewUnit) && NewUnit->IsAlive())
 		{
+			if (URomanUnitRegistrySubsystem* Units = World->GetSubsystem<URomanUnitRegistrySubsystem>())
+			{
+				Units->CreateSquad({ NewUnit });
+			}
 			UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
 			return true;
 		}

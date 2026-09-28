@@ -10,6 +10,7 @@
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireHUD.h"
 #include "Units/UnitBase.h"
+#include "Units/RomanUnitRegistry.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
@@ -340,6 +341,8 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 
 	// Spawn Roman Legionaries in formation near the Roman camp
 	FVector RomanBase = FVector(0.0f, 0.0f, 50.0f);
+	TArray<AUnitBase*> RomanUnits;
+	TArray<AUnitBase*> CarthaginianUnits;
 	
 	// Formation: 3 rows of 5
 	for (int32 Row = 0; Row < 3; Row++)
@@ -348,10 +351,10 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 		{
 			FVector SpawnLoc = RomanBase + FVector(Col * 200.0f - 400.0f, Row * 200.0f - 200.0f, 0.0f);
 			
-			SpawnUnitFromDefinition(
+			if (AUnitBase* Unit = SpawnUnitFromDefinition(
 				TEXT("Legionary"),
 				EFactionID::Rome,
-				FTransform(FRotator::ZeroRotator, SpawnLoc));
+				FTransform(FRotator::ZeroRotator, SpawnLoc))) RomanUnits.Add(Unit);
 		}
 	}
 	
@@ -365,10 +368,15 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 			0.0f
 		);
 		
-		SpawnUnitFromDefinition(
+		if (AUnitBase* Unit = SpawnUnitFromDefinition(
 			TEXT("Legionary"),
 			EFactionID::Carthage,
-			FTransform(FRotator(0.0f, 180.0f, 0.0f), SpawnLoc));
+			FTransform(FRotator(0.0f, 180.0f, 0.0f), SpawnLoc))) CarthaginianUnits.Add(Unit);
+	}
+	if (URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>())
+	{
+		Registry->CreateSquad(RomanUnits);
+		Registry->CreateSquad(CarthaginianUnits);
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 15 Roman + 10 Carthaginian units"));

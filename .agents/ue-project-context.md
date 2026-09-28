@@ -118,7 +118,7 @@
 |---|---|---|
 | `USupabaseSubsystem` | `UGameInstanceSubsystem` | Prototype HTTP persistence/leaderboard client; explicitly disabled for the offline slice |
 | `URomanContentRegistrySubsystem` | `UGameInstanceSubsystem` | Loads and cross-validates faction, unit, building, and territory Primary Data Assets; provides canonical stable-ID/factory/menu lookups |
-| `URomanUnitRegistrySubsystem` | `UWorldSubsystem` | Game/PIE-only live units with weak references and derived faction buckets; actor lifecycle/ownership remain canonical. Registers after successful BeginPlay, removes before death notifications/EndPlay, reindexes before owner notifications and clears on teardown. Supplies idle enemy acquisition and player rectangle selection without world enumeration; no squad/save/spatial contract yet. |
+| `URomanUnitRegistrySubsystem` | `UWorldSubsystem` | Game/PIE-only live units with weak references and derived faction buckets; actor lifecycle/ownership remain canonical. Registers after successful BeginPlay, removes before death notifications/EndPlay, reindexes before owner notifications and clears on teardown. Supplies idle acquisition/rectangle selection and owns tactical squad membership: ordered weak members, one same-faction group per unit, atomic creation, disband and lifecycle removal. Handles are world/session-local GUIDs, not campaign/save identities; no spatial index. |
 
 **Current actor-managed systems:**
 
@@ -157,6 +157,8 @@
 **Platform-specific notes:** Windows/DX12 desktop; no Server or Client target planned. Windows security policy must not be weakened to load development binaries; use the repository's non-UBA default when application control rejects UBA output. This workstation can also reject newly generated unsigned player executables even after a successful package; release candidates therefore require signing or execution on a controlled runner whose application-control policy trusts the build output.
 
 **Current tests:**
+
+**Latest tactical squad verification (2026-09-28):** `SquadRegistryPIE` brings the full regression to 26/26 without result warnings/failures/pending (`20260928_000739_201`); final targeted 1/1 (`M3_Squads_Final_Targeted`). Tests cover atomic membership, initial forces and real training, disband preserving orders, reentrant regroup after owner change, death/EndPlay, GC and world teardown. No new module/dependency/asset or packaged-player evidence. Full details and compilation results: `M3_SQUAD_REGISTRY_REVIEW.md`.
 
 **Latest building/additive-selection verification (2026-09-27):** Building ownership baseline `e5825e5` passed 24/24. The subsequent additive-selection changes pass 6/6 targeted tests (`Artifacts/Automation/M3_Additive_Fixed_Targeted`) and 25/25 full regression, zero result warnings/failures/pending (`20260927_142020_752`), strict IWYU (60 actions) and Shipping (6). The initial targeted run caught a cached Enhanced Input action surviving `FlushPressedKeys` until the next processing pass; the controller now checks held resolved mappings as well as the evaluated action, and the synchronous assertion passes. Saved input configuration now has 20 actions and Tactical has 18 mappings, superseding the historical 19-action input description above. Both Shift keys, mode/menu/placement/focus guards, Add/Toggle/Replace deduplication, rectangle projection, building input clicks and feedback expiry/destruct are covered. Fresh package/rendered evidence is pending for this revision; no earlier package is claimed as proof.
 

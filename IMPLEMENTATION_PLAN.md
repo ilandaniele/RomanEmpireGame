@@ -545,7 +545,21 @@ Additive selection and invalid-target feedback (implemented 2026-09-27; packaged
 - Skills: `ue-input-system`, `unreal-cpp-gameplay`, `ue-ui-umg-slate`, `ue-testing-debugging`, `ue-module-build-system`, `unreal-packaging`, `unreal-mcp`, `ue-data-assets-tables`, `ue-project-context`. No new runtime dependencies or services.
 - Separate editor-game preview passes selection-state and reflected-feedback assertions; both 1920×1080 captures were inspected (15 selected units, rings, Shift help and warning). This is explicitly not packaged-player evidence. Preview-only Python/toolset startup incompatibility is avoided with `-DisablePython`; editor widget-factory/render warnings remain documented.
 
-Remaining M3.2 work: squad identity/membership contract and the fresh additive-selection packaged/rendered gate on a runner that trusts the binary. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. Do not invent persistent squad IDs or save semantics without a separate contract. M3.1 routed policy remains open. Production capture/queue/refund policies remain M3.5, not implied by selection eligibility.
+Remaining M3.2 gate: fresh packaged/rendered verification on a runner that trusts the binary. Tactical squad membership follows the explicit contract below; persistent campaign identities and their battle mapping remain M5 work. The live registry removes enumeration but not per-unit all-enemy search complexity; spatial indexing and cadence must follow measurement. M3.1 routed policy remains open. Production capture/queue/refund policies remain M3.5, not implied by selection eligibility.
+
+M3.2 squad foundation contract (implementation started 2026-09-27):
+
+- Extend the existing world-scoped unit registry as the sole owner of tactical squad membership. Each live registered unit belongs to at most one squad; all members have the same non-None actor-owned faction. Creating a group validates the complete input atomically, deduplicates it and rejects already-grouped or invalid members without moving them implicitly.
+- Handles are generated `FGuid`s local to one world/battle. They are not persistent campaign army/unit identifiers and must not be serialized as a save contract. M5 will define the explicit mapping from campaign records to tactical groups and battle results.
+- Members are weak actor references, ordered by explicit insertion. Death, EndPlay and ownership changes remove membership before actor observers; a squad disappears when its last member leaves. Disband changes only membership, never ownership/orders/selection. Possession alone does not change membership.
+- Bootstrap Romans and Carthaginians form one group each. Newly trained units start as singleton tactical groups; no automatic merge or recruitment-to-army policy is implied. Selection remains per-unit. Formation/path execution remains M3.3.
+- Verify atomic rejection, deduplication, single membership, ordering, actual bootstrap/training integration, owner/death/EndPlay and nested notifications, world isolation/teardown and non-retention. No additional assets, subsystem, dependency, world scan or per-frame update is required.
+
+Squad implementation evidence (2026-09-28):
+
+- The existing registry now exposes atomic creation/disband and validated weak-member/reverse/faction queries. Actor removal/reindex boundaries retire membership before observers. GameMode creates the initial faction groups and Barracks creates singleton recruited groups.
+- `SquadRegistryPIE` passes the strengthened targeted run (1/1); full regression passes 26/26 without result warnings/failures/pending. It covers actual bootstrap/training and nested owner/death notifications, disband/order preservation, world isolation/teardown and real GC. Revision-specific build results and limits: [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md). No packaged-player or performance gate is implied.
+- Strict IWYU (60 actions), Shipping (6), repository/LFS validation and diff checks pass. Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-project-context`; existing build/module conventions remain unchanged.
 
 #### M3.3 Commands, navigation, and formations
 
