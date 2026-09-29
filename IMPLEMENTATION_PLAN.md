@@ -581,6 +581,8 @@ Opposing-group congestion coverage implemented (2026-09-29): six real Legionarie
 
 #### M3.4 Shared combat
 
+Melee wind-up and single-impact package implemented (2026-09-29): `FUnitCombatState` remains the sole recovery clock and now owns a cancellable pending impact that fires once after a wind-up equal to 25% of the derived `1 / AttackSpeed` recovery. Both AI-targeted and direct-control melee use that window, validate current enemy/range/world/life at impact, and enter the same `TakeCombatDamage` pipeline. Direct control traces at impact, not at button press. Replaced orders, Hold/Stop, mode changes and death cancel pending hits without refunding recovery; a target leaving range is missed. Source faction/world validation rejects friendly/self damage, while null remains valid for environmental/test damage. Pure-state and real-PIE targeted tests and full 34/34 regression pass. Evidence and remaining gates: [M3_COMBAT_WINDOWS_REVIEW.md](M3_COMBAT_WINDOWS_REVIEW.md). M3.4 is not closed: death-to-objective/campaign wiring, any retained ranged/special action policy, animation/feedback and packaged combat checks still require work. Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`, `ue-module-build-system`.
+
 - Establish one damage entry point and one cooldown source.
 - Implement melee range, wind-up, hit window, cooldown, death, and faction validation.
 - Remove double application between controller traces and unit attacks.

@@ -92,6 +92,8 @@ Multi-selection movement assigns distinct formation slots, rejects invalid footp
 
 The tactical selection panel now exposes STOP and HOLD for selected units. Its original 30/30 regression gate passed, and the latest expanded suite passes 34/34; [M3_SELECTED_COMMANDS_REVIEW.md](M3_SELECTED_COMMANDS_REVIEW.md) records live route, Slate click and lifecycle checks. A fresh packaged-player gate remains open.
 
+Melee attacks now have one wind-up, one validated hit and one recovery clock for AI and direct control. The impact can miss or be cancelled without refunding recovery; [M3_COMBAT_WINDOWS_REVIEW.md](M3_COMBAT_WINDOWS_REVIEW.md) records the real-PIE and pure-state tests. Objective/death wiring and a fresh player check remain open.
+
 ### M1 baseline evidence
 
 - Visual Studio Build Tools 2022 17.14, MSVC 14.44, .NET Framework 4.8 SDK, and Windows SDK 10.0.22621/26100 are installed and accepted by UE 5.8.2.

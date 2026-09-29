@@ -97,6 +97,32 @@ bool FUnitCombatStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Smallest normalized positive duration is accepted"), State.TryBeginAttack(std::numeric_limits<float>::min()));
 	State.Advance(std::numeric_limits<float>::min());
 	TestTrue(TEXT("Small positive exact boundary completes"), State.CanAttack());
+
+	FUnitCombatState Window;
+	for (const float InvalidWindup : {-1.0f, 1.0f, 2.0f, std::numeric_limits<float>::quiet_NaN(),
+		std::numeric_limits<float>::infinity()})
+	{
+		TestFalse(TEXT("Invalid windup cannot start an attack"), Window.TryBeginAttack(1.0f, InvalidWindup));
+		TestTrue(TEXT("Invalid windup preserves readiness"), Window.CanAttack());
+	}
+	TestTrue(TEXT("Valid windup reserves one impact and recovery"), Window.TryBeginAttack(1.0f, 0.375f));
+	TestTrue(TEXT("Windup holds an impact"), Window.HasPendingImpact());
+	TestFalse(TEXT("Impact is not immediate"), Window.Advance(0.125f));
+	TestEqual(TEXT("Windup and recovery advance once"), Window.GetRecoveryRemaining(), 0.875f);
+	TestTrue(TEXT("Crossing impact boundary emits once"), Window.Advance(0.25f));
+	TestFalse(TEXT("Impact is committed before delivery"), Window.HasPendingImpact());
+	TestFalse(TEXT("Subsequent frames cannot apply second hit"), Window.Advance(0.125f));
+	TestFalse(TEXT("Cancelled empty impact stays empty"), Window.HasPendingImpact());
+	Window.Advance(0.5f);
+	TestTrue(TEXT("Recovery completes after impact"), Window.CanAttack());
+	TestTrue(TEXT("Next attack may reserve new impact"), Window.TryBeginAttack(1.0f, 0.25f));
+	Window.CancelPendingImpact();
+	TestFalse(TEXT("Cancellation discards pending hit"), Window.HasPendingImpact());
+	TestFalse(TEXT("Cancelled hit cannot fire later"), Window.Advance(0.5f));
+	TestEqual(TEXT("Cancellation never refunds recovery"), Window.GetRecoveryRemaining(), 0.5f);
+	Window.Reset();
+	TestFalse(TEXT("Reset clears pending impact"), Window.HasPendingImpact());
+	TestTrue(TEXT("Reset restores readiness"), Window.CanAttack());
 	return true;
 }
 #endif

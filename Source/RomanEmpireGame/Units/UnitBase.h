@@ -286,6 +286,10 @@ protected:
 
 private:
 	friend class ARomanUnitAIController;
+	enum class EPendingMeleeKind : uint8 { None, Ordered, Direct };
+	void CancelPendingMelee();
+	void ResolveMeleeImpact();
+	bool TryApplyMeleeHit(AUnitBase* Target);
 	void StopNavigation();
 	void CompleteNavigation(uint64 Revision, bool bSuccess);
 	UPROPERTY(Transient)
@@ -300,6 +304,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Unit|State")
 	FUnitCombatState Combat;
+	TWeakObjectPtr<AUnitBase> PendingMeleeTarget;
+	uint64 PendingMeleeOrderRevision = 0;
+	EPendingMeleeKind PendingMeleeKind = EPendingMeleeKind::None;
 
 	UPROPERTY(Transient)
 	FUnitSelectionPresentation SelectionPresentation;

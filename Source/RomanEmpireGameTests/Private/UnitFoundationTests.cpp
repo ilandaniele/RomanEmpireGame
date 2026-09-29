@@ -153,13 +153,13 @@ namespace RomanEmpireUnitTests
 	{
 		FCall Call(Test, Unit, TEXT("SetCurrentHealth"), 1); Call.Set<FIntProperty>(TEXT("NewHealth"), Value); Call.Execute();
 	}
-	void Damage(FAutomationTestBase& Test, UObject* Unit, float Value)
+	void Damage(FAutomationTestBase& Test, UObject* Unit, float Value, AActor* Source = nullptr)
 	{
 		FCall Call(Test, Unit, TEXT("TakeCombatDamage"), 3);
 		Call.Set<FFloatProperty>(TEXT("Damage"), Value);
 		Call.Set<FBoolProperty>(TEXT("bIsRanged"), false);
-		// DamageSource is initialized to null by FStructOnScope.
-		Call.Property<FObjectPropertyBase>(TEXT("DamageSource"));
+		if (FObjectPropertyBase* Property = Call.Property<FObjectPropertyBase>(TEXT("DamageSource")))
+			Property->SetObjectPropertyValue_InContainer(Call.Params.GetStructMemory(), Source);
 		Call.Execute();
 	}
 	void Move(FAutomationTestBase& Test, UObject* Unit, const FVector& Destination = FVector(45000.0, 40000.0, 100.0))
@@ -816,24 +816,64 @@ namespace RomanEmpireUnitTests
 			const int32 BeforeHealth = Int(Test, Defender, TEXT("GetCurrentHealth"));
 			Attack(Test, Fighter, Defender);
 			Fighter->Tick(0.125f);
-			Test.TestEqual(TEXT("AI first hit deals actual damage once"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
-			Test.TestEqual(TEXT("AI hit starts full recovery without charging current frame twice"), Recovery(Test, Fighter), 0.5f);
+			Test.TestEqual(TEXT("AI windup does not damage immediately"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth);
+			Test.TestEqual(TEXT("AI windup starts full recovery without charging current frame twice"), Recovery(Test, Fighter), 0.5f);
+			Test.TestTrue(TEXT("AI windup reserves exactly one impact"), StoredState<FUnitCombatState>(Test, Fighter, TEXT("Combat")).HasPendingImpact());
+			Fighter->Tick(0.125f);
+			Test.TestEqual(TEXT("AI first window applies one hit"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
+			Test.TestEqual(TEXT("Impact consumes elapsed recovery once"), Recovery(Test, Fighter), 0.375f);
+			Test.TestFalse(TEXT("First impact cannot repeat"), StoredState<FUnitCombatState>(Test, Fighter, TEXT("Combat")).HasPendingImpact());
 			Test.TestEqual(TEXT("AI recovery derives attacking activity"), Activity(Test, Fighter), EUnitActivity::Attacking);
 			Test.TestTrue(TEXT("AI attack marks combat in progress"), Bool(Test, Fighter, TEXT("IsAttacking")));
 			Test.TestFalse(TEXT("In-range attack pauses movement"), Bool(Test, Fighter, TEXT("HasMoveCommand")));
 			CheckTarget(Fighter, Defender);
-			for (int32 Index = 1; Index <= 3; ++Index)
+			for (int32 Index = 1; Index <= 2; ++Index)
 			{
 				Fighter->Tick(0.125f);
-				Test.TestEqual(TEXT("AI recovery advances exactly once per explicit tick"), Recovery(Test, Fighter), 0.5f - Index * 0.125f);
+				Test.TestEqual(TEXT("AI recovery advances exactly once per explicit tick"), Recovery(Test, Fighter), 0.375f - Index * 0.125f);
 				Test.TestEqual(TEXT("AI cannot strike again before complete recovery"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
 			}
 			Fighter->Tick(0.125f);
-			Test.TestEqual(TEXT("AI strikes once when recovery reaches zero"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 2);
-			Test.TestEqual(TEXT("Second AI strike starts one full recovery"), Recovery(Test, Fighter), 0.5f);
+			Test.TestEqual(TEXT("Second windup also waits before impact"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 1);
+			Test.TestEqual(TEXT("Second windup starts one full recovery"), Recovery(Test, Fighter), 0.5f);
+			Fighter->Tick(0.125f);
+			Test.TestEqual(TEXT("Second AI window applies one additional hit"), Int(Test, Defender, TEXT("GetCurrentHealth")), BeforeHealth - 2);
+
+			ACharacter* CancelAttacker = Spawn(EFactionID::Rome, FVector(120000.0, 0.0, 400.0));
+			ACharacter* CancelTarget = Spawn(EFactionID::Carthage, FVector(120001.0, 0.0, 400.0));
+			if (!CancelAttacker || !CancelTarget) return true;
+			const int32 CancelTargetHealth = Int(Test, CancelTarget, TEXT("GetCurrentHealth"));
+			Attack(Test, CancelAttacker, CancelTarget);
+			CancelAttacker->Tick(0.125f);
+			Command(Test, CancelAttacker, TEXT("CommandHold"));
+			CancelAttacker->Tick(0.125f);
+			Test.TestEqual(TEXT("Hold during windup prevents damage"), Int(Test, CancelTarget, TEXT("GetCurrentHealth")), CancelTargetHealth);
+			Test.TestFalse(TEXT("Hold consumes pending impact"), StoredState<FUnitCombatState>(Test, CancelAttacker, TEXT("Combat")).HasPendingImpact());
+			Test.TestEqual(TEXT("Hold does not refund recovery"), Recovery(Test, CancelAttacker), 0.375f);
+			Damage(Test, CancelAttacker, 10.0f, Fighter);
+			Test.TestEqual(TEXT("Same-faction damage source is rejected"), Int(Test, CancelAttacker, TEXT("GetCurrentHealth")), Int(Test, CancelAttacker, TEXT("GetMaxHealth")));
+			Damage(Test, CancelAttacker, 10.0f, CancelAttacker);
+			Test.TestEqual(TEXT("Self damage source is rejected"), Int(Test, CancelAttacker, TEXT("GetCurrentHealth")), Int(Test, CancelAttacker, TEXT("GetMaxHealth")));
+			Damage(Test, CancelTarget, 1.0f, Fighter);
+			Test.TestEqual(TEXT("Enemy damage source uses single damage entry"), Int(Test, CancelTarget, TEXT("GetCurrentHealth")), CancelTargetHealth - 1);
+
+			ACharacter* DodgedAttacker = Spawn(EFactionID::Rome, FVector(130000.0, 0.0, 400.0));
+			ACharacter* DodgedTarget = Spawn(EFactionID::Carthage, FVector(130001.0, 0.0, 400.0));
+			if (!DodgedAttacker || !DodgedTarget) return true;
+			const int32 DodgedHealth = Int(Test, DodgedTarget, TEXT("GetCurrentHealth"));
+			Attack(Test, DodgedAttacker, DodgedTarget);
+			DodgedAttacker->Tick(0.125f);
+			DodgedTarget->SetActorLocation(FVector(132000.0, 0.0, 400.0));
+			DodgedAttacker->Tick(0.125f);
+			Test.TestEqual(TEXT("Target leaving melee range before impact avoids damage"), Int(Test, DodgedTarget, TEXT("GetCurrentHealth")), DodgedHealth);
+			Test.TestFalse(TEXT("Missed impact is consumed once"), StoredState<FUnitCombatState>(Test, DodgedAttacker, TEXT("Combat")).HasPendingImpact());
 
 			ACharacter* PlayerUnit = Spawn(EFactionID::Rome, FVector(140000.0, 0.0, 400.0));
 			if (!PlayerUnit) return true;
+			const float UnpossessedStamina = Stamina(Test, PlayerUnit);
+			Command(Test, PlayerUnit, TEXT("PerformAttack"));
+			Test.TestEqual(TEXT("Direct attack requires possession"), Stamina(Test, PlayerUnit), UnpossessedStamina);
+			Test.TestEqual(TEXT("Unpossessed direct attack cannot reserve impact"), Recovery(Test, PlayerUnit), 0.0f);
 			SetBool(Test, PlayerUnit, TEXT("SetPossessedByPlayer"), TEXT("bPossessed"), true);
 			TStrongObjectPtr<UUnitLifecycleProbe> AttackProbe(NewObject<UUnitLifecycleProbe>());
 			AttackProbe->Test = &Test;
@@ -869,6 +909,20 @@ namespace RomanEmpireUnitTests
 			Command(Test, PlayerUnit, TEXT("PerformAttack"));
 			Test.TestEqual(TEXT("Next attack derives current instance speed once"), Recovery(Test, PlayerUnit), 0.25f);
 			Test.TestEqual(TEXT("Next legal attack spends once"), Stamina(Test, PlayerUnit), BeforeNextAttack - 10.0f);
+			PlayerUnit->Tick(0.25f);
+			ACharacter* DirectVictim = Spawn(EFactionID::Carthage, PlayerUnit->GetActorLocation() + FVector(80, 0, 0));
+			if (!DirectVictim) return true;
+			PlayerUnit->SetActorEnableCollision(true);
+			DirectVictim->SetActorEnableCollision(true);
+			const int32 DirectHealth = Int(Test, DirectVictim, TEXT("GetCurrentHealth"));
+			Command(Test, PlayerUnit, TEXT("PerformAttack"));
+			Test.TestEqual(TEXT("Direct attack does not trace at input time"), Int(Test, DirectVictim, TEXT("GetCurrentHealth")), DirectHealth);
+			PlayerUnit->Tick(0.03125f);
+			Test.TestEqual(TEXT("Direct hit waits for its window"), Int(Test, DirectVictim, TEXT("GetCurrentHealth")), DirectHealth);
+			PlayerUnit->Tick(0.03125f);
+			Test.TestEqual(TEXT("Direct window applies exactly one validated hit"), Int(Test, DirectVictim, TEXT("GetCurrentHealth")), DirectHealth - 1);
+			PlayerUnit->Tick(0.03125f);
+			Test.TestEqual(TEXT("Direct hit cannot repeat inside recovery"), Int(Test, DirectVictim, TEXT("GetCurrentHealth")), DirectHealth - 1);
 
 			int32 ScenarioIndex = 0;
 			for (const EUnitProbeDamageAction Action : {EUnitProbeDamageAction::MoveAttacker, EUnitProbeDamageAction::HoldAttacker,
@@ -887,8 +941,10 @@ namespace RomanEmpireUnitTests
 				const float AttackerStamina = Stamina(Test, Attacker);
 				Attack(Test, Attacker, Target);
 				Attacker->Tick(0.125f);
+				Test.TestEqual(TEXT("Damage observer is not called during windup"), DamageProbe->DamageEvents, 0);
+				Attacker->Tick(0.125f);
 				Test.TestEqual(TEXT("AI hit notifies target once despite nested direct attack"), DamageProbe->DamageEvents, 1);
-				Test.TestEqual(TEXT("Damage observer sees already-committed full recovery"), DamageProbe->RecoveryAtDamage, 0.5f);
+				Test.TestEqual(TEXT("Damage observer sees committed elapsed recovery"), DamageProbe->RecoveryAtDamage, 0.375f);
 				Test.TestEqual(TEXT("Damage callback cannot start another attack or spend stamina"), StoredVitals(Test, Attacker).GetStamina(), AttackerStamina);
 				if (Action == EUnitProbeDamageAction::KillAttacker || Action == EUnitProbeDamageAction::DestroyAttacker)
 				{
@@ -902,7 +958,7 @@ namespace RomanEmpireUnitTests
 						Action == EUnitProbeDamageAction::HoldAttacker ? EUnitOrderType::Hold : EUnitOrderType::None;
 					Test.TestEqual(TEXT("Damage callback replacement/cancellation survives outer AI attack"), Order(Test, Attacker), Expected);
 					CheckTargetReset(Test, StoredState<FUnitOrderState>(Test, Attacker, TEXT("Orders")));
-					Test.TestEqual(TEXT("Nested order change cannot charge recovery twice"), Recovery(Test, Attacker), 0.5f);
+					Test.TestEqual(TEXT("Nested order change cannot charge recovery twice"), Recovery(Test, Attacker), 0.375f);
 					Test.TestEqual(TEXT("Outer attack cannot perform stale target movement after callback"), Attacker->GetActorLocation(), Location);
 				}
 			}

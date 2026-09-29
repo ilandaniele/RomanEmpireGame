@@ -429,7 +429,11 @@ void AUnitBase::Tick(float DeltaSeconds)
 	if (!CanAcceptCommands()) return;
 
 	// The only temporal combat update, before either AI or direct-control actions.
-	Combat.Advance(DeltaSeconds);
+	if (Combat.Advance(DeltaSeconds))
+	{
+		ResolveMeleeImpact();
+		return; // A damage observer may replace orders; evaluate them on the next tick.
+	}
 	if (!bIsPossessedByPlayer)
 	{
 		// Order state owns intent; the AI controller executes it through path following.
@@ -447,31 +451,16 @@ void AUnitBase::Tick(float DeltaSeconds)
 					const uint64 Revision = Orders.GetRevision();
 					StopNavigation();
 					if (!CanAcceptCommands() || Orders.GetRevision() != Revision) return;
-					if (Combat.TryBeginAttack(GetAttackRecoveryDuration()))
+					const float RecoveryDuration = GetAttackRecoveryDuration();
+					const float WindupDuration = RecoveryDuration * 0.25f;
+					if (WindupDuration > 0.0f && Combat.TryBeginAttack(RecoveryDuration, WindupDuration))
 					{
-						const float Dmg = static_cast<float>(UnitData.BaseStats.MeleeAttack);
-						Target->TakeCombatDamage(Dmg, this, false);
-						if (!CanAcceptCommands()) return;
-						if (!IsValid(Target) || !Target->CanAcceptCommands())
-						{
-							// Do not overwrite a replacement order issued by a damage callback.
-							if (Orders.GetTarget() == Target) Orders.Clear();
-							else Orders.ClearInvalidTarget();
-							return;
-						}
-						if (Orders.GetTarget() != Target) return;
+						PendingMeleeKind = EPendingMeleeKind::Ordered;
+						PendingMeleeTarget = Target;
+						PendingMeleeOrderRevision = Revision;
 
 						// Arm swing
 						if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
-
-						// BRIGHT GREEN — impossible to miss on screen
-						if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
-							FString::Printf(TEXT("HIT! %s->%s DMG:%.0f HP:%d/%d"),
-								*UnitData.DisplayName.ToString(),
-								*Target->UnitData.DisplayName.ToString(),
-								Dmg, Target->GetCurrentHealth(),
-								Target->UnitData.BaseStats.MaxHealth));
-
 					}
 					// Face target while fighting
 					FVector FaceDir = Target->GetActorLocation() - GetActorLocation();
@@ -640,6 +629,7 @@ void AUnitBase::CommandMoveTo(const FVector& Destination)
 	if (!CanAcceptCommands()) return;
 	if (Orders.IssueMove(Destination))
 	{
+		CancelPendingMelee();
 		NavigationResult = EUnitNavigationResult::None;
 		StopNavigation();
 	}
@@ -652,6 +642,7 @@ void AUnitBase::CommandAttack(AActor* Target)
 	if (!TargetUnit || !TargetUnit->CanAcceptCommands() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
 	if (Orders.IssueAttack(Target, Target->GetActorLocation()))
 	{
+		CancelPendingMelee();
 		NavigationResult = EUnitNavigationResult::None;
 		StopNavigation();
 	}
@@ -659,6 +650,7 @@ void AUnitBase::CommandAttack(AActor* Target)
 
 void AUnitBase::CommandStop()
 {
+	CancelPendingMelee();
 	Orders.Clear();
 	NavigationResult = EUnitNavigationResult::None;
 	ConsumeMovementInputVector();
@@ -670,6 +662,7 @@ void AUnitBase::CommandStop()
 void AUnitBase::CommandHold()
 {
 	if (!CanAcceptCommands()) return;
+	CancelPendingMelee();
 	Orders.Hold();
 	NavigationResult = EUnitNavigationResult::None;
 	ConsumeMovementInputVector();
@@ -712,7 +705,9 @@ void AUnitBase::LookInput(const FVector2D& InputVector)
 void AUnitBase::PerformAttack()
 {
 	const float RecoveryDuration = GetAttackRecoveryDuration();
-	if (!CanAcceptCommands() || !Combat.CanAttack() || RecoveryDuration <= 0.0f)
+	const float WindupDuration = RecoveryDuration * 0.25f;
+	if (!CanAcceptCommands() || !bIsPossessedByPlayer || !Combat.CanAttack() ||
+		WindupDuration <= 0.0f || WindupDuration >= RecoveryDuration)
 	{
 		return; // Still on cooldown
 	}
@@ -722,34 +717,58 @@ void AUnitBase::PerformAttack()
 		return; // Not enough stamina
 	}
 
-	Combat.TryBeginAttack(RecoveryDuration);
+	if (!Combat.TryBeginAttack(RecoveryDuration, WindupDuration)) return;
+	PendingMeleeKind = EPendingMeleeKind::Direct;
+	PendingMeleeTarget.Reset();
+	PendingMeleeOrderRevision = 0;
 	OnUnitVitalsChanged.Broadcast(this);
 	if (!CanAcceptCommands()) return;
+}
 
-	// Perform melee attack trace
-	FVector Start = GetActorLocation() + FVector(0, 0, 80);
-	FVector End = Start + GetActorForwardVector() * UnitData.AttackRange;
+void AUnitBase::CancelPendingMelee()
+{
+	Combat.CancelPendingImpact();
+	PendingMeleeKind = EPendingMeleeKind::None;
+	PendingMeleeTarget.Reset();
+	PendingMeleeOrderRevision = 0;
+}
 
-	FHitResult HitResult;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
+bool AUnitBase::TryApplyMeleeHit(AUnitBase* Target)
+{
+	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld() ||
+		!Target->CanAcceptCommands() || Target->GetOwnerFaction() == OwnerFaction ||
+		FVector::Dist2D(GetActorLocation(), Target->GetActorLocation()) > UnitData.AttackRange ||
+		FMath::Abs(GetActorLocation().Z - Target->GetActorLocation().Z) > 200.0) return false;
+	Target->TakeCombatDamage(float(UnitData.BaseStats.MeleeAttack), this, false);
+	return true;
+}
 
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Pawn, Params))
+void AUnitBase::ResolveMeleeImpact()
+{
+	const EPendingMeleeKind Kind = PendingMeleeKind;
+	AUnitBase* Target = PendingMeleeTarget.Get();
+	const uint64 Revision = PendingMeleeOrderRevision;
+	PendingMeleeKind = EPendingMeleeKind::None;
+	PendingMeleeTarget.Reset();
+	PendingMeleeOrderRevision = 0;
+	if (!CanAcceptCommands()) return;
+	if (Kind == EPendingMeleeKind::Ordered)
 	{
-		if (AUnitBase* HitUnit = Cast<AUnitBase>(HitResult.GetActor()))
-		{
-			// Check if enemy
-			if (HitUnit->GetOwnerFaction() != OwnerFaction)
-			{
-				float Damage = UnitData.BaseStats.MeleeAttack;
-				HitUnit->TakeCombatDamage(Damage, this, false);
-			}
-		}
+		if (bIsPossessedByPlayer || Orders.GetRevision() != Revision || Orders.GetTarget() != Target) return;
+		TryApplyMeleeHit(Target);
+		if (CanAcceptCommands() && Orders.GetRevision() == Revision &&
+			(!IsValid(Target) || !Target->CanAcceptCommands())) Orders.Clear();
 	}
-
-	// TODO: Play attack animation
-	
-	UE_LOG(LogRomanEmpire, Verbose, TEXT("Unit %s attacking"), *GetName());
+	else if (Kind == EPendingMeleeKind::Direct && bIsPossessedByPlayer)
+	{
+		const FVector Start = GetActorLocation() + FVector(0, 0, 80);
+		const FVector End = Start + GetActorForwardVector() * UnitData.AttackRange;
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Pawn, Params))
+			TryApplyMeleeHit(Cast<AUnitBase>(HitResult.GetActor()));
+	}
 }
 
 void AUnitBase::StartBlocking()
@@ -807,6 +826,9 @@ void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRan
 	{
 		return;
 	}
+	if (DamageSource && (!IsValid(DamageSource) || DamageSource->GetWorld() != GetWorld())) return;
+	if (const AUnitBase* SourceUnit = Cast<AUnitBase>(DamageSource);
+		SourceUnit && (SourceUnit == this || SourceUnit->GetOwnerFaction() == OwnerFaction)) return;
 
 	// Calculate damage reduction from armor and blocking
 	const float ActualDamage = CalculateDamageReduction(Damage, bIsRanged);
@@ -853,6 +875,7 @@ float AUnitBase::CalculateDamageReduction(float RawDamage, bool bIsRanged) const
 void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 {
 	if (bPossessed && !CanAcceptCommands()) return;
+	if (bPossessed != bIsPossessedByPlayer) CancelPendingMelee();
 	bIsPossessedByPlayer = bPossessed;
 	if (!bPossessed)
 	{

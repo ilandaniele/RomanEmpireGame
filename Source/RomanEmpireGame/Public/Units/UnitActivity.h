@@ -5,7 +5,7 @@
 #include "UnitActivity.generated.h"
 
 /** Read projection, never a separately stored state machine.
- * Attacking currently includes recovery; validated impact windows arrive in M3.4.
+ * Attacking includes both melee windup and recovery; a pending impact is consumed once.
  * Routed gameplay policy is intentionally not implied by zero morale.
  */
 UENUM(BlueprintType)
