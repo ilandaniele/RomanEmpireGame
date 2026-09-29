@@ -86,7 +86,7 @@ Shift-click toggle, Shift-drag add and transient invalid-target feedback are imp
 
 Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. That baseline passed 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; campaign mapping remains later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
 
-Navigation uses AIController, CharacterMovement and dynamic NavMesh in both maps. A real-PIE obstacle/pursuit test also covers cancellation, possession reuse and lifecycle cleanup. That foundation passed 27/27, strict IWYU and Shipping compilation; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md) records revision-specific evidence and host audio warnings.
+Navigation uses AIController, CharacterMovement and dynamic NavMesh in both maps. Real-PIE tests cover obstacle avoidance, pursuit, cancellation, possession reuse, lifecycle cleanup, disconnected islands and a gated narrow passage. The latest regression passes 31/31, strict IWYU and Shipping compilation; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md) and [M3_DISCONNECTED_NAVIGATION_REVIEW.md](M3_DISCONNECTED_NAVIGATION_REVIEW.md) record revision-specific evidence and host audio warnings.
 
 Multi-selection movement assigns distinct formation slots, rejects invalid footprints without replacing prior orders, and protects newer group commands from reentrant cancellation callbacks. Partial squad selections remain partial. That revision passed 29/29; [M3_FORMATION_REVIEW.md](M3_FORMATION_REVIEW.md) records its evidence.
 

@@ -563,6 +563,139 @@ namespace RomanEmpireUnitTests
 		uint64 PursuitRevision = 0;
 	};
 
+	class FExerciseDisconnectedNavigation : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseDisconnectedNavigation(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			if (FPlatformTime::Seconds() - StartedAt > 120.0)
+			{
+				Test.AddError(FString::Printf(TEXT("Disconnected navigation PIE timed out in phase %d; unit %s"), Phase,
+					Unit.IsValid() ? *Unit->GetActorLocation().ToString() : TEXT("not spawned")));
+				return true;
+			}
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			if (!Nav) return false;
+			if (Phase == 0)
+			{
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+				if (!Test.TestNotNull(TEXT("Wall fixture mesh"), Cube)) return true;
+				auto SpawnWall = [&](const FVector& Center, const FVector& Scale)
+				{
+					FActorSpawnParameters Params;
+					Params.ObjectFlags |= RF_Transient;
+					AStaticMeshActor* Wall = World->SpawnActor<AStaticMeshActor>(Center, FRotator::ZeroRotator, Params);
+					if (!Wall) return static_cast<AStaticMeshActor*>(nullptr);
+					UStaticMeshComponent* Mesh = Wall->GetStaticMeshComponent();
+					Mesh->SetMobility(EComponentMobility::Movable);
+					Mesh->SetStaticMesh(Cube);
+					Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+					Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+					Wall->SetActorScale3D(Scale);
+					Walls.Add(Wall);
+					return Wall;
+				};
+				// The two long sections exceed the NavMesh bounds. The 400 cm opening
+				// between them is navigable for a 42 cm-radius agent only after the gate goes.
+				if (!Test.TestNotNull(TEXT("South wall"), SpawnWall(FVector(6000, -5100, 240), FVector(3, 28, 5))) ||
+					!Test.TestNotNull(TEXT("North wall"), SpawnWall(FVector(6000, 1600, 240), FVector(3, 98, 5))) ||
+					!Test.TestNotNull(TEXT("Passage gate"), SpawnWall(FVector(6000, -3500, 240), FVector(3, 5, 5)))) return true;
+				Gate = Walls.Last();
+				Phase = 1;
+				PhaseStartedAt = World->GetTimeSeconds();
+				return false;
+			}
+			if (Phase == 1)
+			{
+				if (World->GetTimeSeconds() - PhaseStartedAt < 1.0f || Nav->IsNavigationBuildInProgress()) return false;
+				FNavLocation StartPoint, EndPoint;
+				if (!Nav->ProjectPointToNavigation(FVector(5000, -3500, 0), StartPoint, FVector(100, 100, 300)) ||
+					!Nav->ProjectPointToNavigation(FVector(7000, -3500, 0), EndPoint, FVector(100, 100, 300))) return false;
+				Start = StartPoint.Location;
+				Goal = EndPoint.Location;
+				UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Start, Goal);
+				if (Path && Path->IsValid() && !Path->IsPartial()) return false;
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				if (!Test.TestNotNull(TEXT("Disconnected fixture class"), Class)) return true;
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true;
+				Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Spawned = World->SpawnActor<ACharacter>(Class, FTransform(Start + FVector(0, 0, 100)), Params);
+				if (!Test.TestNotNull(TEXT("Disconnected fixture unit"), Spawned)) return true;
+				Unit = Spawned;
+				if (!Initialize(Test, Spawned, TEXT("Legionary"), EFactionID::Rome)) return true;
+				Spawned->FinishSpawning(Spawned->GetActorTransform());
+				AI = Cast<AAIController>(Spawned->GetController());
+				if (!Test.TestNotNull(TEXT("Disconnected fixture AI"), AI.Get())) return true;
+				Move(Test, Spawned, Goal);
+				Phase = 2;
+				return false;
+			}
+			if (!Test.TestTrue(TEXT("Disconnected fixture remains alive"), Unit.IsValid() && AI.IsValid())) return true;
+			ACharacter* Actor = Unit.Get();
+			if (Phase == 2)
+			{
+				if (NavigationResult(Test, Actor) != EUnitNavigationResult::Unreachable) return false;
+				Test.TestEqual(TEXT("Disconnected goal settles in Hold"), Order(Test, Actor), EUnitOrderType::Hold);
+				Test.TestEqual(TEXT("Disconnected route leaves path follower idle"), AI->GetMoveStatus(), EPathFollowingStatus::Idle);
+				Test.TestTrue(TEXT("Disconnected goal cannot teleport through gate"), Actor->GetActorLocation().X < 5500);
+				if (!Test.TestTrue(TEXT("Gate survives until opening"), Gate.IsValid())) return true;
+				Gate->Destroy();
+				Phase = 3;
+				PhaseStartedAt = World->GetTimeSeconds();
+				return false;
+			}
+			if (Phase == 3)
+			{
+				if (World->GetTimeSeconds() - PhaseStartedAt < 1.0f || Nav->IsNavigationBuildInProgress()) return false;
+				UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Actor->GetActorLocation(), Goal);
+				if (!Path || !Path->IsValid() || Path->IsPartial()) return false;
+				Move(Test, Actor, Goal);
+				Phase = 4;
+				return false;
+			}
+			const FVector Location = Actor->GetActorLocation();
+			bMovedWithVelocity |= Actor->GetVelocity().Size2D() > 1.0;
+			if (FMath::Abs(Location.X - 6000) < 175 && FMath::Abs(Location.Y + 3500) > 180)
+			{
+				Test.AddError(TEXT("Unit crossed a solid wall instead of the narrow opening"));
+				return true;
+			}
+			const EUnitNavigationResult Result = NavigationResult(Test, Actor);
+			if (Result == EUnitNavigationResult::Unreachable)
+			{
+				Test.AddError(TEXT("Opened passage failed during execution"));
+				return true;
+			}
+			if (Result != EUnitNavigationResult::Arrived) return false;
+			Test.TestTrue(TEXT("Opened passage used CharacterMovement"), bMovedWithVelocity);
+			Test.TestTrue(TEXT("Unit reached far side through narrow opening"), Location.X > 6500 && FVector::Dist2D(Location, Goal) < 60);
+			Test.TestEqual(TEXT("Arrival consumes opened-passage Move"), Order(Test, Actor), EUnitOrderType::None);
+			Actor->Destroy();
+			for (const TWeakObjectPtr<AStaticMeshActor>& Wall : Walls) if (Wall.IsValid()) Wall->Destroy();
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		float PhaseStartedAt = 0;
+		int32 Phase = 0;
+		TWeakObjectPtr<ACharacter> Unit;
+		TWeakObjectPtr<AAIController> AI;
+		TArray<TWeakObjectPtr<AStaticMeshActor>> Walls;
+		TWeakObjectPtr<AStaticMeshActor> Gate;
+		FVector Start = FVector::ZeroVector;
+		FVector Goal = FVector::ZeroVector;
+		bool bMovedWithVelocity = false;
+	};
+
 	class FExerciseUnitOrders : public IAutomationLatentCommand
 	{
 	public:
@@ -2435,6 +2568,18 @@ bool FUnitNavigationTest::RunTest(const FString& Parameters)
 	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseNavigation(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitDisconnectedNavigationTest, "RomanEmpireGame.Units.DisconnectedNavigationPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitDisconnectedNavigationTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseDisconnectedNavigation(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
