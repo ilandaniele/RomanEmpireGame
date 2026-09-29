@@ -163,6 +163,8 @@
 
 **Current tests:**
 
+**Latest group-congestion verification (2026-09-29):** `GroupCongestionPIE` targeted 1/1 (`M3_Congestion_Final_Targeted`) and full 32/32 (`20260929_190751_272`) pass. Two controller-issued three-unit formations cross the same corridor; all six reach distinct goals without route failure or capsule overlap, and the closest opposing pair is 84 cm apart. Sixteen full-suite tests carry only the known WASAPI host notices. IWYU/Shipping status and remaining gates: `M3_GROUP_CONGESTION_REVIEW.md`.
+
 **Latest disconnected-navigation verification (2026-09-29):** `DisconnectedNavigationPIE` targeted 1/1 (`M3_Disconnected_Targeted`) and full 31/31 (`20260929_185920_597`) pass. Transient walls isolate two projected NavMesh points until a gate opens; the real AI first settles in Hold/Unreachable without crossing, then CharacterMovement carries the unit through a 400 cm passage to arrival. Fifteen full-suite tests carry only the two known WASAPI host audio notices. Strict IWYU and Shipping pass; no rendered/package claim. See `M3_DISCONNECTED_NAVIGATION_REVIEW.md`.
 
 **Latest selected-command verification (2026-09-29):** `SelectedCommandsPIE` targeted 1/1 (`M3_Commands_Final_Targeted`) checks routed Slate clicks, active path cancellation, reentrant Stop-to-Hold supersession, persistent Hold and strategic/possession/owner-loss guards. Full regression 30/30 (`20260929_185107_129`) passes with fourteen tests carrying only the two known host WASAPI notices. Strict IWYU (63 actions) and Shipping (5) pass; no package/player claim. See `M3_SELECTED_COMMANDS_REVIEW.md`.

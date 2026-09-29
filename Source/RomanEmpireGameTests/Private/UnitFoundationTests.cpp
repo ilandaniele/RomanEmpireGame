@@ -1995,6 +1995,119 @@ namespace RomanEmpireUnitTests
 		TArray<bool> Arrived;
 	};
 
+	class FExerciseGroupCongestion : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseGroupCongestion(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 120.0)
+			{
+				Test.AddError(FString::Printf(TEXT("Opposing formation routes timed out; %d of 6 arrived"), ArrivedCount));
+				return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Player = World->GetFirstPlayerController();
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			if (!Player || !Nav || !Bool(Test, Player, TEXT("CanIssueTacticalCommands")) || Nav->IsNavigationBuildInProgress()) return false;
+			auto PlayerMove = [&](const FVector& Destination)
+			{
+				FCall Call(Test, Player, TEXT("CommandSelectedUnitsMove"), 1);
+				if (FStructProperty* Property = Call.Property<FStructProperty>(TEXT("Destination")))
+					Property->CopyCompleteValue(Property->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Destination);
+				Call.Execute();
+			};
+			if (Phase == 0)
+			{
+				FNavLocation Left, Right;
+				if (!Nav->ProjectPointToNavigation(FVector(-1500, -3500, 0), Left, FVector(100, 100, 250)) ||
+					!Nav->ProjectPointToNavigation(FVector(1500, -3500, 0), Right, FVector(100, 100, 250))) return false;
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				if (!Test.TestNotNull(TEXT("Congestion fixture class"), Class)) return true;
+				for (int32 Index = 0; Index < 6; ++Index)
+				{
+					const bool bLeft = Index < 3;
+					const FVector Location(bLeft ? -1500.0 : 1500.0, -3900.0 + 400.0 * (Index % 3), 100.0);
+					FActorSpawnParameters Params;
+					Params.bDeferConstruction = true;
+					Params.ObjectFlags |= RF_Transient;
+					Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					ACharacter* Unit = World->SpawnActor<ACharacter>(Class, FTransform(Location), Params);
+					if (!Test.TestNotNull(TEXT("Congestion member spawned"), Unit)) return true;
+					Members.Add(Unit);
+					if (!Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome)) return true;
+					Unit->FinishSpawning(Unit->GetActorTransform());
+					Command(Test, Unit, TEXT("CommandHold"));
+				}
+				SelectMany(Test, Player, { Members[0].Get(), Members[1].Get(), Members[2].Get() });
+				PlayerMove(Right.Location);
+				SelectMany(Test, Player, { Members[3].Get(), Members[4].Get(), Members[5].Get() });
+				PlayerMove(Left.Location);
+				for (int32 Index = 0; Index < 6; ++Index)
+				{
+					if (!Test.TestEqual(TEXT("Both groups receive simultaneous Move orders"), Order(Test, Members[Index].Get()), EUnitOrderType::Move)) return true;
+					Goals.Add(StoredState<FUnitOrderState>(Test, Members[Index].Get(), TEXT("Orders")).GetDestination());
+				}
+				Arrived.Init(false, 6);
+				Phase = 1;
+				return false;
+			}
+			for (const auto& Unit : Members)
+				if (!Test.TestTrue(TEXT("Congestion member remains valid"), Unit.IsValid())) return true;
+			for (int32 A = 0; A < Members.Num(); ++A)
+				for (int32 B = A + 1; B < Members.Num(); ++B)
+				{
+					const double Separation = FVector::Dist2D(Members[A]->GetActorLocation(), Members[B]->GetActorLocation());
+					if (A < 3 && B >= 3) MinOpposingDistance = FMath::Min(MinOpposingDistance, Separation);
+					if (Separation < 65.0)
+					{
+						Test.AddError(FString::Printf(TEXT("Congested units %d and %d overlap"), A, B));
+						return true;
+					}
+				}
+			bool bAnyMoving = false;
+			for (int32 Index = 0; Index < Members.Num(); ++Index)
+			{
+				if (Arrived[Index]) continue;
+				ACharacter* Unit = Members[Index].Get();
+				bMovedWithVelocity |= Unit->GetVelocity().Size2D() > 1.0;
+				const EUnitNavigationResult Result = NavigationResult(Test, Unit);
+				if (Result == EUnitNavigationResult::Unreachable)
+				{
+					Test.AddError(FString::Printf(TEXT("Congestion member %d lost its route"), Index));
+					return true;
+				}
+				if (Result != EUnitNavigationResult::Arrived) { bAnyMoving = true; continue; }
+				Test.TestTrue(TEXT("Congestion member reaches its assigned slot"), FVector::Dist2D(Unit->GetActorLocation(), Goals[Index]) < 60);
+				Arrived[Index] = true;
+				++ArrivedCount;
+				Command(Test, Unit, TEXT("CommandHold"));
+			}
+			if (bAnyMoving) return false;
+			Test.TestEqual(TEXT("All opposing group members arrived"), ArrivedCount, 6);
+			Test.TestTrue(TEXT("Congested traffic used CharacterMovement"), bMovedWithVelocity);
+			Test.TestTrue(TEXT("Opposing groups actually shared a congested corridor"), MinOpposingDistance < 300.0);
+			Test.AddInfo(FString::Printf(TEXT("Closest opposing units: %.1f cm"), MinOpposingDistance));
+			Command(Test, Player, TEXT("ClearSelection"));
+			for (const auto& Unit : Members) Unit->Destroy();
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		int32 Phase = 0;
+		int32 ArrivedCount = 0;
+		bool bMovedWithVelocity = false;
+		double MinOpposingDistance = TNumericLimits<double>::Max();
+		TArray<TWeakObjectPtr<ACharacter>> Members;
+		TArray<FVector> Goals;
+		TArray<bool> Arrived;
+	};
+
 	bool ClickUnitCommandThroughSlate(FAutomationTestBase& Test, UUserWidget* Root, UButton* Button)
 	{
 		if (!Test.TestTrue(TEXT("Slate pointer router initialized"), FSlateApplication::IsInitialized() && Root && Button)) return false;
@@ -2568,6 +2681,18 @@ bool FUnitNavigationTest::RunTest(const FString& Parameters)
 	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseNavigation(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitGroupCongestionTest, "RomanEmpireGame.Units.GroupCongestionPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitGroupCongestionTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseGroupCongestion(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
