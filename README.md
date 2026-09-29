@@ -86,11 +86,11 @@ Shift-click toggle, Shift-drag add and transient invalid-target feedback are imp
 
 Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. That baseline passed 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; campaign mapping remains later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
 
-Navigation uses AIController, CharacterMovement and dynamic NavMesh in both maps. Real-PIE tests cover obstacle avoidance, pursuit, cancellation, possession reuse, lifecycle cleanup, disconnected islands, a gated narrow passage and crossing formations. The latest regression passes 32/32; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md), [M3_DISCONNECTED_NAVIGATION_REVIEW.md](M3_DISCONNECTED_NAVIGATION_REVIEW.md) and [M3_GROUP_CONGESTION_REVIEW.md](M3_GROUP_CONGESTION_REVIEW.md) record revision-specific evidence and remaining gates.
+Navigation uses AIController, CharacterMovement and dynamic NavMesh in both maps. Real-PIE tests cover obstacle avoidance, pursuit, cancellation, possession reuse, lifecycle cleanup, disconnected islands, a gated narrow passage and crossing formations. The latest regression passes 34/34; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md), [M3_DISCONNECTED_NAVIGATION_REVIEW.md](M3_DISCONNECTED_NAVIGATION_REVIEW.md) and [M3_GROUP_CONGESTION_REVIEW.md](M3_GROUP_CONGESTION_REVIEW.md) record revision-specific evidence and remaining gates. [M3_PERFORMANCE_BASELINE_REVIEW.md](M3_PERFORMANCE_BASELINE_REVIEW.md) records provisional 50/100-unit editor profiling; it is not a packaged-player benchmark.
 
 Multi-selection movement assigns distinct formation slots, rejects invalid footprints without replacing prior orders, and protects newer group commands from reentrant cancellation callbacks. Partial squad selections remain partial. That revision passed 29/29; [M3_FORMATION_REVIEW.md](M3_FORMATION_REVIEW.md) records its evidence.
 
-The tactical selection panel now exposes STOP and HOLD for selected units. The current full regression passes 30/30, plus strict IWYU and Shipping compilation; [M3_SELECTED_COMMANDS_REVIEW.md](M3_SELECTED_COMMANDS_REVIEW.md) records live route, Slate click and lifecycle checks. Runtime crowd/performance and rendered/package verification remain open.
+The tactical selection panel now exposes STOP and HOLD for selected units. Its original 30/30 regression gate passed, and the latest expanded suite passes 34/34; [M3_SELECTED_COMMANDS_REVIEW.md](M3_SELECTED_COMMANDS_REVIEW.md) records live route, Slate click and lifecycle checks. A fresh packaged-player gate remains open.
 
 ### M1 baseline evidence
 

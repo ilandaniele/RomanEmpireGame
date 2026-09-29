@@ -571,7 +571,7 @@ Player-facing STOP/HOLD controls implemented (2026-09-29): selected-unit control
 
 Disconnected-island and narrow-passage coverage implemented (2026-09-29): a separate real-PIE test places transient walls across the saved NavMesh bounds. A reachable-on-mesh but disconnected destination must settle in Hold/Unreachable without crossing the gate; removing the gate must yield a full path and actual CharacterMovement arrival through the 400 cm opening. Targeted 1/1 and full 31/31 regression pass, with only the known host WASAPI sample-rate notices; strict IWYU and Shipping compilation pass. Evidence: [M3_DISCONNECTED_NAVIGATION_REVIEW.md](M3_DISCONNECTED_NAVIGATION_REVIEW.md). Skill: `ue-testing-debugging`.
 
-Opposing-group congestion coverage implemented (2026-09-29): six real Legionaries receive two three-unit formation moves simultaneously through the player controller and cross the same corridor. Each reaches its distinct slot with CharacterMovement and no route failure or capsule overlap. The closest opposing pair reaches 84 cm, so the test exercises actual contact-distance congestion rather than separate lanes. Targeted 1/1 and full 32/32 regression pass. Gate details: [M3_GROUP_CONGESTION_REVIEW.md](M3_GROUP_CONGESTION_REVIEW.md). Real 50/100-unit performance, rendered and fresh packaged validation remain open. Skill: `ue-testing-debugging`.
+Opposing-group congestion coverage implemented (2026-09-29): six real Legionaries receive two three-unit formation moves simultaneously through the player controller and cross the same corridor. Each reaches its distinct slot with CharacterMovement and no route failure or capsule overlap. The closest opposing pair reaches 84 cm, so the test exercises actual contact-distance congestion rather than separate lanes. Targeted 1/1 and full 32/32 regression pass. Gate details: [M3_GROUP_CONGESTION_REVIEW.md](M3_GROUP_CONGESTION_REVIEW.md). Skill: `ue-testing-debugging`.
 
 - Replace direct `SetActorLocation` movement with AIController/Character Movement/NavMesh path following.
 - Implement move, attack, attack-move if selected for the slice, stop, and hold with explicit command state.
@@ -605,6 +605,8 @@ Opposing-group congestion coverage implemented (2026-09-29): six real Legionarie
 - Display restart/continue actions through UMG.
 
 #### M3.7 Performance baseline
+
+Preliminary 50/100-unit load capture (2026-09-29): two repeatable PIE fixtures spawn 50 or 100 additional Legionaries, issue live formation paths, warm up 30 frames and capture 240 frames with CSV profiling and an Unreal Insights trace. A D3D12 offscreen run frames all added units and records game/render/GPU timings, categorized draw-call counters and process memory on the local RTX 5070 Ti Laptop GPU; the full regression passes 34/34. The committed summary and exact captures are in [M3_PERFORMANCE_BASELINE_REVIEW.md](M3_PERFORMANCE_BASELINE_REVIEW.md). This is an Editor-only provisional baseline, not a packaged-player measurement or M3.7 exit: the scene lacks finished combat/building/objective load, the frame clock is capped near 16.67 ms, memory includes Editor, and a target FPS has not yet been agreed. Repeat on the finished encounter in a trusted packaged runner before optimization decisions. Skill: `ue-testing-debugging`.
 
 - Remove per-frame world-wide actor scans.
 - Establish stat captures and Unreal Insights traces at 50 and 100 units.

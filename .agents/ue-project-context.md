@@ -163,6 +163,8 @@
 
 **Current tests:**
 
+**Preliminary load verification (2026-09-29):** `Load50PIE` and `Load100PIE` pass with 50/100 additional live pathing Legionaries, 240 captured frames each, CSV stats and an Unreal Insights trace. In the offscreen D3D12 run all added units project inside the tactical viewport; no route fails. The full suite passes 34/34 (`20260929_192436_087`) with eighteen tests carrying only the known host WASAPI notices. This is an Editor/PIE baseline, not a packaged encounter/target-FPS gate; exact hardware, CSV-derived timings, caveats and build results are in `M3_PERFORMANCE_BASELINE_REVIEW.md`.
+
 **Latest group-congestion verification (2026-09-29):** `GroupCongestionPIE` targeted 1/1 (`M3_Congestion_Final_Targeted`) and full 32/32 (`20260929_190751_272`) pass. Two controller-issued three-unit formations cross the same corridor; all six reach distinct goals without route failure or capsule overlap, and the closest opposing pair is 84 cm apart. Sixteen full-suite tests carry only the known WASAPI host notices. IWYU/Shipping status and remaining gates: `M3_GROUP_CONGESTION_REVIEW.md`.
 
 **Latest disconnected-navigation verification (2026-09-29):** `DisconnectedNavigationPIE` targeted 1/1 (`M3_Disconnected_Targeted`) and full 31/31 (`20260929_185920_597`) pass. Transient walls isolate two projected NavMesh points until a gate opens; the real AI first settles in Hold/Unreachable without crossing, then CharacterMovement carries the unit through a 400 cm passage to arrival. Fifteen full-suite tests carry only the two known WASAPI host audio notices. Strict IWYU and Shipping pass; no rendered/package claim. See `M3_DISCONNECTED_NAVIGATION_REVIEW.md`.

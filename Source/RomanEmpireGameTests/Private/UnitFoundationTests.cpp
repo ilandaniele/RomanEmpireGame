@@ -36,6 +36,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/PlatformMemory.h"
 #include "Input/Events.h"
 #include "Input/Reply.h"
 #include "Materials/MaterialInterface.h"
@@ -2108,6 +2109,138 @@ namespace RomanEmpireUnitTests
 		TArray<bool> Arrived;
 	};
 
+	class FExerciseUnitLoadProfile : public IAutomationLatentCommand
+	{
+	public:
+		FExerciseUnitLoadProfile(FAutomationTestBase* InTest, int32 InCount)
+			: Test(*InTest), Count(InCount), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 120.0)
+			{
+				StopCapture();
+				Test.AddError(FString::Printf(TEXT("%d-unit profile timed out in phase %d"), Count, Phase));
+				return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Player = World->GetFirstPlayerController();
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			if (!Player || !Nav || !Bool(Test, Player, TEXT("CanIssueTacticalCommands")) || Nav->IsNavigationBuildInProgress()) return false;
+			if (Phase == 0)
+			{
+				FNavLocation Goal;
+				if (!Nav->ProjectPointToNavigation(FVector(2500, -3500, 0), Goal, FVector(100, 100, 250))) return false;
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				if (!Test.TestNotNull(TEXT("Load fixture class"), Class)) return true;
+				TArray<AActor*> Selection;
+				for (int32 Index = 0; Index < Count; ++Index)
+				{
+					const FVector Location(-4000.0 + 240.0 * (Index / 10), -4800.0 + 240.0 * (Index % 10), 100.0);
+					FActorSpawnParameters Params;
+					Params.bDeferConstruction = true;
+					Params.ObjectFlags |= RF_Transient;
+					Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					ACharacter* Unit = World->SpawnActor<ACharacter>(Class, FTransform(Location), Params);
+					if (!Test.TestNotNull(TEXT("Load fixture unit"), Unit)) return true;
+					Members.Add(Unit);
+					if (!Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome)) return true;
+					Unit->FinishSpawning(Unit->GetActorTransform());
+					Command(Test, Unit, TEXT("CommandHold"));
+					Selection.Add(Unit);
+				}
+				// Put the active traffic inside the tactical viewport for rendered runs.
+				if (APawn* CameraPawn = Player->GetPawn())
+				{
+					CameraPawn->SetActorLocation(FVector(-3000, -3500, 0));
+					FCall Zoom(Test, CameraPawn, TEXT("SetZoomLevel"), 1);
+					if (FFloatProperty* Property = Zoom.Property<FFloatProperty>(TEXT("NewZoomLevel")))
+						Property->SetPropertyValue_InContainer(Zoom.Params.GetStructMemory(), 0.52f);
+					Zoom.Execute();
+				}
+				SelectMany(Test, Player, Selection);
+				FCall Call(Test, Player, TEXT("CommandSelectedUnitsMove"), 1);
+				if (FStructProperty* Property = Call.Property<FStructProperty>(TEXT("Destination")))
+					Property->CopyCompleteValue(Property->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Goal.Location);
+				Call.Execute();
+				int32 MovingCount = 0;
+				for (const auto& Unit : Members)
+					MovingCount += Order(Test, Unit.Get()) == EUnitOrderType::Move ? 1 : 0;
+				if (!Test.TestEqual(TEXT("Load fixture orders all real units"), MovingCount, Count)) return true;
+				Phase = 1;
+				return false;
+			}
+			if (Phase == 1)
+			{
+				if (++FrameCount < 30) return false; // Warm up paths, RVO and render-independent world ticks.
+				int32 ViewWidth = 0, ViewHeight = 0;
+				Player->GetViewportSize(ViewWidth, ViewHeight);
+				for (const auto& Unit : Members)
+				{
+					FVector2D Screen;
+					if (Unit.IsValid() && Player->ProjectWorldLocationToScreen(Unit->GetActorLocation(), Screen) &&
+						Screen.X >= 0 && Screen.X < ViewWidth && Screen.Y >= 0 && Screen.Y < ViewHeight) ++VisibleAtCapture;
+				}
+				FrameCount = 0;
+				CaptureStartedAt = FPlatformTime::Seconds();
+				UsedPhysicalStart = FPlatformMemory::GetStats().UsedPhysical;
+				if (GEngine)
+				{
+					GEngine->Exec(World, *FString::Printf(TEXT("Trace.Bookmark M3Load%dStart"), Count));
+					GEngine->Exec(World, TEXT("CsvProfile Start"));
+					bCaptureActive = true;
+				}
+				Phase = 2;
+				return false;
+			}
+			if (++FrameCount < 240) return false;
+			StopCapture();
+			int32 LiveCount = 0;
+			int32 FailedCount = 0;
+			for (const auto& Unit : Members)
+			{
+				if (Unit.IsValid())
+				{
+					++LiveCount;
+					FailedCount += NavigationResult(Test, Unit.Get()) == EUnitNavigationResult::Unreachable ? 1 : 0;
+				}
+			}
+			Test.TestEqual(TEXT("Load fixture retains all units"), LiveCount, Count);
+			Test.TestEqual(TEXT("Active load routes stay navigable"), FailedCount, 0);
+			Test.AddInfo(FString::Printf(TEXT("M3Load%d: 240 sampled PIE frames, %.3f wall seconds, %d/%d units initially inside viewport, process used physical memory %.1f -> %.1f MiB; editor PIE measurement, not a packaged-player baseline; GPU validity depends on launch RHI"),
+				Count, FPlatformTime::Seconds() - CaptureStartedAt,
+				VisibleAtCapture, Count,
+				double(UsedPhysicalStart) / 1048576.0, double(FPlatformMemory::GetStats().UsedPhysical) / 1048576.0));
+			Command(Test, Player, TEXT("ClearSelection"));
+			for (const auto& Unit : Members) if (Unit.IsValid()) Unit->Destroy();
+			return true;
+		}
+	private:
+		void StopCapture()
+		{
+			if (!bCaptureActive || !GEngine) return;
+			if (UWorld* World = GEditor ? GEditor->PlayWorld : nullptr)
+			{
+				GEngine->Exec(World, TEXT("CsvProfile Stop"));
+				GEngine->Exec(World, *FString::Printf(TEXT("Trace.Bookmark M3Load%dEnd"), Count));
+			}
+			bCaptureActive = false;
+		}
+		FAutomationTestBase& Test;
+		int32 Count;
+		double StartedAt;
+		double CaptureStartedAt = 0;
+		uint64 UsedPhysicalStart = 0;
+		int32 FrameCount = 0;
+		int32 Phase = 0;
+		int32 VisibleAtCapture = 0;
+		bool bCaptureActive = false;
+		TArray<TWeakObjectPtr<ACharacter>> Members;
+	};
+
 	bool ClickUnitCommandThroughSlate(FAutomationTestBase& Test, UUserWidget* Root, UButton* Button)
 	{
 		if (!Test.TestTrue(TEXT("Slate pointer router initialized"), FSlateApplication::IsInitialized() && Root && Button)) return false;
@@ -2681,6 +2814,30 @@ bool FUnitNavigationTest::RunTest(const FString& Parameters)
 	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseNavigation(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitLoad50Test, "RomanEmpireGame.Performance.Load50PIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitLoad50Test::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitLoadProfile(this, 50));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitLoad100Test, "RomanEmpireGame.Performance.Load100PIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitLoad100Test::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitLoadProfile(this, 100));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
