@@ -119,6 +119,12 @@ public:
 	void CommandSelectedUnitsAttack(AUnitBase* Target);
 
 	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void CommandSelectedUnitsStop();
+
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void CommandSelectedUnitsHold();
+
+	UFUNCTION(BlueprintCallable, Category = "Selection")
 	void ClearSelection();
 
 	UFUNCTION(BlueprintPure, Category = "Selection")
@@ -283,6 +289,7 @@ private:
 	bool bControllerEndingPlay = false;
 	// Invalidates an outer dispatch if a path-completion observer issues a newer command.
 	uint64 TacticalCommandRevision = 0;
+	void DispatchSelectedUnitCancellation(bool bHold);
 	void PerformBoxSelect(bool bAdditive);
 	UPROPERTY(Transient)
 	bool bAdditiveSelectionGesture = false;

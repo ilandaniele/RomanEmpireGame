@@ -12,6 +12,7 @@ The controller loads `/Game/Input/DA_RomanInputConfig`. Exactly one gameplay con
 | Left mouse | Unmapped | Click/drag selection; confirm valid placement | Attack |
 | Left / right Shift | Unmapped | Hold before click to toggle units; before drag to add units | Unmapped |
 | Right mouse | Unmapped | Command selected player units; cancel placement | Hold shield; release to stop blocking |
+| STOP / HOLD buttons | Unavailable | Stop clears the current order; Hold keeps selected units in place and suppresses automatic enemy acquisition | Unavailable |
 | F | Unmapped | Possess selected living player unit | Return to camera |
 | B | Unmapped | Toggle building menu | Unmapped |
 | 1–6 | Unmapped | Choose authored building quick slot, only with menu open | Unmapped |

@@ -9,6 +9,8 @@
 #include "Components/Button.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
@@ -184,7 +186,24 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	TrainButton->AddChild(TrainButtonText);
 	TrainButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleTrainClicked);
 	TrainButton->SetVisibility(ESlateVisibility::Collapsed);
+	UHorizontalBox* UnitCommandRow = WidgetTree->ConstructWidget<UHorizontalBox>(
+		UHorizontalBox::StaticClass(), TEXT("UnitCommandRow"));
+	StopButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("StopButton"));
+	UTextBlock* StopLabel = CreateTextBlock(WidgetTree, TEXT("StopButtonText"), 16, FLinearColor(1.0f, 0.78f, 0.42f));
+	StopLabel->SetText(NSLOCTEXT("RomanCommands", "Stop", "STOP"));
+	StopButton->AddChild(StopLabel);
+	StopButton->SetToolTipText(NSLOCTEXT("RomanCommands", "StopTooltip", "Cancel the selected units' orders. Idle units may acquire enemies again."));
+	StopButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleStopClicked);
+	HoldButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("HoldButton"));
+	UTextBlock* HoldLabel = CreateTextBlock(WidgetTree, TEXT("HoldButtonText"), 16, FLinearColor(0.74f, 0.93f, 1.0f));
+	HoldLabel->SetText(NSLOCTEXT("RomanCommands", "Hold", "HOLD"));
+	HoldButton->AddChild(HoldLabel);
+	HoldButton->SetToolTipText(NSLOCTEXT("RomanCommands", "HoldTooltip", "Keep selected units in place until a new order. They will not acquire enemies automatically."));
+	HoldButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleHoldClicked);
+	UnitCommandRow->AddChildToHorizontalBox(StopButton)->SetPadding(FMargin(0, 2, 10, 0));
+	UnitCommandRow->AddChildToHorizontalBox(HoldButton)->SetPadding(FMargin(0, 2, 0, 0));
 	SelectionBox->AddChildToVerticalBox(SelectionText);
+	SelectionBox->AddChildToVerticalBox(UnitCommandRow);
 	SelectionBox->AddChildToVerticalBox(ProductionText);
 	SelectionBox->AddChildToVerticalBox(TrainButton);
 	SelectionPanel->SetContent(SelectionBox);
@@ -454,7 +473,7 @@ void URomanEmpireMainWidget::RefreshCommands()
 	}
 	if (ControlsText)
 	{
-		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nShift + click: toggle | + drag: add\nRight click: order | F: possess unit\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
+		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nShift + click: toggle | + drag: add\nRight click: order | F: possess unit\nSelected units: STOP / HOLD buttons\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
 		if (Mode == EGameplayMode::Possessed)
 		{
 			Help = TEXT("SOLDIER CONTROLS\nWASD: move | Mouse: look\nLeft click: attack | Hold right click: block\nF / Esc: return to camera");
@@ -483,6 +502,8 @@ void URomanEmpireMainWidget::RefreshObjectives(const FCampaignObjectiveState& St
 void URomanEmpireMainWidget::RefreshSelection()
 {
 	if (TrainButton) TrainButton->SetIsEnabled(false);
+	if (StopButton) StopButton->SetVisibility(ESlateVisibility::Collapsed);
+	if (HoldButton) HoldButton->SetVisibility(ESlateVisibility::Collapsed);
 	if (!SelectionPanel || !SelectionText || !ProductionText || !TrainButton)
 	{
 		return;
@@ -519,6 +540,17 @@ void URomanEmpireMainWidget::RefreshSelection()
 	if (!Units.IsEmpty())
 	{
 		SelectionPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		const bool bCanCommand = CachedController && CachedController->CanIssueTacticalCommands();
+		if (StopButton)
+		{
+			StopButton->SetVisibility(bCanCommand ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			StopButton->SetIsEnabled(bCanCommand);
+		}
+		if (HoldButton)
+		{
+			HoldButton->SetVisibility(bCanCommand ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			HoldButton->SetIsEnabled(bCanCommand);
+		}
 		TrainButton->SetVisibility(ESlateVisibility::Collapsed);
 		ProductionText->SetVisibility(ESlateVisibility::Collapsed);
 		if (Units.Num() == 1 && Units[0])
@@ -907,6 +939,16 @@ void URomanEmpireMainWidget::HandleTrainClicked()
 	{
 		ProductionText->SetText(FText::FromString(TEXT("Cannot train: check resources, building state, and queue capacity")));
 	}
+}
+
+void URomanEmpireMainWidget::HandleStopClicked()
+{
+	if (CachedController) CachedController->CommandSelectedUnitsStop();
+}
+
+void URomanEmpireMainWidget::HandleHoldClicked()
+{
+	if (CachedController) CachedController->CommandSelectedUnitsHold();
 }
 
 void URomanEmpireMainWidget::HandleEndTurnClicked()

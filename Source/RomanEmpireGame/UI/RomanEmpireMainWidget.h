@@ -121,6 +121,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> TrainButton;
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> StopButton;
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> HoldButton;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> EndTurnButton;
@@ -208,6 +212,10 @@ private:
 
 	UFUNCTION()
 	void HandleTrainClicked();
+	UFUNCTION()
+	void HandleStopClicked();
+	UFUNCTION()
+	void HandleHoldClicked();
 
 	UFUNCTION()
 	void HandleEndTurnClicked();

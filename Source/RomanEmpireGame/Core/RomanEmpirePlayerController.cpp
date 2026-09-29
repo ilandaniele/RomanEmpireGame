@@ -734,6 +734,33 @@ void ARomanEmpirePlayerController::CommandSelectedUnitsAttack(AUnitBase* Target)
 	}
 }
 
+void ARomanEmpirePlayerController::CommandSelectedUnitsStop()
+{
+	DispatchSelectedUnitCancellation(false);
+}
+
+void ARomanEmpirePlayerController::CommandSelectedUnitsHold()
+{
+	DispatchSelectedUnitCancellation(true);
+}
+
+void ARomanEmpirePlayerController::DispatchSelectedUnitCancellation(bool bHold)
+{
+	if (!CanIssueTacticalCommands() || SelectedUnits.IsEmpty()) return;
+	TArray<TWeakObjectPtr<AUnitBase>> Snapshot;
+	for (AUnitBase* Unit : SelectedUnits) Snapshot.Add(Unit);
+	const uint64 Revision = ++TacticalCommandRevision;
+	ReportInteractionFeedback(FText::GetEmpty());
+	for (const TWeakObjectPtr<AUnitBase>& Member : Snapshot)
+	{
+		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands()) return;
+		AUnitBase* Unit = Member.Get();
+		if (!IsPlayerUnitEligible(Unit) || !SelectedUnits.Contains(Unit)) continue;
+		if (bHold) Unit->CommandHold();
+		else Unit->CommandStop();
+	}
+}
+
 void ARomanEmpirePlayerController::HandleSelectedUnitDied(AUnitBase* Unit)
 {
 	HandleSelectedActorDestroyed(Unit);

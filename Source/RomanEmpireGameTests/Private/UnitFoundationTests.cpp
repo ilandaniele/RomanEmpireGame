@@ -13,6 +13,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Building/BuildingTypes.h"
 #include "Components/ActorComponent.h"
+#include "Components/Button.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
@@ -27,15 +28,22 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Faction/FactionData.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/PlatformTime.h"
+#include "Input/Events.h"
+#include "Input/Reply.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
+#include "Layout/ArrangedWidget.h"
+#include "Layout/Geometry.h"
+#include "Layout/WidgetPath.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Slate/SceneViewport.h"
 #include "Units/UnitActivity.h"
@@ -51,6 +59,7 @@
 #include "UObject/StructOnScope.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
+#include "Widgets/SWidget.h"
 #include <limits>
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
@@ -1853,6 +1862,212 @@ namespace RomanEmpireUnitTests
 		TArray<bool> Arrived;
 	};
 
+	bool ClickUnitCommandThroughSlate(FAutomationTestBase& Test, UUserWidget* Root, UButton* Button)
+	{
+		if (!Test.TestTrue(TEXT("Slate pointer router initialized"), FSlateApplication::IsInitialized() && Root && Button)) return false;
+		Root->ForceLayoutPrepass();
+		const TSharedPtr<SWidget> SlateButton = Button->GetCachedWidget();
+		if (!Test.TestTrue(TEXT("Visible command materializes a native SButton"),
+			SlateButton.IsValid() && SlateButton->GetType() == FName(TEXT("SButton")))) return false;
+		FSlateApplication& Slate = FSlateApplication::Get();
+		FWidgetPath Path;
+		if (!Test.TestTrue(TEXT("Command button has a live viewport path"),
+			Slate.GeneratePathToWidgetUnchecked(SlateButton.ToSharedRef(), Path) && Path.IsValid())) return false;
+		for (int32 Index = 0; Index < Path.Widgets.Num() - 1; ++Index)
+			if (!Test.TestTrue(TEXT("Command ancestors permit child pointer input"),
+				Path.Widgets[Index].Widget->GetVisibility().AreChildrenHitTestVisible())) return false;
+		const FGeometry& Geometry = Path.Widgets.Last().Geometry;
+		if (!Test.TestTrue(TEXT("Command button has a positive arranged area"),
+			Geometry.GetLocalSize().X > 0 && Geometry.GetLocalSize().Y > 0)) return false;
+		const FVector2D Position = Geometry.LocalToAbsolute(Geometry.GetLocalSize() * 0.5f);
+		TArray<FWidgetAndPointer> PointerWidgets;
+		for (int32 Index = 0; Index < Path.Widgets.Num(); ++Index)
+			PointerWidgets.Emplace(Path.Widgets[Index], TOptional<FVirtualPointerPosition>());
+		const FWidgetPath PointerPath{MakeArrayView(PointerWidgets)};
+		const TSharedRef<FSlateVirtualUserHandle> VirtualUser = Slate.FindOrCreateVirtualUser(26);
+		const TSharedPtr<FSlateUser> User = Slate.GetUser(VirtualUser->GetUserIndex());
+		if (!Test.TestTrue(TEXT("Command pointer uses an isolated virtual user"), User.IsValid() && User->IsVirtualUser())) return false;
+		const uint32 UserIndex = static_cast<uint32>(VirtualUser->GetUserIndex());
+		const TSet<FKey> NoButtons;
+		TSet<FKey> PressedButtons;
+		PressedButtons.Add(EKeys::LeftMouseButton);
+		const FModifierKeysState Modifiers;
+		const FPointerEvent Move(UserIndex, 0, Position, Position, NoButtons, FKey(), 0.0f, Modifiers);
+		const FPointerEvent Down(UserIndex, 0, Position, Position, PressedButtons, EKeys::LeftMouseButton, 0.0f, Modifiers);
+		const FPointerEvent Up(UserIndex, 0, Position, Position, NoButtons, EKeys::LeftMouseButton, 0.0f, Modifiers);
+		Slate.RoutePointerMoveEvent(PointerPath, Move, false);
+		const FReply DownReply = Slate.RoutePointerDownEvent(PointerPath, Down);
+		const FReply UpReply = Slate.RoutePointerUpEvent(PointerPath, Up);
+		Slate.RoutePointerMoveEvent(FWidgetPath(), Move, false);
+		User->ReleaseAllCapture();
+		return Test.TestTrue(TEXT("Command SButton consumes press and release before gameplay"),
+			DownReply.IsEventHandled() && DownReply.GetHandler() == SlateButton &&
+			UpReply.IsEventHandled() && UpReply.GetHandler() == SlateButton);
+	}
+
+	class FExerciseSelectedCommands : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseSelectedCommands(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 90)
+			{
+				Test.AddError(FString::Printf(TEXT("Stop/Hold PIE timed out in phase %d"), Phase)); return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Player = World->GetFirstPlayerController();
+			if (!Player) return false;
+			auto PlayerMove = [&]()
+			{
+				FCall Call(Test, Player, TEXT("CommandSelectedUnitsMove"), 1);
+				if (FStructProperty* Prop = Call.Property<FStructProperty>(TEXT("Destination")))
+				{
+					const FVector Goal(1200, -3500, 0);
+					Prop->CopyCompleteValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), &Goal);
+				}
+				Call.Execute();
+			};
+			if (Phase == 0)
+			{
+				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+				FNavLocation Point;
+				if (!Nav || Nav->IsNavigationBuildInProgress() ||
+					!Nav->ProjectPointToNavigation(FVector(1200, -3500, 0), Point, FVector(100, 100, 250))) return false;
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				for (int32 Index = 0; Index < 2; ++Index)
+				{
+					FActorSpawnParameters Params;
+					Params.bDeferConstruction = true;
+					Params.ObjectFlags |= RF_Transient;
+					Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					ACharacter* Unit = World->SpawnActor<ACharacter>(Class,
+						FTransform(FVector(-1200, -3500 + Index * 300, 100)), Params);
+					if (!Test.TestNotNull(TEXT("Command fixture spawned"), Unit)) return true;
+					Units.Add(Unit);
+					if (!Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome)) return true;
+					Unit->FinishSpawning(Unit->GetActorTransform());
+					Command(Test, Unit, TEXT("CommandHold"));
+				}
+				Root = Cast<UUserWidget>(ObjectQuery(Test, Player, TEXT("GetMainWidget")));
+				Stop = Root.IsValid() ? Cast<UButton>(Root->GetWidgetFromName(TEXT("StopButton"))) : nullptr;
+				Hold = Root.IsValid() ? Cast<UButton>(Root->GetWidgetFromName(TEXT("HoldButton"))) : nullptr;
+				if (!Test.TestTrue(TEXT("Native Stop and Hold controls exist"), Stop.IsValid() && Hold.IsValid())) return true;
+				Test.TestFalse(TEXT("Command controls hidden without unit selection"), Stop->IsVisible() || Hold->IsVisible());
+				SelectMany(Test, Player, { Units[0].Get(), Units[1].Get() });
+				Test.TestTrue(TEXT("Tactical selection exposes enabled commands"), Stop->IsVisible() && Hold->IsVisible() &&
+					Stop->GetIsEnabled() && Hold->GetIsEnabled());
+				PlayerMove();
+				Phase = 1;
+				return false;
+			}
+			for (const auto& Unit : Units)
+				if (!Test.TestTrue(TEXT("Command fixture remains alive"), Unit.IsValid())) return true;
+			if (Phase == 1)
+			{
+				for (const auto& Unit : Units)
+					if (NavigationResult(Test, Unit.Get()) != EUnitNavigationResult::Moving) return false;
+				AAIController* AI = Cast<AAIController>(Units[0]->GetController());
+				if (!Test.TestNotNull(TEXT("Selected unit has active path following"), AI)) return true;
+				bool bNested = false;
+				const FDelegateHandle Handle = AI->GetPathFollowingComponent()->OnRequestFinished.AddLambda(
+					[&](FAIRequestID, const FPathFollowingResult&)
+					{
+						if (bNested) return;
+						bNested = true;
+						Command(Test, Player, TEXT("CommandSelectedUnitsHold"));
+					});
+				Command(Test, Player, TEXT("CommandSelectedUnitsStop"));
+				AI->GetPathFollowingComponent()->OnRequestFinished.Remove(Handle);
+				Test.TestTrue(TEXT("Stopping an active route invoked the nested order"), bNested);
+				for (const auto& Unit : Units)
+					Test.TestEqual(TEXT("New Hold supersedes outer Stop for the whole selection"), Order(Test, Unit.Get()), EUnitOrderType::Hold);
+				PlayerMove();
+				Phase = 2;
+				return false;
+			}
+			if (Phase == 2)
+			{
+				for (const auto& Unit : Units)
+					if (NavigationResult(Test, Unit.Get()) != EUnitNavigationResult::Moving) return false;
+				if (!ClickUnitCommandThroughSlate(Test, Root.Get(), Stop.Get())) return true;
+				for (const auto& Unit : Units)
+				{
+					Test.TestEqual(TEXT("Stop click clears tactical order"), Order(Test, Unit.Get()), EUnitOrderType::None);
+					Test.TestEqual(TEXT("Stop click clears navigation result"), NavigationResult(Test, Unit.Get()), EUnitNavigationResult::None);
+					AAIController* AI = Cast<AAIController>(Unit->GetController());
+					Test.TestTrue(TEXT("Stop click idles path following"), AI && AI->GetMoveStatus() == EPathFollowingStatus::Idle);
+				}
+				PlayerMove();
+				Phase = 3;
+				return false;
+			}
+			if (Phase == 3)
+			{
+				for (const auto& Unit : Units)
+					if (NavigationResult(Test, Unit.Get()) != EUnitNavigationResult::Moving) return false;
+				if (!ClickUnitCommandThroughSlate(Test, Root.Get(), Hold.Get())) return true;
+				for (const auto& Unit : Units)
+				{
+					Test.TestEqual(TEXT("Hold click persists commanded order"), Order(Test, Unit.Get()), EUnitOrderType::Hold);
+					AAIController* AI = Cast<AAIController>(Unit->GetController());
+					Test.TestTrue(TEXT("Hold click idles path following"), AI && AI->GetMoveStatus() == EPathFollowingStatus::Idle);
+				}
+				Phase = 4;
+				return false;
+			}
+			if (Phase == 4)
+			{
+				for (const auto& Unit : Units)
+					Test.TestEqual(TEXT("Hold still persists after world update"), Order(Test, Unit.Get()), EUnitOrderType::Hold);
+				auto SetMode = [&](EGameplayMode Mode)
+				{
+					FCall Call(Test, World->GetAuthGameMode(), TEXT("SetGameplayMode"), 1);
+					if (FEnumProperty* Prop = Call.Property<FEnumProperty>(TEXT("NewMode")))
+						Prop->GetUnderlyingProperty()->SetIntPropertyValue(Prop->ContainerPtrToValuePtr<void>(Call.Params.GetStructMemory()), static_cast<int64>(Mode));
+					Call.Execute();
+				};
+				SetMode(EGameplayMode::Strategic);
+				Test.TestFalse(TEXT("Strategic mode hides tactical unit controls"), Stop->IsVisible() || Hold->IsVisible());
+				Command(Test, Player, TEXT("CommandSelectedUnitsStop"));
+				FCall(Test, Root.Get(), TEXT("HandleStopClicked"), 0).Execute();
+				for (const auto& Unit : Units)
+					Test.TestEqual(TEXT("Strategic mode rejects native and stale UI commands"), Order(Test, Unit.Get()), EUnitOrderType::Hold);
+				SetMode(EGameplayMode::Tactical);
+				Test.TestTrue(TEXT("Tactical return restores unit controls"), Stop->IsVisible() && Hold->IsVisible());
+				ObjectCommand(Test, Player, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Units[0].Get());
+				Test.TestFalse(TEXT("Possession hides tactical command buttons"), Stop->IsVisible() || Hold->IsVisible());
+				FCall(Test, Root.Get(), TEXT("HandleStopClicked"), 0).Execute();
+				FCall(Test, Root.Get(), TEXT("HandleHoldClicked"), 0).Execute();
+				Test.TestEqual(TEXT("Stale UI callbacks cannot command possessed unit"), Order(Test, Units[0].Get()), EUnitOrderType::None);
+				Command(Test, Player, TEXT("ExitFirstPersonMode"));
+				SelectMany(Test, Player, { Units[0].Get(), Units[1].Get() });
+				Command(Test, Player, TEXT("CommandSelectedUnitsHold"));
+				SetOwner(Test, Units[1].Get(), EFactionID::Carthage);
+				Test.TestTrue(TEXT("Owner loss keeps commands for remaining selection"), Stop->IsVisible() && Hold->IsVisible());
+				SetOwner(Test, Units[0].Get(), EFactionID::Carthage);
+				Test.TestFalse(TEXT("Owner loss hides controls when selection empties"), Stop->IsVisible() || Hold->IsVisible());
+				FCall(Test, Root.Get(), TEXT("HandleStopClicked"), 0).Execute();
+				Test.TestEqual(TEXT("Stale Stop callback cannot touch former unit"), Order(Test, Units[0].Get()), EUnitOrderType::Hold);
+				for (const auto& Unit : Units) Unit->Destroy();
+				return true;
+			}
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		int32 Phase = 0;
+		TWeakObjectPtr<UUserWidget> Root;
+		TWeakObjectPtr<UButton> Stop;
+		TWeakObjectPtr<UButton> Hold;
+		TArray<TWeakObjectPtr<ACharacter>> Units;
+	};
+
 	class FExerciseSquadRegistry : public IAutomationLatentCommand
 	{
 	public:
@@ -2279,6 +2494,18 @@ bool FSquadRegistryTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseSquadRegistry(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSelectedCommandsTest, "RomanEmpireGame.Units.SelectedCommandsPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSelectedCommandsTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseSelectedCommands(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
