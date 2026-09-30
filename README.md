@@ -86,7 +86,7 @@ Shift-click toggle, Shift-drag add and transient invalid-target feedback are imp
 
 M3 placement now checks buildable terrain, rotated footprint, territory ownership, blocking actors and canonical affordability before charging; stale previews are revalidated. The Roman camp's barracks is now a real completed producer rather than a decorative mesh. The 34/34 regression passes, but the enemy objective structure, production failure policy and a trusted packaged-player check remain open. See [M3_PLACEMENT_VALIDATION_REVIEW.md](M3_PLACEMENT_VALIDATION_REVIEW.md) and [M3_INITIAL_BARRACKS_REVIEW.md](M3_INITIAL_BARRACKS_REVIEW.md).
 
-M3.6 now has a typed tactical battle result and a pure, single-owner victory evaluator (35/35 regression), but no live capture/objective wiring or restart/continue flow yet. See [M3_BATTLE_RESULT_FOUNDATION_REVIEW.md](M3_BATTLE_RESULT_FOUNDATION_REVIEW.md).
+M3.6 now has a typed tactical battle result and one world-local evaluator fed by initial squads, training and deaths (35/35 regression), but no live capture/objective interaction or restart/continue flow yet. See [M3_BATTLE_RESULT_FOUNDATION_REVIEW.md](M3_BATTLE_RESULT_FOUNDATION_REVIEW.md) and [M3_BATTLE_WORLD_WIRING_REVIEW.md](M3_BATTLE_WORLD_WIRING_REVIEW.md).
 
 Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. That baseline passed 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; campaign mapping remains later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
 

@@ -6,6 +6,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "Battle/TacticalBattleSubsystem.h"
 #include "Building/BuildingTypes.h"
 #include "Campaign/CampaignObjectiveState.h"
 #include "Campaign/CampaignTurn.h"
@@ -449,6 +450,7 @@ namespace RomanEmpireUITests
 		UObject* FactionManager = nullptr;
 		UObject* CampaignManager = nullptr;
 		UObject* WorldMapManager = nullptr;
+		UTacticalBattleSubsystem* TacticalBattle = nullptr;
 		AActor* Producer = nullptr;
 		UUserWidget* Root = nullptr;
 		UTextBlock* ResourceText = nullptr;
@@ -486,6 +488,42 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("Completion promotes the prepaid queued order"), ReadBool(Test, Producer, TEXT("IsTraining")));
 			Test.TestEqual(TEXT("Promotion consumes one pending order"), ReadInt(Test, Producer, TEXT("GetPendingOrderCount")), 0);
 			CheckTrainingCharge(TEXT("Completion and queue promotion"), BeforeCompletion, NoCharge);
+			if (TacticalBattle)
+			{
+				const FTacticalBattleResult Result = TacticalBattle->GetResult();
+				Test.TestEqual(TEXT("Trained Legionary enters the one tactical result owner"), Result.Squads.Num(), 3);
+				if (Result.Squads.Num() == 3)
+				{
+					Test.TestEqual(TEXT("Trained unit is a Roman singleton reinforcement"), Result.Squads[2].Faction, EFactionID::Rome);
+					Test.TestEqual(TEXT("Trained squad starts with one survivor"), Result.Squads[2].Survivors, 1);
+				}
+			}
+			UClass* UnitClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.UnitBase")).TryLoadClass<AActor>();
+			if (!Test.TestNotNull(TEXT("The live unit class is available for casualty verification"), UnitClass)) return false;
+			AActor* EnemyCasualty = nullptr;
+			for (TActorIterator<AActor> It(Producer->GetWorld(), UnitClass); It; ++It)
+			{
+				FCall Owner(Test, *It, TEXT("GetOwnerFaction"), 1);
+				Owner.Execute();
+				if (Owner.ReadEnum<EFactionID>() == EFactionID::Carthage)
+				{
+					EnemyCasualty = *It;
+					break;
+				}
+			}
+			if (!Test.TestNotNull(TEXT("A known defender is available for the battle death event"), EnemyCasualty)) return false;
+			FCall LethalDamage(Test, EnemyCasualty, TEXT("TakeCombatDamage"), 3);
+			LethalDamage.SetFloat(TEXT("Damage"), 100000.0f);
+			LethalDamage.SetObject(TEXT("DamageSource"), nullptr);
+			LethalDamage.Execute();
+			if (TacticalBattle)
+			{
+				const FTacticalBattleResult AfterDeath = TacticalBattle->GetResult();
+				Test.TestEqual(TEXT("Live death enters the tactical casualty ledger"), AfterDeath.Squads[1].Casualties, 1);
+				Test.TestEqual(TEXT("Live death reduces defender survivors once"), AfterDeath.Squads[1].Survivors, 9);
+				Test.TestEqual(TEXT("A single defender loss does not end the objective battle"),
+					AfterDeath.Outcome, ETacticalBattleOutcome::InProgress);
+			}
 
 			const int32 GoldBeforeDrain = ReadResources(Test, FactionManager).Gold;
 			AddGold(Test, FactionManager, -GoldBeforeDrain);
@@ -737,6 +775,16 @@ namespace RomanEmpireUITests
 			WorldMapManager = ReadObject(Test, GameMode, TEXT("GetWorldMapManager"));
 			if (!Test.TestTrue(TEXT("Normal startup supplies the public GameState and canonical managers"),
 				GameState && FactionManager && CampaignManager && WorldMapManager)) return false;
+			TacticalBattle = World->GetSubsystem<UTacticalBattleSubsystem>();
+			if (!Test.TestNotNull(TEXT("Normal startup supplies one tactical battle owner"), TacticalBattle)) return false;
+			const FTacticalBattleResult InitialBattle = TacticalBattle->GetResult();
+			Test.TestEqual(TEXT("Known prototype forces create two result squads"), InitialBattle.Squads.Num(), 2);
+			if (InitialBattle.Squads.Num() == 2)
+			{
+				Test.TestEqual(TEXT("Initial Roman formation has 15 survivors"), InitialBattle.Squads[0].Survivors, 15);
+				Test.TestEqual(TEXT("Initial Carthaginian formation has 10 survivors"), InitialBattle.Squads[1].Survivors, 10);
+			}
+			Test.TestEqual(TEXT("Initial objective has its stable ID"), InitialBattle.ObjectiveID, FName(TEXT("CarthaginianCamp")));
 			CheckRelayContract();
 			FCall ModeCall(Test, GameMode, TEXT("SetGameplayMode"), 1);
 			ModeCall.SetEnum(TEXT("NewMode"), EGameplayMode::Tactical);

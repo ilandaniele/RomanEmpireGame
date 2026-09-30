@@ -3,6 +3,7 @@
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireGame.h"
 #include "Building/Barracks.h"
+#include "Battle/TacticalBattleSubsystem.h"
 #include "Content/RomanContentRegistry.h"
 #include "Faction/FactionManager.h"
 #include "World/WorldMapManager.h"
@@ -390,8 +391,13 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 	}
 	if (URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>())
 	{
-		Registry->CreateSquad(RomanUnits);
-		Registry->CreateSquad(CarthaginianUnits);
+		const FGuid RomanSquad = Registry->CreateSquad(RomanUnits);
+		const FGuid CarthaginianSquad = Registry->CreateSquad(CarthaginianUnits);
+		UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>();
+		if (!Battle || !Battle->BeginEncounter(TEXT("CarthaginianCamp"), RomanSquad, CarthaginianSquad))
+		{
+			UE_LOG(LogRomanEmpire, Error, TEXT("Cannot initialize the tactical encounter from starting squads"));
+		}
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 15 Roman + 10 Carthaginian units"));

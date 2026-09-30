@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Barracks.h"
+#include "Battle/TacticalBattleSubsystem.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
@@ -172,7 +173,14 @@ bool ABarracks::SpawnTrainedUnit()
 		{
 			if (URomanUnitRegistrySubsystem* Units = World->GetSubsystem<URomanUnitRegistrySubsystem>())
 			{
-				Units->CreateSquad({ NewUnit });
+				const FGuid SquadID = Units->CreateSquad({ NewUnit });
+				if (SquadID.IsValid())
+				{
+					if (UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>())
+					{
+						Battle->RegisterReinforcement(NewUnit);
+					}
+				}
 			}
 			UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
 			return true;
