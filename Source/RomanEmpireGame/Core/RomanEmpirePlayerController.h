@@ -21,6 +21,7 @@ class ABarracks;
 class ALegionary;
 class UBuildingPlacementComponent;
 class ASeamlessZoomCamera;
+class APlayerCameraManager;
 class URomanEmpireMainWidget;
 
 /**
@@ -217,6 +218,11 @@ protected:
 	// Cached camera pawn for restoring after FPS mode
 	UPROPERTY()
 	TObjectPtr<ASeamlessZoomCamera> CachedCameraPawn;
+
+	// The FPS-only pitch window must leave the tactical camera manager unchanged on return.
+	TWeakObjectPtr<APlayerCameraManager> PossessionCameraManager;
+	float PreviousViewPitchMin = 0.0f;
+	float PreviousViewPitchMax = 0.0f;
 
 	// Building placement
 	UPROPERTY()

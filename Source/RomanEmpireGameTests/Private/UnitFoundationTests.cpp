@@ -1467,13 +1467,21 @@ namespace RomanEmpireUnitTests
 			Test.TestTrue(TEXT("Repeated possession starts from an owned selection"),
 				SelectionBeforeCycles == TArray<AActor*>({ Other }));
 			const FTransform CameraBeforeCycles = OriginalCamera->GetActorTransform();
+			APlayerCameraManager* CameraManager = Controller->PlayerCameraManager;
+			if (!Test.TestNotNull(TEXT("Repeated possession has the live camera manager"), CameraManager)) return true;
+			const float TacticalPitchMin = CameraManager->ViewPitchMin;
+			const float TacticalPitchMax = CameraManager->ViewPitchMax;
 			AAIController* OriginalAI = Cast<AAIController>(Other->GetController());
 			Test.TestNotNull(TEXT("Repeated possession starts with tactical AI"), OriginalAI);
 			for (int32 Cycle = 0; Cycle < 3; ++Cycle)
 			{
 				ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
 				Test.TestTrue(TEXT("Repeated entry possesses the same living unit"), Controller->GetPawn() == Other);
+				Test.TestEqual(TEXT("Possession limits downward view pitch"), CameraManager->ViewPitchMin, -80.0f);
+				Test.TestEqual(TEXT("Possession limits upward view pitch"), CameraManager->ViewPitchMax, 80.0f);
 				Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+				Test.TestEqual(TEXT("Repeated exit restores tactical minimum pitch"), CameraManager->ViewPitchMin, TacticalPitchMin);
+				Test.TestEqual(TEXT("Repeated exit restores tactical maximum pitch"), CameraManager->ViewPitchMax, TacticalPitchMax);
 				Test.TestTrue(TEXT("Repeated exit restores the tactical pawn"), Controller->GetPawn() == OriginalCamera);
 				Test.TestFalse(TEXT("Repeated exit leaves possession mode"), Bool(Test, Controller, TEXT("IsInFirstPersonMode")));
 				Test.TestTrue(TEXT("Repeated exit preserves the tactical camera transform"),

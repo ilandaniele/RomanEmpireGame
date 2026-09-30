@@ -14,6 +14,7 @@
 #include "Building/Barracks.h"
 #include "Building/BuildingPlacementComponent.h"
 #include "Camera/SeamlessZoomCamera.h"
+#include "Camera/PlayerCameraManager.h"
 #include "UI/RomanEmpireMainWidget.h"
 #include "CollisionQueryParams.h"
 #include "Engine/Engine.h"
@@ -881,6 +882,14 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 		GameMode->SetGameplayMode(EGameplayMode::Possessed);
 	}
 	if (!IsEntryCurrent() || !IsInFirstPersonMode()) { CancelEntry(); return; }
+	if (APlayerCameraManager* CameraManager = PlayerCameraManager)
+	{
+		PreviousViewPitchMin = CameraManager->ViewPitchMin;
+		PreviousViewPitchMax = CameraManager->ViewPitchMax;
+		PossessionCameraManager = CameraManager;
+		CameraManager->ViewPitchMin = -80.0f;
+		CameraManager->ViewPitchMax = 80.0f;
+	}
 	UE_LOG(LogRomanEmpire, Log, TEXT("Entered FPS mode with unit: %s"), *UnitToPossess->GetName());
 	OnPossessedUnitChanged.Broadcast(PreviousUnit, PossessedUnit);
 }
@@ -895,6 +904,12 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 	AUnitBase* PreviousUnit = PossessedUnit;
 	{
 		TGuardValue<bool> ExitGuard(bExitingPossession, true);
+		if (APlayerCameraManager* CameraManager = PossessionCameraManager.Get())
+		{
+			CameraManager->ViewPitchMin = PreviousViewPitchMin;
+			CameraManager->ViewPitchMax = PreviousViewPitchMax;
+		}
+		PossessionCameraManager.Reset();
 		CancelTransientInput();
 		// Commit absence before deactivation/Possess callbacks; recursive exits are no-ops.
 		PossessedUnit = nullptr;

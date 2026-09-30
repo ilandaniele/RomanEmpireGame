@@ -663,6 +663,8 @@ Possession return-cycle evidence added (2026-09-30): the real controller/player 
 
 Guard feedback implemented (2026-09-30): the possessed soldier's canonical block state updates the existing native HUD through its vitals event, with no UI tick or second owner. The real-PIE test proves immediate DOWN/UP/DOWN text transitions and block state; full regression 35/35 zero test warnings/failures, IWYU 66/66, Shipping 5/5, repository/LFS/diff checks pass. This advances only M4.7 feedback; camera collision, montage/hit visuals, time-scale policy and player-rendered gates remain open. See [M4_GUARD_FEEDBACK_REVIEW.md](M4_GUARD_FEEDBACK_REVIEW.md). Skills: `ue-ui-umg-slate`, `ue-testing-debugging`.
 
+Possession pitch bounds implemented (2026-09-30): the live camera manager uses ±80° only while possession is committed, then restores its exact prior bounds on repeated ordinary exit or death. Targeted ownership/UI PIE tests each pass 1/1; final full regression 35/35 zero test warnings/failures, IWYU 66/66, Shipping Game up to date after a 4/4 runtime compilation, repository/LFS/diff checks pass. This advances only M4.7 look limits; camera collision, montage, time-scale, physical mouse and trusted player gates remain open. See [M4_PITCH_LIMIT_REVIEW.md](M4_PITCH_LIMIT_REVIEW.md). Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`.
+
 Estimated effort: 1–2 focused weeks.
 
 ### M5 — Campaign loop and persistence

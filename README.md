@@ -92,6 +92,8 @@ M4 possession now has three-cycle real-PIE return evidence: the original tactica
 
 The possession HUD also shows live guard UP/DOWN feedback from the controlled soldier's block state without polling or copied state. Its 35/35 regression passes, while rendered fit and the rest of M4.7 remain open. See [M4_GUARD_FEEDBACK_REVIEW.md](M4_GUARD_FEEDBACK_REVIEW.md).
 
+First-person pitch is limited to ±80° only during possession; repeated exits and death restore the exact tactical camera bounds. The final 35/35 regression passes; physical mouse/rendered camera checks remain open. See [M4_PITCH_LIMIT_REVIEW.md](M4_PITCH_LIMIT_REVIEW.md).
+
 Tactical squad membership is now integrated with initial forces and recruitment, with atomic same-faction grouping and lifecycle cleanup. That baseline passed 26/26 without result warnings, strict IWYU and Shipping compilation. Handles are battle-local, not persistent campaign IDs; campaign mapping remains later work. See [M3_SQUAD_REGISTRY_REVIEW.md](M3_SQUAD_REGISTRY_REVIEW.md).
 
 Navigation uses AIController, CharacterMovement and dynamic NavMesh in both maps. Real-PIE tests cover obstacle avoidance, pursuit, cancellation, possession reuse, lifecycle cleanup, disconnected islands, a gated narrow passage and crossing formations. The latest regression passes 34/34; [M3_NAVIGATION_REVIEW.md](M3_NAVIGATION_REVIEW.md), [M3_DISCONNECTED_NAVIGATION_REVIEW.md](M3_DISCONNECTED_NAVIGATION_REVIEW.md) and [M3_GROUP_CONGESTION_REVIEW.md](M3_GROUP_CONGESTION_REVIEW.md) record revision-specific evidence and remaining gates. [M3_PERFORMANCE_BASELINE_REVIEW.md](M3_PERFORMANCE_BASELINE_REVIEW.md) records provisional 50/100-unit editor profiling; it is not a packaged-player benchmark.

@@ -4,6 +4,7 @@
 #include "PlacementTransactionProbe.h"
 #include "BuildingSelectionProbe.h"
 
+#include "Camera/PlayerCameraManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Battle/TacticalBattleSubsystem.h"
@@ -718,10 +719,13 @@ namespace RomanEmpireUITests
 				}
 			}
 			APawn* CameraPawn = Controller->GetPawn();
+			APlayerCameraManager* CameraManager = Controller->PlayerCameraManager;
 			UWidget* Crosshair = Root->GetWidgetFromName(TEXT("CrosshairText"));
 			UTextBlock* PossessionText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("PossessionText")));
 			if (!Test.TestTrue(TEXT("Normal bootstrap supplies a living Rome soldier, camera, and possession controls"),
-				Soldier && CameraPawn && Crosshair && PossessionText)) return false;
+				Soldier && CameraPawn && CameraManager && Crosshair && PossessionText)) return false;
+			const float OriginalViewPitchMin = CameraManager->ViewPitchMin;
+			const float OriginalViewPitchMax = CameraManager->ViewPitchMax;
 
 			FCall SelectCall(Test, Controller, TEXT("SelectUnit"), 1);
 			SelectCall.SetObject(TEXT("Unit"), Soldier);
@@ -744,6 +748,8 @@ namespace RomanEmpireUITests
 			PossessCall.SetObject(TEXT("UnitToPossess"), Soldier);
 			PossessCall.Execute();
 			Test.TestTrue(TEXT("Entering possession transfers the controller to the selected soldier"), Controller->GetPawn() == Soldier);
+			Test.TestEqual(TEXT("Possession applies its downward pitch limit"), CameraManager->ViewPitchMin, -80.0f);
+			Test.TestEqual(TEXT("Possession applies its upward pitch limit"), CameraManager->ViewPitchMax, 80.0f);
 			Test.TestTrue(TEXT("Possession changes the authoritative controller mode"), ReadBool(Test, Controller, TEXT("IsInFirstPersonMode")));
 			Test.TestTrue(TEXT("Possession events display crosshair and soldier vitals"), Crosshair->IsVisible() && PossessionText->IsVisible());
 			Test.TestTrue(TEXT("Possession UI reads the same damaged health"), PossessionText->GetText().ToString().Contains(HealthLabel));
@@ -756,6 +762,8 @@ namespace RomanEmpireUITests
 			KillCall.Execute();
 			Test.TestFalse(TEXT("Canonical health transition kills the possessed soldier"), ReadBool(Test, Soldier, TEXT("IsAlive")));
 			Test.TestTrue(TEXT("Possessed soldier death restores the original camera pawn"), Controller->GetPawn() == CameraPawn);
+			Test.TestEqual(TEXT("Death restores the tactical minimum pitch"), CameraManager->ViewPitchMin, OriginalViewPitchMin);
+			Test.TestEqual(TEXT("Death restores the tactical maximum pitch"), CameraManager->ViewPitchMax, OriginalViewPitchMax);
 			Test.TestFalse(TEXT("Death exits the controller's possession mode"), ReadBool(Test, Controller, TEXT("IsInFirstPersonMode")));
 			Test.TestFalse(TEXT("Restored tactical header remains single-line"), PhaseText->GetAutoWrapText());
 			Test.TestTrue(TEXT("Header follows the restored tactical mode"), PhaseText->GetText().ToString().StartsWith(TEXT("Tactical   |   Turn ")));
