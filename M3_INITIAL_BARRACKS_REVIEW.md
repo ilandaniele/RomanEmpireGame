@@ -1,6 +1,6 @@
 # M3.5 initial Roman barracks
 
-Status: the Roman camp's decorative barracks mesh has been replaced by one real, initially completed `ABarracks` producer. M3.5 is still open for the enemy objective structure, production cancellation/failure policy, injected refund failure coverage and a trusted packaged-player check.
+Status: the Roman camp's decorative barracks mesh has been replaced by one real, initially completed `ABarracks` producer. M3.5 is still open for the enemy objective structure, production cancellation/failure policy and a trusted packaged-player check. The later placement fixture covers post-charge spawn failure and refund in `M3_PLACEMENT_VALIDATION_REVIEW.md`.
 
 `ARomanEmpireGameMode` resolves the authored `Barracks` definition and its factory class, deferred-spawns the building at the existing camp site, initializes its stable ID and Rome ownership before `BeginPlay`, and completes its starting construction without charging the player or advancing simulation time. Runtime placement still uses the normal construction path. The new `CompleteInitialConstruction` entry point is restricted to an initialized, begun-play building in the Placing state, so completion notifications and visuals use the existing canonical transition.
 

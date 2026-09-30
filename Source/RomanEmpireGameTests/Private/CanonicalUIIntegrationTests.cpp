@@ -879,6 +879,23 @@ void UPlacementTransactionProbe::OnResourcesChanged(EFactionID FactionID, FFacti
 	++WalletNotifications;
 	// Bound recursion ensures a broken implementation reports failure, not a stack overflow.
 	if (!Test || WalletNotifications > 1) return;
+	if (bDestroyDeferredDuringSpend)
+	{
+		UActorComponent* Component = Cast<UActorComponent>(Placement.Get());
+		UWorld* World = Component ? Component->GetWorld() : nullptr;
+		if (World && BuildingClass.IsValid())
+		{
+			for (TActorIterator<AActor> It(World, BuildingClass.Get()); It; ++It)
+			{
+				if (!It->HasActorBegunPlay() && It->Destroy())
+				{
+					++DestroyedDeferredCount;
+					break;
+				}
+			}
+		}
+		return;
+	}
 	Test->TestFalse(TEXT("Wallet observer cannot recursively confirm the same placement"),
 		ReadBool(*Test, Placement.Get(), TEXT("ConfirmPlacement")));
 	Test->TestFalse(TEXT("Placement is not actionable while committing"),
@@ -1159,6 +1176,52 @@ namespace RomanEmpireUITests
 			Test.TestTrue(TEXT("Original preview succeeds after funding"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
 			Test.TestEqual(TEXT("Retry deducts exactly its newly funded gold"), ReadResources(Test, Manager).Gold, 0);
 			Test.TestFalse(TEXT("Successful retry consumes the preview"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+
+			// An observer can retire a deferred actor during the committed spend.
+			// That post-charge failure must refund every resource and publish no building.
+			FFactionResourceDelta RefundFixtureFunding;
+			RefundFixtureFunding.Gold = Expected.Cost.Gold;
+			RefundFixtureFunding.Food = Expected.Cost.Food;
+			RefundFixtureFunding.Iron = Expected.Cost.Iron;
+			RefundFixtureFunding.Wood = Expected.Cost.Wood;
+			RefundFixtureFunding.Stone = Expected.Cost.Stone;
+			RefundFixtureFunding.Population = Expected.Cost.Population;
+			FCall FundRefundFixture(Test, Manager, TEXT("ApplyFactionResourceDelta"), 3);
+			FundRefundFixture.SetEnum(TEXT("FactionID"), EFactionID::Rome);
+			FundRefundFixture.SetStruct(TEXT("Delta"), RefundFixtureFunding);
+			FundRefundFixture.Execute();
+			FCall FailStart(Test, Placement, TEXT("StartPlacement"), 1);
+			FailStart.SetName(TEXT("BuildingID"), Expected.BuildingID);
+			FailStart.Execute();
+			FCall FailMove(Test, Placement, TEXT("UpdatePreview"), 1);
+			FailMove.SetVector(TEXT("WorldLocation"), FVector(OwnedCenter.X + 4000.0, OwnedCenter.Y + 4000.0, -10.0));
+			FailMove.Execute();
+			if (!Test.TestTrue(TEXT("Post-charge failure fixture starts from a valid site"), ReadBool(Test, Placement, TEXT("CanPlace")))) return;
+			const FFactionResourceAmounts BeforeSpawnFailure = ReadResources(Test, Manager);
+			int32 BuildingsBeforeSpawnFailure = 0;
+			for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) ++BuildingsBeforeSpawnFailure;
+			TStrongObjectPtr<UPlacementTransactionProbe> FailureProbe(NewObject<UPlacementTransactionProbe>());
+			FailureProbe->Test = &Test;
+			FailureProbe->Placement = Placement;
+			FailureProbe->BuildingClass = BuildingClass;
+			FailureProbe->bDestroyDeferredDuringSpend = true;
+			FScopedProbeBinding FailureWalletBinding(Test, Manager, TEXT("OnFactionResourcesChanged"), FailureProbe.Get(), TEXT("OnResourcesChanged"));
+			FScopedProbeBinding FailurePlacedBinding(Test, Placement, TEXT("OnBuildingPlaced"), FailureProbe.Get(), TEXT("OnPlaced"));
+			if (!FailureWalletBinding.bValid || !FailurePlacedBinding.bValid) return;
+			Test.AddExpectedMessage(TEXT("Building spawn failed; resources refunded"),
+				ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
+			Test.TestFalse(TEXT("Destroyed deferred actor prevents placement completion"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
+			Test.TestEqual(TEXT("Failure observer destroyed exactly one deferred actor"), FailureProbe->DestroyedDeferredCount, 1);
+			Test.TestEqual(TEXT("Spend and compensating refund each emit one wallet event"), FailureProbe->WalletNotifications, 2);
+			Test.TestEqual(TEXT("Failed spawn emits no placed event"), FailureProbe->PlacedNotifications, 0);
+			const FFactionResourceAmounts AfterSpawnFailure = ReadResources(Test, Manager);
+			Test.TestTrue(TEXT("Post-charge failure refunds all six resource fields"),
+				FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&BeforeSpawnFailure, &AfterSpawnFailure, 0));
+			int32 BuildingsAfterSpawnFailure = 0;
+			for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) ++BuildingsAfterSpawnFailure;
+			Test.TestEqual(TEXT("Failed spawn leaves no additional building"), BuildingsAfterSpawnFailure, BuildingsBeforeSpawnFailure);
+			Test.TestTrue(TEXT("Failed spawn keeps the preview retryable"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+			FCall(Test, Placement, TEXT("CancelPlacement"), 0).Execute();
 		}
 	};
 

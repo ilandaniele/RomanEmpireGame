@@ -21,8 +21,11 @@ public:
 	TWeakObjectPtr<UObject> Placement;
 	int32 WalletNotifications = 0;
 	int32 PlacedNotifications = 0;
+	int32 DestroyedDeferredCount = 0;
 	bool bCancelDuringSpend = false;
+	bool bDestroyDeferredDuringSpend = false;
 	FName BuildingID;
+	TWeakObjectPtr<UClass> BuildingClass;
 
 	UFUNCTION()
 	void OnResourcesChanged(EFactionID FactionID, FFactionResourceAmounts NewBalance);
