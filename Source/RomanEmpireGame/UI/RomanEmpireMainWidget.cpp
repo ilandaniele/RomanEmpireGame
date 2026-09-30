@@ -142,7 +142,11 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 		FLinearColor(0.04f, 0.045f, 0.075f, 0.90f));
 	ObjectivePanel->SetVisibility(ESlateVisibility::HitTestInvisible);
 	ObjectiveText = CreateTextBlock(WidgetTree, TEXT("ObjectiveText"), 15, FLinearColor(0.88f, 0.9f, 0.95f));
-	ObjectivePanel->SetContent(ObjectiveText);
+	BattleText = CreateTextBlock(WidgetTree, TEXT("BattleText"), 13, FLinearColor(1.0f, 0.78f, 0.45f));
+	UVerticalBox* ObjectiveBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ObjectiveBox"));
+	ObjectiveBox->AddChildToVerticalBox(ObjectiveText);
+	ObjectiveBox->AddChildToVerticalBox(BattleText);
+	ObjectivePanel->SetContent(ObjectiveBox);
 	PlaceFixed(RootCanvas, ObjectivePanel, FAnchors(0.0f, 0.0f), FVector2D::ZeroVector,
 		FVector2D(10.0f, 52.0f), FVector2D(410.0f, 88.0f));
 
@@ -307,6 +311,8 @@ void URomanEmpireMainWidget::BindCanonicalEvents()
 		this, &URomanEmpireMainWidget::HandleCampaignStarted);
 	CachedGameState->OnCampaignObjectivesChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleObjectivesChanged);
+	CachedGameState->OnTacticalBattleChanged.AddUniqueDynamic(
+		this, &URomanEmpireMainWidget::HandleTacticalBattleChanged);
 	CachedGameState->OnVictory.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleVictory);
 	CachedGameState->OnDefeat.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	bCanonicalEventsBound = true;
@@ -343,6 +349,8 @@ void URomanEmpireMainWidget::UnbindCanonicalEvents()
 			this, &URomanEmpireMainWidget::HandleCampaignStarted);
 		CachedGameState->OnCampaignObjectivesChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleObjectivesChanged);
+		CachedGameState->OnTacticalBattleChanged.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandleTacticalBattleChanged);
 		CachedGameState->OnVictory.RemoveDynamic(this, &URomanEmpireMainWidget::HandleVictory);
 		CachedGameState->OnDefeat.RemoveDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	}
@@ -412,6 +420,7 @@ void URomanEmpireMainWidget::RefreshFromCanonicalState()
 	{
 		const FCampaignObjectiveState State = CachedGameState->GetObjectiveState();
 		RefreshObjectives(State);
+		RefreshBattle(CachedGameState->GetTacticalBattleResult());
 		RefreshOutcome(State.Outcome);
 	}
 	RefreshSelection();
@@ -497,6 +506,39 @@ void URomanEmpireMainWidget::RefreshObjectives(const FCampaignObjectiveState& St
 			State.CurrentGold,
 			State.RequiredGold)));
 	}
+}
+
+void URomanEmpireMainWidget::RefreshBattle(const FTacticalBattleResult& Result)
+{
+	if (!BattleText) return;
+	if (Result.ObjectiveID.IsNone())
+	{
+		BattleText->SetText(FText::FromString(TEXT("BATTLE  awaiting encounter")));
+		return;
+	}
+	const EFactionID PlayerFaction = CachedGameState ? CachedGameState->GetPlayerFaction() : EFactionID::None;
+	int32 OwnAlive = 0;
+	int32 OwnTotal = 0;
+	int32 FoeAlive = 0;
+	int32 FoeTotal = 0;
+	for (const FTacticalBattleSquadResult& Squad : Result.Squads)
+	{
+		if (Squad.Faction == PlayerFaction)
+		{
+			OwnAlive += Squad.Survivors;
+			OwnTotal += Squad.InitialUnits;
+		}
+		else
+		{
+			FoeAlive += Squad.Survivors;
+			FoeTotal += Squad.InitialUnits;
+		}
+	}
+	const TCHAR* Status = Result.Outcome == ETacticalBattleOutcome::PlayerVictory ? TEXT("Victory") :
+		Result.Outcome == ETacticalBattleOutcome::PlayerDefeat ? TEXT("Defeat") : TEXT("Capture camp");
+	BattleText->SetText(FText::FromString(FString::Printf(
+		TEXT("BATTLE  Allies %d/%d | Foes %d/%d | %s"),
+		OwnAlive, OwnTotal, FoeAlive, FoeTotal, Status)));
 }
 
 void URomanEmpireMainWidget::RefreshSelection()
@@ -890,6 +932,12 @@ void URomanEmpireMainWidget::HandleObjectivesChanged(FCampaignObjectiveState Sta
 	RefreshSelection();
 	RefreshDiagnostic();
 	RefreshCommands();
+}
+
+void URomanEmpireMainWidget::HandleTacticalBattleChanged(FTacticalBattleResult Result)
+{
+	(void)Result;
+	if (CachedGameState) RefreshBattle(CachedGameState->GetTacticalBattleResult());
 }
 
 void URomanEmpireMainWidget::HandleVictory(EFactionID WinningFaction, EVictoryCondition Condition)

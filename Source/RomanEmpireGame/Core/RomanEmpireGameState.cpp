@@ -2,6 +2,7 @@
 
 #include "Core/RomanEmpireGameState.h"
 #include "Core/RomanEmpireGameMode.h"
+#include "Battle/TacticalBattleSubsystem.h"
 #include "Engine/World.h"
 #include "Faction/FactionManager.h"
 #include "RomanEmpireGame.h"
@@ -32,6 +33,7 @@ void ARomanEmpireGameState::HandleGameplayInitialized()
 	Factions = Rules->GetFactionManager();
 	Campaign = Rules->GetCampaignManager();
 	WorldMap = Rules->GetWorldMapManager();
+	TacticalBattle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
 	if (!Factions.IsValid() || !Campaign.IsValid() || !WorldMap.IsValid()) return;
 	Factions->OnFactionResourcesChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleResourcesChanged);
 	Factions->OnPlayerFactionChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandlePlayerFactionChanged);
@@ -41,6 +43,11 @@ void ARomanEmpireGameState::HandleGameplayInitialized()
 	Campaign->OnCampaignObjectivesChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleObjectivesChanged);
 	Campaign->OnVictory.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleVictory);
 	Campaign->OnDefeat.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleDefeat);
+	if (TacticalBattle.IsValid())
+	{
+		TacticalBattle->OnTacticalBattleChanged.AddUniqueDynamic(
+			this, &ARomanEmpireGameState::HandleTacticalBattleChanged);
+	}
 	bObserversBound = true;
 	UE_LOG(LogRomanEmpire, Log, TEXT("Public GameState ready; canonical gameplay reads and event relays bound"));
 	OnGameplayInitialized.Broadcast();
@@ -67,11 +74,17 @@ void ARomanEmpireGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		Campaign->OnVictory.RemoveDynamic(this, &ARomanEmpireGameState::HandleVictory);
 		Campaign->OnDefeat.RemoveDynamic(this, &ARomanEmpireGameState::HandleDefeat);
 	}
+	if (TacticalBattle.IsValid())
+	{
+		TacticalBattle->OnTacticalBattleChanged.RemoveDynamic(
+			this, &ARomanEmpireGameState::HandleTacticalBattleChanged);
+	}
 	bObserversBound = false;
 	Rules.Reset();
 	Factions.Reset();
 	Campaign.Reset();
 	WorldMap.Reset();
+	TacticalBattle.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -121,6 +134,11 @@ EVictoryCondition ARomanEmpireGameState::GetResolvedVictoryCondition() const
 	return Campaign.IsValid() ? Campaign->GetResolvedVictoryCondition() : EVictoryCondition::Conquest;
 }
 
+FTacticalBattleResult ARomanEmpireGameState::GetTacticalBattleResult() const
+{
+	return TacticalBattle.IsValid() ? TacticalBattle->GetResult() : FTacticalBattleResult();
+}
+
 void ARomanEmpireGameState::HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode)
 {
 	OnGameplayModeChanged.Broadcast(OldMode, NewMode);
@@ -167,4 +185,10 @@ void ARomanEmpireGameState::HandleVictory(EFactionID WinningFaction, EVictoryCon
 void ARomanEmpireGameState::HandleDefeat(EFactionID LosingFaction)
 {
 	OnDefeat.Broadcast(LosingFaction);
+}
+
+void ARomanEmpireGameState::HandleTacticalBattleChanged(FTacticalBattleResult Result)
+{
+	(void)Result;
+	OnTacticalBattleChanged.Broadcast(GetTacticalBattleResult());
 }

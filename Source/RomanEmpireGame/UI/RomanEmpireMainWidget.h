@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Battle/TacticalBattleResult.h"
 #include "Building/ProductionEvent.h"
 #include "Campaign/CampaignObjectiveState.h"
 #include "Campaign/CampaignTurn.h"
@@ -68,6 +69,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> ObjectiveText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> BattleText;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> DiagnosticText;
@@ -158,6 +162,7 @@ private:
 	void RefreshModeAndTurn();
 	void RefreshCommands();
 	void RefreshObjectives(const FCampaignObjectiveState& State);
+	void RefreshBattle(const FTacticalBattleResult& Result);
 	void RefreshSelection();
 	void RefreshDiagnostic();
 	void RefreshOutcome(ECampaignOutcome Outcome);
@@ -194,6 +199,9 @@ private:
 
 	UFUNCTION()
 	void HandleObjectivesChanged(FCampaignObjectiveState State);
+
+	UFUNCTION()
+	void HandleTacticalBattleChanged(FTacticalBattleResult Result);
 
 	UFUNCTION()
 	void HandleVictory(EFactionID WinningFaction, EVictoryCondition Condition);

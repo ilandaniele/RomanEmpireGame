@@ -456,6 +456,7 @@ namespace RomanEmpireUITests
 		UTextBlock* ResourceText = nullptr;
 		UTextBlock* PhaseText = nullptr;
 		UTextBlock* ProductionText = nullptr;
+		UTextBlock* BattleText = nullptr;
 		UTextBlock* OutcomeText = nullptr;
 		UButton* TrainButton = nullptr;
 		FName TrainingUnitID;
@@ -497,6 +498,19 @@ namespace RomanEmpireUITests
 					Test.TestEqual(TEXT("Trained unit is a Roman singleton reinforcement"), Result.Squads[2].Faction, EFactionID::Rome);
 					Test.TestEqual(TEXT("Trained squad starts with one survivor"), Result.Squads[2].Survivors, 1);
 				}
+				const FString BattleLabel = BattleText ? BattleText->GetText().ToString() : TEXT("<missing>");
+				int32 RomanSurvivors = 0;
+				int32 RomanRoster = 0;
+				for (const FTacticalBattleSquadResult& Squad : Result.Squads)
+				{
+					if (Squad.Faction == EFactionID::Rome)
+					{
+						RomanSurvivors += Squad.Survivors;
+						RomanRoster += Squad.InitialUnits;
+					}
+				}
+				Test.TestTrue(*FString::Printf(TEXT("Battle UMG receives training without a UI tick: %s"), *BattleLabel),
+					BattleLabel.Contains(FString::Printf(TEXT("Allies %d/%d"), RomanSurvivors, RomanRoster)) && RomanRoster == 16);
 			}
 			UClass* UnitClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.UnitBase")).TryLoadClass<AActor>();
 			if (!Test.TestNotNull(TEXT("The live unit class is available for casualty verification"), UnitClass)) return false;
@@ -523,6 +537,8 @@ namespace RomanEmpireUITests
 				Test.TestEqual(TEXT("Live death reduces defender survivors once"), AfterDeath.Squads[1].Survivors, 9);
 				Test.TestEqual(TEXT("A single defender loss does not end the objective battle"),
 					AfterDeath.Outcome, ETacticalBattleOutcome::InProgress);
+				Test.TestTrue(TEXT("Battle UMG receives one defender casualty without a UI tick"),
+					BattleText && BattleText->GetText().ToString().Contains(TEXT("Foes 9/10")));
 			}
 
 			const int32 GoldBeforeDrain = ReadResources(Test, FactionManager).Gold;
@@ -593,6 +609,12 @@ namespace RomanEmpireUITests
 				ListenerCount(Test, FactionManager, TEXT("OnFactionResourcesChanged"), GameState), 1);
 			Test.TestEqual(TEXT("GameState owns one turn relay independent of UMG attachment"),
 				ListenerCount(Test, CampaignManager, TEXT("OnTurnProcessed"), GameState), 1);
+			Test.TestEqual(TEXT("Exactly the expected number of root battle subscriptions exist"),
+				ListenerCount(Test, GameState, TEXT("OnTacticalBattleChanged"), Root), Expected);
+			Test.TestEqual(TEXT("GameState owns one battle relay independent of UMG attachment"),
+				ListenerCount(Test, TacticalBattle, TEXT("OnTacticalBattleChanged"), GameState), 1);
+			Test.TestEqual(TEXT("Root never observes the tactical authority directly"),
+				ListenerCount(Test, TacticalBattle, TEXT("OnTacticalBattleChanged"), Root), 0);
 			Test.TestEqual(TEXT("Exactly the expected number of root selection subscriptions exist"),
 				ListenerCount(Test, Controller, TEXT("OnSelectionChanged"), Root), Expected);
 			Test.TestEqual(TEXT("Exactly the expected number of root production subscriptions exist"),
@@ -757,13 +779,14 @@ namespace RomanEmpireUITests
 			ResourceText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("ResourceText")));
 			PhaseText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("PhaseText")));
 			ProductionText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("ProductionText")));
+			BattleText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("BattleText")));
 			OutcomeText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("OutcomeText")));
 			TrainButton = Cast<UButton>(Root->GetWidgetFromName(TEXT("TrainButton")));
 			UTextBlock* DiagnosticText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("DiagnosticText")));
 			UTextBlock* SelectionText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("SelectionText")));
 			UTextBlock* ObjectiveText = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("ObjectiveText")));
 			if (!Test.TestTrue(TEXT("All production UI controls materialize as the expected UMG types"),
-				ResourceText && PhaseText && ProductionText && OutcomeText && TrainButton && DiagnosticText && SelectionText && ObjectiveText &&
+				ResourceText && PhaseText && ProductionText && BattleText && OutcomeText && TrainButton && DiagnosticText && SelectionText && ObjectiveText &&
 				Root->GetWidgetFromName(TEXT("BuildingMenu")) && Root->GetWidgetFromName(TEXT("OutcomePanel")))) return false;
 			Test.TestFalse(TEXT("Fixed-height resource header must not wrap"), ResourceText->GetAutoWrapText());
 			Test.TestFalse(TEXT("Fixed-height mode/turn header must not wrap"), PhaseText->GetAutoWrapText());
@@ -785,6 +808,9 @@ namespace RomanEmpireUITests
 				Test.TestEqual(TEXT("Initial Carthaginian formation has 10 survivors"), InitialBattle.Squads[1].Survivors, 10);
 			}
 			Test.TestEqual(TEXT("Initial objective has its stable ID"), InitialBattle.ObjectiveID, FName(TEXT("CarthaginianCamp")));
+			Test.TestTrue(TEXT("Battle UMG initially projects both known forces"),
+				BattleText->GetText().ToString().Contains(TEXT("Allies 15/15")) &&
+				BattleText->GetText().ToString().Contains(TEXT("Foes 10/10")));
 			CheckRelayContract();
 			FCall ModeCall(Test, GameMode, TEXT("SetGameplayMode"), 1);
 			ModeCall.SetEnum(TEXT("NewMode"), EGameplayMode::Tactical);

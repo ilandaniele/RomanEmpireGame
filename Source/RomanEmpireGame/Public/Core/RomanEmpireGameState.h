@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Campaign/CampaignObjectiveState.h"
 #include "Campaign/CampaignTurn.h"
+#include "Battle/TacticalBattleResult.h"
 #include "Core/GameplayMode.h"
 #include "Faction/FactionData.h"
 #include "GameFramework/GameStateBase.h"
@@ -14,6 +15,7 @@ class ACampaignManager;
 class AFactionManager;
 class ARomanEmpireGameMode;
 class AWorldMapManager;
+class UTacticalBattleSubsystem;
 
 /** Public single-player read/event contract. Values stay owned by their canonical
  * managers; this actor holds no wallet, turn, mode or outcome copy and accepts no commands.
@@ -48,6 +50,8 @@ public:
 	int32 GetFactionTerritoryCount(EFactionID FactionID) const;
 	UFUNCTION(BlueprintPure, Category = "Game State")
 	EVictoryCondition GetResolvedVictoryCondition() const;
+	UFUNCTION(BlueprintPure, Category = "Game State")
+	FTacticalBattleResult GetTacticalBattleResult() const;
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPublicGameplayInitialized);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPublicGameplayModeChanged, EGameplayMode, OldMode, EGameplayMode, NewMode);
@@ -59,6 +63,7 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPublicObjectivesChanged, FCampaignObjectiveState, ObjectiveState);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPublicVictory, EFactionID, WinningFaction, EVictoryCondition, Condition);
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPublicDefeat, EFactionID, LosingFaction);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPublicTacticalBattleChanged, FTacticalBattleResult, Result);
 
 	UPROPERTY(BlueprintAssignable, Category = "Game State|Events")
 	FOnPublicGameplayInitialized OnGameplayInitialized;
@@ -80,6 +85,8 @@ public:
 	FOnPublicVictory OnVictory;
 	UPROPERTY(BlueprintAssignable, Category = "Game State|Events")
 	FOnPublicDefeat OnDefeat;
+	UPROPERTY(BlueprintAssignable, Category = "Game State|Events")
+	FOnPublicTacticalBattleChanged OnTacticalBattleChanged;
 
 private:
 	UPROPERTY(Transient)
@@ -90,6 +97,8 @@ private:
 	TWeakObjectPtr<ACampaignManager> Campaign;
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AWorldMapManager> WorldMap;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UTacticalBattleSubsystem> TacticalBattle;
 	bool bObserversBound = false;
 
 	UFUNCTION()
@@ -112,4 +121,6 @@ private:
 	void HandleVictory(EFactionID WinningFaction, EVictoryCondition Condition);
 	UFUNCTION()
 	void HandleDefeat(EFactionID LosingFaction);
+	UFUNCTION()
+	void HandleTacticalBattleChanged(FTacticalBattleResult Result);
 };
