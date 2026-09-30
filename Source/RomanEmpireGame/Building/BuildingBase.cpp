@@ -296,6 +296,11 @@ void ABuildingBase::OnDestroyed()
 	SetActorEnableCollision(false);
 }
 
+FVector ABuildingBase::GetPlacementHalfExtent() const
+{
+	return CollisionBox ? CollisionBox->GetScaledBoxExtent() : FVector::ZeroVector;
+}
+
 bool ABuildingBase::CanPlaceAt(const FVector& Location) const
 {
 	// Check for overlapping actors

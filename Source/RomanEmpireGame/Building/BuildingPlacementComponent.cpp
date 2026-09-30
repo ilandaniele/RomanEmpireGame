@@ -2,12 +2,16 @@
 
 #include "BuildingPlacementComponent.h"
 #include "BuildingBase.h"
+#include "CollisionQueryParams.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Core/RomanEmpireGameMode.h"
 #include "Core/RomanEmpirePlayerController.h"
 #include "Faction/FactionManager.h"
+#include "World/TerritoryRegion.h"
+#include "World/WorldMapManager.h"
 #include "Engine/Engine.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -77,6 +81,8 @@ void UBuildingPlacementComponent::StartPlacement(FName BuildingID)
 	CurrentBuildingClass = BuildingClass;
 	CurrentBuildingID = BuildingID;
 	CurrentRotation = 0.0f;
+	CurrentPlacementLocation = FVector::ZeroVector;
+	bCanPlace = false;
 	bIsPlacing = true;
 	LastTransactionFailure = EResourceTransactionFailure::None;
 
@@ -111,6 +117,15 @@ void UBuildingPlacementComponent::UpdatePreview(const FVector& WorldLocation)
 
 	// Snap to grid if enabled
 	FVector SnappedLocation = bSnapToGrid ? SnapToGrid(WorldLocation) : WorldLocation;
+	const FVector HalfExtent = PreviewBuilding->GetPlacementHalfExtent();
+	if (!FMath::IsFinite(SnappedLocation.X) || !FMath::IsFinite(SnappedLocation.Y) ||
+		!FMath::IsFinite(SnappedLocation.Z) || HalfExtent.Z <= 0.0)
+	{
+		bCanPlace = false;
+		PreviewBuilding->SetPlacementMode(true, false);
+		return;
+	}
+	SnappedLocation.Z += HalfExtent.Z; // Cursor point is terrain surface; actor origin is box center.
 	CurrentPlacementLocation = SnappedLocation;
 
 	// Update preview position and rotation
@@ -143,6 +158,8 @@ void UBuildingPlacementComponent::RotatePreview(float Degrees)
 	{
 		FRotator Rotation(0.0f, CurrentRotation, 0.0f);
 		PreviewBuilding->SetActorRotation(Rotation);
+		bCanPlace = ValidatePlacement();
+		PreviewBuilding->SetPlacementMode(true, bCanPlace);
 	}
 }
 
@@ -157,9 +174,25 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
-	if (!bIsPlacing || !bCanPlace || !CurrentBuildingClass || CurrentBuildingID.IsNone())
+	if (!bIsPlacing || !PreviewBuilding || !CurrentBuildingClass || CurrentBuildingID.IsNone())
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: invalid state"));
+		return false;
+	}
+	// Never trust an earlier preview frame: terrain, actors, faction or wallet may have changed.
+	bCanPlace = ValidatePlacement();
+	PreviewBuilding->SetPlacementMode(true, bCanPlace);
+	if (!bCanPlace)
+	{
+		if (LastTransactionFailure != EResourceTransactionFailure::None)
+		{
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: resource transaction failed (%s)"),
+				RomanEmpireEconomy::GetTransactionFailureName(LastTransactionFailure));
+		}
+		else
+		{
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot confirm placement: invalid site"));
+		}
 		return false;
 	}
 
@@ -217,7 +250,32 @@ bool UBuildingPlacementComponent::ConfirmPlacement()
 		return false;
 	}
 
-	UGameplayStatics::FinishSpawningActor(NewBuilding, PlacementTransform);
+	if (IsValid(NewBuilding))
+	{
+		UGameplayStatics::FinishSpawningActor(NewBuilding, PlacementTransform);
+	}
+	if (!IsValid(NewBuilding) || !NewBuilding->HasActorBegunPlay())
+	{
+		if (IsValid(NewBuilding)) NewBuilding->Destroy();
+		FFactionResourceDelta Refund;
+		Refund.Gold = Cost.Gold;
+		Refund.Food = Cost.Food;
+		Refund.Iron = Cost.Iron;
+		Refund.Wood = Cost.Wood;
+		Refund.Stone = Cost.Stone;
+		Refund.Population = Cost.Population;
+		const FFactionResourceTransactionResult RefundResult = FactionManager->ApplyFactionResourceDelta(PlayerFaction, Refund);
+		if (!RefundResult.WasSuccessful())
+		{
+			UE_LOG(LogRomanEmpire, Error, TEXT("Building spawn failed and resource refund failed (%s)"),
+				RomanEmpireEconomy::GetTransactionFailureName(RefundResult.Failure));
+		}
+		else
+		{
+			UE_LOG(LogRomanEmpire, Error, TEXT("Building spawn failed; resources refunded"));
+		}
+		return false;
+	}
 	NewBuilding->StartConstruction();
 
 	DestroyPreviewBuilding();
@@ -323,12 +381,61 @@ FVector UBuildingPlacementComponent::SnapToGrid(const FVector& Location) const
 
 bool UBuildingPlacementComponent::ValidatePlacement()
 {
-	if (!PreviewBuilding)
+	LastTransactionFailure = EResourceTransactionFailure::None;
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(PreviewBuilding) || !bIsPlacing || CurrentBuildingID.IsNone()) return false;
+	const ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+	AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	const AWorldMapManager* MapManager = GameMode ? GameMode->GetWorldMapManager() : nullptr;
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* Asset = Registry ? Registry->FindBuilding(CurrentBuildingID) : nullptr;
+	if (!FactionManager || !MapManager || !Asset || FactionManager->GetPlayerFaction() == EFactionID::None ||
+		PreviewBuilding->GetOwnerFaction() != FactionManager->GetPlayerFaction())
 	{
+		LastTransactionFailure = EResourceTransactionFailure::InvalidFaction;
 		return false;
 	}
-
-	// For now, all placements are valid (on ground)
-	return true;
+	const FVector Extent = PreviewBuilding->GetPlacementHalfExtent();
+	if (Extent.X <= 0.0 || Extent.Y <= 0.0 || Extent.Z <= 0.0 ||
+		!FMath::IsFinite(CurrentPlacementLocation.X) || !FMath::IsFinite(CurrentPlacementLocation.Y) ||
+		!FMath::IsFinite(CurrentPlacementLocation.Z)) return false;
+	const FQuat Rotation = FRotator(0.0f, CurrentRotation, 0.0f).Quaternion();
+	const double SurfaceZ = CurrentPlacementLocation.Z - Extent.Z;
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(BuildingPlacement), false);
+	TraceParams.AddIgnoredActor(PreviewBuilding);
+	// Center and all footprint corners must land on the explicit buildable terrain.
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		const FVector Offset = Index == 0 ? FVector::ZeroVector :
+			Rotation.RotateVector(FVector((Index & 1) ? Extent.X : -Extent.X,
+				(Index & 2) ? Extent.Y : -Extent.Y, 0.0));
+		const FVector Point = CurrentPlacementLocation + Offset;
+		FHitResult Hit;
+		if (!World->LineTraceSingleByChannel(Hit, FVector(Point.X, Point.Y, SurfaceZ + 300.0),
+			FVector(Point.X, Point.Y, SurfaceZ - 300.0), ECC_Visibility, TraceParams) ||
+			!IsValid(Hit.GetActor()) || !Hit.GetActor()->ActorHasTag(TEXT("BuildableGround")) ||
+			FMath::Abs(Hit.ImpactPoint.Z - SurfaceZ) > 25.0) return false;
+		const ATerritoryRegion* Territory = MapManager->GetTerritoryAtLocation(Point);
+		if (!IsValid(Territory) ||
+			MapManager->GetTerritoryOwner(Territory->GetTerritoryID()) != FactionManager->GetPlayerFaction()) return false;
+	}
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	TArray<FOverlapResult> Overlaps;
+	World->OverlapMultiByObjectType(Overlaps, CurrentPlacementLocation, Rotation, Objects,
+		FCollisionShape::MakeBox(Extent), TraceParams);
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Actor = Overlap.GetActor();
+		if (Overlap.bBlockingHit && IsValid(Actor) && !Actor->IsA<ATerritoryRegion>() && Actor != PreviewBuilding &&
+			!Actor->ActorHasTag(TEXT("BuildableGround"))) return false;
+	}
+	// Check a copy through the canonical transaction rules; the real wallet is spent only on commit.
+	FFactionResourceAmounts Balance = FactionManager->GetFactionResources(FactionManager->GetPlayerFaction());
+	const FFactionResourceTransactionResult Affordable = RomanEmpireEconomy::TrySpendResources(Balance, Asset->Definition.Cost);
+	LastTransactionFailure = Affordable.Failure;
+	return Affordable.WasSuccessful();
 }
 

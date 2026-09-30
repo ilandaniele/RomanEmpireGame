@@ -32,6 +32,8 @@ public:
 	// Building info
 	UFUNCTION(BlueprintPure, Category = "Building")
 	FBuildingData GetBuildingData() const { return BuildingData; }
+	/** World-space half extent of the authored footprint collision box. */
+	FVector GetPlacementHalfExtent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Building")
 	EBuildingType GetBuildingType() const { return BuildingData.BuildingType; }

@@ -1,0 +1,15 @@
+# M3.5 placement validation
+
+Status: terrain, bounds, footprint overlap, canonical territory ownership and affordability are enforced by the existing placement command. This is a partial M3.5 block; production and the final packaged-player gate remain open.
+
+`UBuildingPlacementComponent` places the definition-derived preview box above the clicked surface, validates its center and rotated corners against explicitly buildable ground, and checks the footprint against blocking actors. The existing `L_Testbed` floor is tagged during GameMode startup because the authored actor predates that convention; the procedural ground is tagged at spawn. Territory markers are nonphysical overlap volumes and do not block construction. Every sampled point must lie in a territory currently owned by the player according to `AWorldMapManager`, not just carry a matching building-faction field. Affordability uses a copy of the canonical wallet and the same atomic transaction rules as commitment.
+
+Confirmation repeats all checks immediately before deferred spawn and the single real charge. Invalid terrain, blocked ground, foreign territory, or insufficient funds leave the preview retryable and do not charge. If the deferred actor fails initialization it is destroyed before spending; if it fails to finish spawning after the charge, the component destroys any remaining actor and requests a compensating canonical refund. A refund failure is logged as an error rather than silently treated as success. The existing reentrant observer guard and event ordering remain intact. This does not replace the decorative prototype camp structures or finish production.
+
+## Evidence
+
+- Final targeted real-PIE `DefinitionPropagationAndAtomicPlacementPIE`: 1/1, `Artifacts/Automation/M3_Placement_TaggedFloor`, log `Artifacts/M3_Placement-TaggedFloorTargeted.log`. It checks out-of-bounds, existing physical barracks, foreign territory, a clear owned site, a blocker introduced after preview, no-charge failure, exact six-resource charge, recursive wallet/placement callbacks, insufficient-funds retry and definition propagation. The authored-floor issue was exposed by earlier targeted runs and corrected; diagnostics were removed from final code.
+- Full regression: 34/34, zero test failures or warnings, `Artifacts/Automation/20260930_123151_052`, log `Artifacts/M3_Placement-FinalFull.log`.
+- Strict non-unity/no-PCH IWYU: 63/63 actions, `Artifacts/M3_Placement-FinalIWYU.log`. Shipping Game compilation: 6/6 actions, `Artifacts/M3_Placement-FinalShipping.log`. Repository validation, Git LFS integrity and diff whitespace checks pass.
+
+No new asset, plugin, module or external service was added. A fresh trusted packaged-player placement check is still pending. `L_Testbed` uses a narrow runtime migration for its untagged floor; future authored maps should explicitly tag intended construction surfaces. The post-charge spawn-failure branch is guarded but does not yet have an injectable failure fixture. Skills applied: `ue-data-assets-tables` for definition-derived footprint/cost and `ue-testing-debugging` for real-PIE command/transaction coverage.

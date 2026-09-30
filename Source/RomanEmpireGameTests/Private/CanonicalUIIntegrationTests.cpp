@@ -13,11 +13,14 @@
 #include "Components/TextBlock.h"
 #include "Components/ActorComponent.h"
 #include "Components/Widget.h"
+#include "Components/StaticMeshComponent.h"
 #include "Content/RomanContentRegistry.h"
 #include "Core/GameplayMode.h"
 #include "Core/RomanEmpireGameState.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Faction/FactionData.h"
@@ -987,6 +990,16 @@ namespace RomanEmpireUITests
 			UActorComponent* Placement = PlacementClass ? Controller->GetComponentByClass(PlacementClass) : nullptr;
 			UClass* BuildingClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.BuildingBase")).TryLoadClass<AActor>();
 			if (!Test.TestTrue(TEXT("Real placement, building class and faction authority exist"), Placement && BuildingClass && Manager)) return;
+			const URomanTerritoryDefinition* OwnedTerritory = nullptr;
+			const URomanTerritoryDefinition* ForeignTerritory = nullptr;
+			for (const URomanTerritoryDefinition* Territory : Registry->GetAllTerritories())
+			{
+				if (Territory->Definition.StartingOwner == EFactionID::Rome && !OwnedTerritory) OwnedTerritory = Territory;
+				if (Territory->Definition.StartingOwner != EFactionID::Rome &&
+					Territory->Definition.StartingOwner != EFactionID::None && !ForeignTerritory) ForeignTerritory = Territory;
+			}
+			if (!Test.TestTrue(TEXT("Authored owned and foreign territories exist"), OwnedTerritory && ForeignTerritory)) return;
+			const FVector OwnedCenter = OwnedTerritory->MapLocation;
 			Placement->SetComponentTickEnabled(false);
 			for (int32 Scenario = 0; Scenario < 2; ++Scenario)
 			{
@@ -995,9 +1008,48 @@ namespace RomanEmpireUITests
 				Start.SetName(TEXT("BuildingID"), Expected.BuildingID);
 				Start.Execute();
 				FCall Move(Test, Placement, TEXT("UpdatePreview"), 1);
-				Move.SetVector(TEXT("WorldLocation"), FVector(50000.0 + Scenario * 2000.0, 50000.0, 300.0));
+				Move.SetVector(TEXT("WorldLocation"), FVector(50000.0, 50000.0, -10.0));
 				Move.Execute();
-				Test.TestTrue(TEXT("Preview can be committed through the public command"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				Test.TestFalse(TEXT("Footprint outside ground cannot be placed"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				Move.SetVector(TEXT("WorldLocation"), FVector(-600.0, -800.0, -10.0));
+				Move.Execute();
+				Test.TestFalse(TEXT("Existing physical barracks blocks placement"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				if (Scenario == 0)
+				{
+				FVector ForeignSite = ForeignTerritory->MapLocation;
+				ForeignSite.Z = -10.0;
+				Move.SetVector(TEXT("WorldLocation"), ForeignSite);
+				Move.Execute();
+				Test.TestFalse(TEXT("Foreign territory rejects placement"), ReadBool(Test, Placement, TEXT("CanPlace")));
+			}
+				const FVector ValidSite(OwnedCenter.X + 3000.0 + Scenario * 1000.0, OwnedCenter.Y + 3000.0, -10.0);
+				Move.SetVector(TEXT("WorldLocation"), ValidSite);
+				Move.Execute();
+				Test.TestTrue(TEXT("Grounded, clear preview can be committed"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				if (Scenario == 0)
+				{
+					const FFactionResourceAmounts BeforeBlocked = ReadResources(Test, Manager);
+					UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+					FActorSpawnParameters Params;
+					Params.ObjectFlags |= RF_Transient;
+					AStaticMeshActor* Blocker = World->SpawnActor<AStaticMeshActor>(
+						FVector(ValidSite.X, ValidSite.Y, 190.0), FRotator::ZeroRotator, Params);
+					if (!Test.TestTrue(TEXT("Transient blocker fixture exists"), Blocker && Cube)) { Test.PopContext(); return; }
+					UStaticMeshComponent* Mesh = Blocker->GetStaticMeshComponent();
+					Mesh->SetMobility(EComponentMobility::Movable);
+					Mesh->SetStaticMesh(Cube);
+					Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+					Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+					Blocker->SetActorScale3D(FVector(4.0));
+					Test.AddExpectedMessage(TEXT("Cannot confirm placement: invalid site"),
+						ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+					Test.TestFalse(TEXT("New blocker invalidates stale preview at confirmation"), ReadBool(Test, Placement, TEXT("ConfirmPlacement")));
+					const FFactionResourceAmounts AfterBlocked = ReadResources(Test, Manager);
+					Test.TestTrue(TEXT("Blocked confirmation never charges resources"),
+						FFactionResourceAmounts::StaticStruct()->CompareScriptStruct(&BeforeBlocked, &AfterBlocked, 0));
+					Test.TestTrue(TEXT("Blocked confirmation preserves retryable preview"), ReadBool(Test, Placement, TEXT("IsPlacing")));
+					Blocker->Destroy();
+				}
 				TSet<AActor*> BeforeActors;
 				for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) BeforeActors.Add(*It);
 				const FFactionResourceAmounts Before = ReadResources(Test, Manager);
@@ -1056,7 +1108,7 @@ namespace RomanEmpireUITests
 			Start.SetName(TEXT("BuildingID"), Expected.BuildingID);
 			Start.Execute();
 			FCall Move(Test, Placement, TEXT("UpdatePreview"), 1);
-			Move.SetVector(TEXT("WorldLocation"), FVector(55000.0, 50000.0, 300.0));
+			Move.SetVector(TEXT("WorldLocation"), FVector(OwnedCenter.X + 3000.0, OwnedCenter.Y + 4000.0, -10.0));
 			Move.Execute();
 			int32 BeforeCount = 0;
 			for (TActorIterator<AActor> It(World, BuildingClass); It; ++It) ++BeforeCount;

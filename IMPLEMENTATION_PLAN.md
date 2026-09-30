@@ -591,6 +591,8 @@ Melee wind-up and single-impact package implemented (2026-09-29): `FUnitCombatSt
 
 #### M3.5 Buildings and production
 
+Placement validation block implemented (2026-09-30): the existing definition-selected command now positions the authored footprint above the surface and validates center/rotated corners against buildable terrain, world bounds, blocking actors, canonical territory ownership and wallet affordability. `L_Testbed`'s pre-existing floor and the procedural terrain are tagged as buildable; nonphysical territory volumes are excluded from footprint blocking. Confirmation revalidates stale previews before a single charge, preserves retry after failure, and refunds through the canonical wallet if post-charge spawn completion fails. Real-PIE targeted 1/1 and full 34/34 regression pass with zero test warnings/failures; strict IWYU (63), Shipping (6), repository and LFS gates pass. [M3_PLACEMENT_VALIDATION_REVIEW.md](M3_PLACEMENT_VALIDATION_REVIEW.md) records evidence and limits. M3.5 remains open: actual gameplay building actors in place of decorative camp meshes, production queue/cost/duration and UI input audit, an injected spawn-failure refund fixture, and a trusted packaged-player check are still required. Skills: `ue-data-assets-tables`, `ue-testing-debugging`.
+
 - Use one building-placement command with a selected building definition.
 - Validate terrain, bounds, overlap, ownership, and affordability before commitment.
 - Use deferred spawning or explicit initialization so type data exists before health/visual/construction initialization.

@@ -16,6 +16,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/RomanEmpireGameState.h"
 #include "UObject/ConstructorHelpers.h"
@@ -146,6 +147,18 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
+	// L_Testbed has an authored floor that predates the buildable-ground marker.
+	// Future maps should tag intended building surfaces explicitly in the editor.
+	for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+	{
+		AStaticMeshActor* Floor = *It;
+		const UStaticMeshComponent* Mesh = Floor->GetStaticMeshComponent();
+		if (Floor->GetName().StartsWith(TEXT("Floor_")) && Mesh &&
+			Mesh->Bounds.BoxExtent.X >= 3000.0 && Mesh->Bounds.BoxExtent.Y >= 3000.0)
+		{
+			Floor->Tags.AddUnique(TEXT("BuildableGround"));
+		}
+	}
 
 	// Spawn a large green ground plane
 	UStaticMesh* PlaneMesh = GetEngineMesh(TEXT("/Engine/BasicShapes/Plane"));
@@ -158,6 +171,7 @@ void ARomanEmpireGameMode::SpawnWorldTerrain()
 	AStaticMeshActor* Ground = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector(0, 0, -10), FRotator::ZeroRotator, SP);
 	if (Ground)
 	{
+		Ground->Tags.Add(TEXT("BuildableGround"));
 		Ground->GetStaticMeshComponent()->SetStaticMesh(PlaneMesh);
 		Ground->SetActorScale3D(FVector(500.0f, 500.0f, 1.0f));  // 50,000 x 50,000 cm = 500m
 		Ground->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
