@@ -1403,6 +1403,17 @@ namespace RomanEmpireUnitTests
 			Test.TestTrue(TEXT("Owned possession transfers actual Pawn"), Controller->GetPawn() == Owned);
 			PlayerMove();
 			Test.TestEqual(TEXT("Tactical order facade rejects possession mode"), Order(Test, Owned), EUnitOrderType::None);
+			UTextBlock* PossessionStatus = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("PossessionText")));
+			if (!Test.TestNotNull(TEXT("Possession status text exists"), PossessionStatus)) return true;
+			Test.TestTrue(TEXT("Possession HUD initially shows lowered guard"),
+				PossessionStatus->GetText().ToString().Contains(TEXT("Guard DOWN")));
+			Command(Test, Owned, TEXT("StartBlocking"));
+			Test.TestTrue(TEXT("Shield block activates on the controlled soldier"), Bool(Test, Owned, TEXT("IsBlocking")));
+			Test.TestTrue(TEXT("Guard activation updates the possession HUD synchronously"),
+				PossessionStatus->GetText().ToString().Contains(TEXT("Guard UP")));
+			Command(Test, Owned, TEXT("StopBlocking"));
+			Test.TestTrue(TEXT("Guard release updates the possession HUD synchronously"),
+				PossessionStatus->GetText().ToString().Contains(TEXT("Guard DOWN")));
 			Command(Test, Owned, TEXT("StartBlocking"));
 			SetOwner(Test, Owned, EFactionID::Carthage);
 			CheckReturned(Controller, OriginalCamera, Root);

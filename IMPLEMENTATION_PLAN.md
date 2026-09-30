@@ -661,6 +661,8 @@ Evidence and exit gate:
 
 Possession return-cycle evidence added (2026-09-30): the real controller/player pawn enters and exits the same owned unit three times, preserving selection and camera transform while returning the unit to the identical tactical AI controller. Targeted 1/1 and full 35/35 with zero test warnings/failures; strict IWYU 66/66, Shipping Game up to date, repository/LFS/diff checks pass. This advances M4.3/M4.4, not M4's complete exit gate. No fresh packaged-player/physical-input verification. See [M4_POSSESSION_CYCLES_REVIEW.md](M4_POSSESSION_CYCLES_REVIEW.md). Skill: `ue-testing-debugging`.
 
+Guard feedback implemented (2026-09-30): the possessed soldier's canonical block state updates the existing native HUD through its vitals event, with no UI tick or second owner. The real-PIE test proves immediate DOWN/UP/DOWN text transitions and block state; full regression 35/35 zero test warnings/failures, IWYU 66/66, Shipping 5/5, repository/LFS/diff checks pass. This advances only M4.7 feedback; camera collision, montage/hit visuals, time-scale policy and player-rendered gates remain open. See [M4_GUARD_FEEDBACK_REVIEW.md](M4_GUARD_FEEDBACK_REVIEW.md). Skills: `ue-ui-umg-slate`, `ue-testing-debugging`.
+
 Estimated effort: 1–2 focused weeks.
 
 ### M5 — Campaign loop and persistence

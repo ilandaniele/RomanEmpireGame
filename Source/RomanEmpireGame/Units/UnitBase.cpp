@@ -773,7 +773,7 @@ void AUnitBase::ResolveMeleeImpact()
 
 void AUnitBase::StartBlocking()
 {
-	if (!CanAcceptCommands() || !UnitData.bHasShield)
+	if (!CanAcceptCommands() || !UnitData.bHasShield || Combat.IsBlocking())
 	{
 		return;
 	}
@@ -786,6 +786,7 @@ void AUnitBase::StartBlocking()
 	{
 		Movement->MaxWalkSpeed = UnitData.BaseStats.Speed * 0.5f;
 	}
+	OnUnitVitalsChanged.Broadcast(this);
 }
 
 void AUnitBase::StopBlocking()
@@ -799,6 +800,7 @@ void AUnitBase::StopBlocking()
 	{
 		Movement->MaxWalkSpeed = bIsPossessedByPlayer ? 500.0f : UnitData.BaseStats.Speed;
 	}
+	OnUnitVitalsChanged.Broadcast(this);
 }
 
 void AUnitBase::PerformDodge(const FVector2D& Direction)

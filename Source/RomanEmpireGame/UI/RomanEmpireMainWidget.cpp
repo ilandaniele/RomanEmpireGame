@@ -228,7 +228,7 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	PossessionText->SetJustification(ETextJustify::Center);
 	PossessionText->SetVisibility(ESlateVisibility::Collapsed);
 	PlaceFixed(RootCanvas, PossessionText, FAnchors(0.5f, 1.0f), FVector2D(0.5f, 1.0f),
-		FVector2D(0.0f, -25.0f), FVector2D(600.0f, 60.0f));
+		FVector2D(0.0f, -25.0f), FVector2D(800.0f, 60.0f));
 	CrosshairText = CreateTextBlock(WidgetTree, TEXT("CrosshairText"), 30, FLinearColor::White);
 	CrosshairText->SetText(FText::FromString(TEXT("+")));
 	CrosshairText->SetJustification(ETextJustify::Center);
@@ -563,9 +563,10 @@ void URomanEmpireMainWidget::RefreshSelection()
 		{
 			const AUnitBase* Soldier = CachedController ? Cast<AUnitBase>(CachedController->GetPawn()) : nullptr;
 			PossessionText->SetText(Soldier
-				? FText::FromString(FString::Printf(TEXT("%s\nHP %d / %d   |   Stamina %.0f%%   |   Morale %d"),
+				? FText::FromString(FString::Printf(TEXT("%s\nHP %d / %d   |   Stamina %.0f%%   |   Morale %d   |   Guard %s"),
 					*Soldier->GetUnitDisplayName(), Soldier->GetCurrentHealth(), Soldier->GetMaxHealth(),
-					Soldier->GetStaminaPercent() * 100.0f, Soldier->GetCurrentMorale()))
+					Soldier->GetStaminaPercent() * 100.0f, Soldier->GetCurrentMorale(),
+					Soldier->IsBlocking() ? TEXT("UP") : TEXT("DOWN")))
 				: FText::GetEmpty());
 		}
 	}
