@@ -57,6 +57,8 @@ public:
 	// Construction
 	UFUNCTION(BlueprintCallable, Category = "Building|Construction")
 	void StartConstruction();
+	/** Finish a pre-placed scenario building without a simulated construction tick or player charge. */
+	void CompleteInitialConstruction();
 
 	UFUNCTION(BlueprintPure, Category = "Building|Construction")
 	float GetConstructionProgress() const { return ConstructionProgress; }

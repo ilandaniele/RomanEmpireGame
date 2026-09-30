@@ -189,6 +189,15 @@ void ABuildingBase::StartConstruction()
 	}
 }
 
+void ABuildingBase::CompleteInitialConstruction()
+{
+	if (!bBuildingInitialized || !HasActorBegunPlay() || CurrentState != EBuildingState::Placing) return;
+	StartConstruction();
+	ConstructionProgress = 1.0f;
+	if (BuildingMesh) BuildingMesh->SetRelativeLocation(FVector::ZeroVector);
+	OnConstructionFinished();
+}
+
 void ABuildingBase::UpdateConstruction(float DeltaSeconds)
 {
 	if (CurrentState != EBuildingState::Constructing)

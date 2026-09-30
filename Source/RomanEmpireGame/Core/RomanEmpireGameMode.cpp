@@ -2,6 +2,7 @@
 
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireGame.h"
+#include "Building/Barracks.h"
 #include "Content/RomanContentRegistry.h"
 #include "Faction/FactionManager.h"
 #include "World/WorldMapManager.h"
@@ -448,15 +449,28 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 
 	// --- ROMAN CAMP ---
 	
-	// Barracks (large red-brown building)
-	AStaticMeshActor* Barracks = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector(-600, -800, 150), FRotator::ZeroRotator, SP);
-	if (Barracks)
+	// The scenario's existing Roman barracks is a real, completed producer, not a decorative mesh.
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanBuildingDefinition* BarracksAsset = Registry ? Registry->FindBuilding(TEXT("Barracks")) : nullptr;
+	UClass* BarracksClass = BarracksAsset ? BarracksAsset->BuildingClass.Get() : nullptr;
+	if (BarracksClass && BarracksClass->IsChildOf(ABarracks::StaticClass()))
 	{
-		Barracks->GetStaticMeshComponent()->SetStaticMesh(CubeMesh);
-		Barracks->SetActorScale3D(FVector(4.0f, 6.0f, 3.0f));
-		Barracks->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		UMaterialInstanceDynamic* Mat = MakeColorMaterial(Barracks, FLinearColor(0.5f, 0.2f, 0.1f));
-		if (Mat) Barracks->GetStaticMeshComponent()->SetMaterial(0, Mat);
+		const FTransform Transform(FRotator::ZeroRotator, FVector(-600.0, -800.0, 200.0));
+		ABarracks* Barracks = World->SpawnActorDeferred<ABarracks>(
+			BarracksClass, Transform, this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (Barracks && Barracks->InitializeBuilding(TEXT("Barracks"), EFactionID::Rome))
+		{
+			UGameplayStatics::FinishSpawningActor(Barracks, Transform);
+			if (IsValid(Barracks)) Barracks->CompleteInitialConstruction();
+		}
+		else if (Barracks)
+		{
+			Barracks->Destroy();
+		}
+	}
+	else
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot spawn initial Roman barracks: authored Barracks class is unavailable"));
 	}
 
 	// Roman Forum (central plaza marker — flat gold cube)

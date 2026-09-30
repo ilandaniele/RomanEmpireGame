@@ -757,6 +757,34 @@ namespace RomanEmpireUITests
 
 			UClass* BarracksClass = FSoftClassPath(TEXT("/Script/RomanEmpireGame.Barracks")).TryLoadClass<AActor>();
 			if (!Test.TestNotNull(TEXT("Native production class is available"), BarracksClass)) return false;
+			AActor* InitialBarracks = nullptr;
+			int32 InitialBarracksCount = 0;
+			for (TActorIterator<AActor> It(World, BarracksClass); It; ++It)
+			{
+				++InitialBarracksCount;
+				if (FVector::Dist2D(It->GetActorLocation(), FVector(-600.0, -800.0, 0.0)) < 1.0)
+				{
+					InitialBarracks = *It;
+				}
+			}
+			if (!Test.TestEqual(TEXT("Scenario starts with one real barracks"), InitialBarracksCount, 1) ||
+				!Test.TestNotNull(TEXT("Real barracks replaces the camp prop at its original site"), InitialBarracks)) return false;
+			Test.TestTrue(TEXT("Initial barracks is complete and ready for production"), ReadBool(Test, InitialBarracks, TEXT("IsComplete")));
+			FCall InitialOwner(Test, InitialBarracks, TEXT("GetOwnerFaction"), 1);
+			InitialOwner.Execute();
+			Test.TestEqual(TEXT("Initial barracks belongs to the player faction"), InitialOwner.ReadEnum<EFactionID>(), EFactionID::Rome);
+			FCall SelectInitial(Test, Controller, TEXT("SelectBuilding"), 1);
+			SelectInitial.SetObject(TEXT("Building"), InitialBarracks);
+			SelectInitial.Execute();
+			Test.TestEqual(TEXT("The camp's real barracks is selectable without a world-trace shortcut"),
+				ReadObject(Test, Controller, TEXT("GetSelectedBuilding")), static_cast<UObject*>(InitialBarracks));
+			Test.TestTrue(TEXT("Initial barracks exposes the functional UMG TRAIN control"), TrainButton->IsVisible());
+			int32 DecorativeBarracksCount = 0;
+			for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+			{
+				if (FVector::Dist(It->GetActorLocation(), FVector(-600.0, -800.0, 150.0)) < 1.0) ++DecorativeBarracksCount;
+			}
+			Test.TestEqual(TEXT("No decorative barracks mesh remains at the original camp site"), DecorativeBarracksCount, 0);
 			FActorSpawnParameters SpawnParameters;
 			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			Producer = World->SpawnActor<AActor>(BarracksClass, FVector(50000.0, 50000.0, 300.0), FRotator::ZeroRotator, SpawnParameters);
@@ -1016,12 +1044,12 @@ namespace RomanEmpireUITests
 				Test.TestFalse(TEXT("Existing physical barracks blocks placement"), ReadBool(Test, Placement, TEXT("CanPlace")));
 				if (Scenario == 0)
 				{
-				FVector ForeignSite = ForeignTerritory->MapLocation;
-				ForeignSite.Z = -10.0;
-				Move.SetVector(TEXT("WorldLocation"), ForeignSite);
-				Move.Execute();
-				Test.TestFalse(TEXT("Foreign territory rejects placement"), ReadBool(Test, Placement, TEXT("CanPlace")));
-			}
+					FVector ForeignSite = ForeignTerritory->MapLocation;
+					ForeignSite.Z = -10.0;
+					Move.SetVector(TEXT("WorldLocation"), ForeignSite);
+					Move.Execute();
+					Test.TestFalse(TEXT("Foreign territory rejects placement"), ReadBool(Test, Placement, TEXT("CanPlace")));
+				}
 				const FVector ValidSite(OwnedCenter.X + 3000.0 + Scenario * 1000.0, OwnedCenter.Y + 3000.0, -10.0);
 				Move.SetVector(TEXT("WorldLocation"), ValidSite);
 				Move.Execute();
