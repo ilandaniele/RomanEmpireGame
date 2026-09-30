@@ -605,6 +605,8 @@ Initial gameplay barracks implemented (2026-09-30): GameMode now deferred-spawns
 
 #### M3.6 Encounter and victory
 
+Typed result/rules foundation implemented (2026-09-30): `FTacticalBattleState` is one pure tactical evaluator over validated known forces, world-local squad handles, reinforcements, casualties and objective capture. `FTacticalBattleResult` reports outcome, winner, objective/captured-objective stable IDs and ordered per-squad initial/surviving/casualty counts. Kills alone do not win without capturing the objective; elimination of all player units defeats them. Targeted 1/1, full 35/35 zero warnings/failures, strict IWYU 65/65, Shipping 4/4, repository and LFS checks pass. [M3_BATTLE_RESULT_FOUNDATION_REVIEW.md](M3_BATTLE_RESULT_FOUNDATION_REVIEW.md) records limits. This is not a live encounter yet: wire one world owner to death/reinforcement/capture events, replace the decorative enemy HQ with the chosen objective interaction, project resolution to UMG, implement restart/continue and verify the end-to-end sequence. Skills: `unreal-cpp-gameplay`, `ue-testing-debugging`.
+
 - Build a deterministic objective scenario with fixed seed and known forces.
 - Establish one victory evaluator for tactical objectives.
 - Report a typed battle result containing winner, surviving squads, casualties, and captured objective.
