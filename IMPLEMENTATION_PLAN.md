@@ -659,6 +659,8 @@ Evidence and exit gate:
 - Damage and cooldown results match equivalent AI-controlled attacks.
 - Tactical battle resolution remains correct after possession was used.
 
+Possession return-cycle evidence added (2026-09-30): the real controller/player pawn enters and exits the same owned unit three times, preserving selection and camera transform while returning the unit to the identical tactical AI controller. Targeted 1/1 and full 35/35 with zero test warnings/failures; strict IWYU 66/66, Shipping Game up to date, repository/LFS/diff checks pass. This advances M4.3/M4.4, not M4's complete exit gate. No fresh packaged-player/physical-input verification. See [M4_POSSESSION_CYCLES_REVIEW.md](M4_POSSESSION_CYCLES_REVIEW.md). Skill: `ue-testing-debugging`.
+
 Estimated effort: 1–2 focused weeks.
 
 ### M5 — Campaign loop and persistence

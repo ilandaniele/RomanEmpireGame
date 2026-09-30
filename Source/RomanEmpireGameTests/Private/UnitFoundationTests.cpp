@@ -1451,6 +1451,28 @@ namespace RomanEmpireUnitTests
 			Test.TestTrue(TEXT("Real deactivation attempted recursive exit and entry"), ExitProbe->bHandledControllerAction);
 			CheckReturned(Controller, OriginalCamera, Root);
 			Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Other);
+			const TArray<AActor*> SelectionBeforeCycles = SelectedActors(Test, Controller);
+			Test.TestTrue(TEXT("Repeated possession starts from an owned selection"),
+				SelectionBeforeCycles == TArray<AActor*>({ Other }));
+			const FTransform CameraBeforeCycles = OriginalCamera->GetActorTransform();
+			AAIController* OriginalAI = Cast<AAIController>(Other->GetController());
+			Test.TestNotNull(TEXT("Repeated possession starts with tactical AI"), OriginalAI);
+			for (int32 Cycle = 0; Cycle < 3; ++Cycle)
+			{
+				ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
+				Test.TestTrue(TEXT("Repeated entry possesses the same living unit"), Controller->GetPawn() == Other);
+				Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+				Test.TestTrue(TEXT("Repeated exit restores the tactical pawn"), Controller->GetPawn() == OriginalCamera);
+				Test.TestFalse(TEXT("Repeated exit leaves possession mode"), Bool(Test, Controller, TEXT("IsInFirstPersonMode")));
+				Test.TestTrue(TEXT("Repeated exit preserves the tactical camera transform"),
+					OriginalCamera->GetActorTransform().Equals(CameraBeforeCycles));
+				Test.TestTrue(TEXT("Repeated exit preserves the selected owned unit"),
+					SelectedActors(Test, Controller) == SelectionBeforeCycles);
+				Test.TestTrue(TEXT("Repeated exit restores the same tactical AI controller"),
+					OriginalAI && Other->GetController() == OriginalAI);
+			}
+			Command(Test, Controller, TEXT("ClearSelection"));
 
 			SetOwner(Test, Owned, EFactionID::Rome);
 			TStrongObjectPtr<UUnitLifecycleProbe> SelectionProbe(NewObject<UUnitLifecycleProbe>());
