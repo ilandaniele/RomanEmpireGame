@@ -11,7 +11,7 @@ namespace
 		Value.Failure = Failure;
 		return Value;
 	}
-	bool GuidLess(const FCampaignArmy& Left, const FCampaignArmy& Right)
+	bool ArmyGuidLess(const FCampaignArmy& Left, const FCampaignArmy& Right)
 	{
 		const FGuid& A = Left.ArmyID;
 		const FGuid& B = Right.ArmyID;
@@ -68,7 +68,7 @@ FCampaignArmyMutationResult FCampaignArmyState::RegisterArmy(const FCampaignArmy
 	FCampaignArmy Copy = Army;
 	SortUnits(Copy);
 	Armies.Add(MoveTemp(Copy));
-	Armies.Sort(GuidLess);
+	Armies.Sort(ArmyGuidLess);
 	return Result(Army.ArmyID, ECampaignArmyFailure::None);
 }
 

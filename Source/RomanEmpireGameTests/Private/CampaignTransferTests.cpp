@@ -11,6 +11,8 @@
 #include "UObject/Class.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+namespace RomanEmpireCampaignTransferTests
+{
 namespace
 {
 	const FGuid Attacker(10, 0, 0, 1), Defender(10, 0, 0, 2), EncounterID(11, 0, 0, 1);
@@ -439,4 +441,5 @@ bool FCampaignSavePayloadValidationTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+} // namespace RomanEmpireCampaignTransferTests
 #endif

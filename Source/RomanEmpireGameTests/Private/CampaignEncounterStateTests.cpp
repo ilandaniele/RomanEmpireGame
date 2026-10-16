@@ -5,6 +5,8 @@
 #include "UObject/Class.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+namespace RomanEmpireCampaignEncounterStateTests
+{
 namespace
 {
 	const FGuid ArmyA(1, 0, 0, 1), ArmyB(1, 0, 0, 2), ArmyC(1, 0, 0, 3), Encounter(2, 0, 0, 1);
@@ -395,4 +397,5 @@ bool FCampaignDefenseResultsTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+} // namespace RomanEmpireCampaignEncounterStateTests
 #endif
