@@ -12,7 +12,8 @@ enum class EProductionEventType : uint8
 	Queued UMETA(DisplayName = "Queued"),
 	Completed UMETA(DisplayName = "Completed"),
 	Cancelled UMETA(DisplayName = "Cancelled"),
-	Failed UMETA(DisplayName = "Failed")
+	Failed UMETA(DisplayName = "Failed"),
+	RefundPending UMETA(DisplayName = "Refund pending")
 };
 
 /** Notification emitted after a queue transition; pending count describes the committed queue. */

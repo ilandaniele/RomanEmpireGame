@@ -35,6 +35,8 @@ bool AFactionManager::InitializeFactionsFromContent()
 		return false;
 	}
 
+	TMap<EFactionID, FFactionInfo> NewInfo;
+	TMap<EFactionID, FFactionResourceAmounts> NewResources;
 	for (const URomanFactionDefinition* Asset : Registry->GetAllFactions())
 	{
 		if (!Asset)
@@ -42,19 +44,48 @@ bool AFactionManager::InitializeFactionsFromContent()
 			continue;
 		}
 		const FFactionInfo& Definition = Asset->Definition;
-		FactionInfoMap.Add(Definition.RuntimeFaction, Definition);
-		FactionResourcesMap.Add(Definition.RuntimeFaction, Definition.StartingResources);
+		// This offline slice has exactly two participants; other definitions remain authored content.
+		if (Definition.RuntimeFaction != EFactionID::Rome && Definition.RuntimeFaction != EFactionID::Carthage)
+		{
+			continue;
+		}
+		NewInfo.Add(Definition.RuntimeFaction, Definition);
+		NewResources.Add(Definition.RuntimeFaction, Definition.StartingResources);
 	}
 
-	return FactionInfoMap.Num() > 0;
+	if (!NewInfo.Contains(EFactionID::Rome) || !NewInfo.Contains(EFactionID::Carthage)) return false;
+	FactionInfoMap = MoveTemp(NewInfo);
+	FactionResourcesMap = MoveTemp(NewResources);
+	return true;
 }
 
 void AFactionManager::InitializeDefaultDiplomacy()
 {
 	DiplomacyState.Reset();
 	DiplomacyState.TrySetStatus(EFactionID::Rome, EFactionID::Carthage, EDiplomaticStatus::War);
-	DiplomacyState.TrySetStatus(EFactionID::Rome, EFactionID::Gaul, EDiplomaticStatus::War);
-	// Carthage and Gaul remain in the implicit canonical Neutral state.
+}
+
+bool AFactionManager::IsFactionActive(EFactionID FactionID) const
+{
+	return FactionInfoMap.Contains(FactionID);
+}
+
+TArray<EFactionID> AFactionManager::GetActiveFactions() const
+{
+	TArray<EFactionID> Result;
+	FactionInfoMap.GetKeys(Result);
+	Result.Sort([](EFactionID First, EFactionID Second)
+	{
+		return static_cast<uint8>(First) < static_cast<uint8>(Second);
+	});
+	return Result;
+}
+
+TArray<EFactionID> AFactionManager::GetAIFactions() const
+{
+	TArray<EFactionID> Result = GetActiveFactions();
+	Result.Remove(PlayerFaction);
+	return Result;
 }
 
 FFactionInfo AFactionManager::GetFactionInfo(EFactionID FactionID) const
@@ -79,6 +110,12 @@ FFactionResourceTransactionResult AFactionManager::ApplyFactionResourceDelta(
 	EFactionID FactionID,
 	const FFactionResourceDelta& Delta)
 {
+	if (bCampaignTransferPending)
+	{
+		FFactionResourceTransactionResult Result;
+		Result.Failure = EResourceTransactionFailure::MutationInProgress;
+		return Result;
+	}
 	if (FFactionResourceAmounts* Resources = FactionResourcesMap.Find(FactionID))
 	{
 		FFactionResourceTransactionResult Result = RomanEmpireEconomy::TryApplyResourceDelta(*Resources, Delta);
@@ -98,6 +135,12 @@ FFactionResourceTransactionResult AFactionManager::TrySpendFactionResources(
 	EFactionID FactionID,
 	const FFactionResourceAmounts& Cost)
 {
+	if (bCampaignTransferPending)
+	{
+		FFactionResourceTransactionResult Result;
+		Result.Failure = EResourceTransactionFailure::MutationInProgress;
+		return Result;
+	}
 	if (FFactionResourceAmounts* Resources = FactionResourcesMap.Find(FactionID))
 	{
 		FFactionResourceTransactionResult Result = RomanEmpireEconomy::TrySpendResources(*Resources, Cost);
@@ -115,6 +158,7 @@ FFactionResourceTransactionResult AFactionManager::TrySpendFactionResources(
 
 EDiplomaticStatus AFactionManager::GetDiplomaticStatus(EFactionID Faction1, EFactionID Faction2) const
 {
+	if (!IsFactionActive(Faction1) || !IsFactionActive(Faction2)) return EDiplomaticStatus::Invalid;
 	return DiplomacyState.GetStatus(Faction1, Faction2);
 }
 
@@ -123,6 +167,21 @@ FDiplomaticChangeResult AFactionManager::SetDiplomaticStatus(
 	EFactionID Faction2,
 	EDiplomaticStatus NewStatus)
 {
+	if (bCampaignTransferPending)
+	{
+		FDiplomaticChangeResult Result;
+		Result.Pair = RomanEmpireDiplomacy::NormalizePair(Faction1, Faction2);
+		Result.RequestedStatus = NewStatus;
+		Result.Failure = EDiplomaticChangeFailure::MutationInProgress;
+		return Result;
+	}
+	if (!IsFactionActive(Faction1) || !IsFactionActive(Faction2))
+	{
+		FDiplomaticChangeResult Rejected;
+		Rejected.Pair = RomanEmpireDiplomacy::NormalizePair(Faction1, Faction2);
+		Rejected.RequestedStatus = NewStatus;
+		return Rejected;
+	}
 	FDiplomaticChangeResult Result = DiplomacyState.TrySetStatus(Faction1, Faction2, NewStatus);
 	if (Result.WasSuccessful())
 	{
@@ -147,7 +206,8 @@ bool AFactionManager::AreAllied(EFactionID Faction1, EFactionID Faction2) const
 
 void AFactionManager::SetPlayerFaction(EFactionID NewFaction)
 {
-	if (NewFaction == PlayerFaction || !FactionInfoMap.Contains(NewFaction))
+	if (bCampaignTransferPending) return;
+	if (NewFaction == PlayerFaction || !IsFactionActive(NewFaction))
 	{
 		return;
 	}
@@ -158,12 +218,10 @@ void AFactionManager::SetPlayerFaction(EFactionID NewFaction)
 
 void AFactionManager::ProcessAITurns()
 {
-	for (const auto& Pair : FactionInfoMap)
+	if (bCampaignTransferPending) return;
+	for (EFactionID FactionID : GetAIFactions())
 	{
-		if (Pair.Key != PlayerFaction)
-		{
-			ProcessAIFactionTurn(Pair.Key);
-		}
+		ProcessAIFactionTurn(FactionID);
 	}
 }
 

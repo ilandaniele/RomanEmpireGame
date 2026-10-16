@@ -11,6 +11,7 @@
 
 class ABuildingBase;
 class AUnitBase;
+class UWorld;
 
 namespace RomanEmpireContent
 {
@@ -108,6 +109,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Prototype Map")
 	FText StartingSettlementName;
+
+	/** Destination for a future battle transition; content validation never loads this world. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Battle")
+	TSoftObjectPtr<UWorld> TacticalMap;
+
+	/** Requires an existing top-level World asset, checked through Asset Manager metadata. */
+	bool HasValidTacticalMap() const;
 
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 

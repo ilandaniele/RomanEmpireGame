@@ -10,6 +10,7 @@
 
 class UBoxComponent;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class USceneComponent;
 class UStaticMeshComponent;
 
@@ -164,6 +165,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Visuals")
 	UMaterialInterface* CompleteMaterial;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Visuals")
+	TObjectPtr<UMaterialInterface> DamagedMaterial;
+
+	UPROPERTY(VisibleAnywhere, Category = "Building|Visuals")
+	TArray<TObjectPtr<UStaticMeshComponent>> SelectionOutline;
+
+	UPROPERTY(Transient)
+	TMap<UMaterialInterface*, TObjectPtr<UMaterialInstanceDynamic>> VisualMaterials;
+
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void UpdateConstruction(float DeltaSeconds);
 	virtual void OnConstructionFinished();
@@ -172,6 +182,7 @@ protected:
 private:
 	bool bBuildingInitialized = false;
 	bool bBuildingEndingPlay = false;
+	bool bPlacementVisualValid = true;
 	void ApplyDefinitionPresentation();
 	void UpdateVisuals();
 };

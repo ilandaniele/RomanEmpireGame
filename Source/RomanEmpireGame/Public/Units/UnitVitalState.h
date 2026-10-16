@@ -26,6 +26,7 @@ struct ROMANEMPIREGAME_API FUnitVitalState
 	bool Initialize(int32 InMaxHealth, float InMaxStamina, int32 InitialMorale);
 	EUnitLifeState GetLifeState() const { return LifeState; }
 	bool IsAlive() const { return LifeState == EUnitLifeState::Alive; }
+	bool IsRouted() const { return IsAlive() && Morale == 0; }
 	int32 GetHealth() const { return Health; }
 	int32 GetMaxHealth() const { return MaxHealth; }
 	int32 GetMorale() const { return Morale; }

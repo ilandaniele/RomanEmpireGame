@@ -3,10 +3,12 @@
 #include "Battle/TacticalBattleState.h"
 
 bool FTacticalBattleState::BeginEncounter(FName InObjectiveID, EFactionID InPlayerFaction,
-	EFactionID InEnemyFaction, const TArray<FTacticalSquadSeed>& StartingSquads)
+	EFactionID InEnemyFaction, const TArray<FTacticalSquadSeed>& StartingSquads, FGuid InEncounterID, EFactionID InAttackingFaction)
 {
+	const EFactionID Attacker = InAttackingFaction == EFactionID::None ? InPlayerFaction : InAttackingFaction;
 	if (bHasEncounter || InObjectiveID.IsNone() || InPlayerFaction == EFactionID::None ||
-		InEnemyFaction == EFactionID::None || InPlayerFaction == InEnemyFaction) return false;
+		InEnemyFaction == EFactionID::None || InPlayerFaction == InEnemyFaction ||
+		(Attacker != InPlayerFaction && Attacker != InEnemyFaction)) return false;
 	TSet<FGuid> Seen;
 	bool bHasPlayerForce = false;
 	bool bHasEnemyForce = false;
@@ -20,9 +22,11 @@ bool FTacticalBattleState::BeginEncounter(FName InObjectiveID, EFactionID InPlay
 	}
 	if (!bHasPlayerForce || !bHasEnemyForce) return false;
 
+	EncounterID = InEncounterID.IsValid() ? InEncounterID : FGuid::NewGuid();
 	ObjectiveID = InObjectiveID;
 	PlayerFaction = InPlayerFaction;
 	EnemyFaction = InEnemyFaction;
+	AttackingFaction = Attacker;
 	bHasEncounter = true;
 	for (const FTacticalSquadSeed& Seed : StartingSquads)
 	{
@@ -76,21 +80,23 @@ void FTacticalBattleState::EvaluateCasualties()
 	const bool bPlayerAlive = HasSurvivors(PlayerFaction);
 	const bool bEnemyAlive = HasSurvivors(EnemyFaction);
 	if (!bPlayerAlive && !bEnemyAlive) Outcome = ETacticalBattleOutcome::Draw;
-	else if (!bPlayerAlive) Outcome = ETacticalBattleOutcome::PlayerDefeat;
+	else if (!HasSurvivors(AttackingFaction))
+		Outcome = AttackingFaction == PlayerFaction ? ETacticalBattleOutcome::PlayerDefeat : ETacticalBattleOutcome::PlayerVictory;
 }
 
 bool FTacticalBattleState::CaptureObjective(EFactionID CapturingFaction)
 {
 	if (!bHasEncounter || Outcome != ETacticalBattleOutcome::InProgress ||
-		CapturingFaction != PlayerFaction || !HasSurvivors(PlayerFaction)) return false;
+		CapturingFaction != AttackingFaction || !HasSurvivors(AttackingFaction) || HasSurvivors(GetDefendingFaction())) return false;
 	CapturedObjectiveID = ObjectiveID;
-	Outcome = ETacticalBattleOutcome::PlayerVictory;
+	Outcome = AttackingFaction == PlayerFaction ? ETacticalBattleOutcome::PlayerVictory : ETacticalBattleOutcome::PlayerDefeat;
 	return true;
 }
 
 FTacticalBattleResult FTacticalBattleState::GetResult() const
 {
 	FTacticalBattleResult Result;
+	Result.EncounterID = EncounterID;
 	Result.Outcome = Outcome;
 	Result.ObjectiveID = ObjectiveID;
 	Result.CapturedObjectiveID = CapturedObjectiveID;
@@ -103,10 +109,12 @@ FTacticalBattleResult FTacticalBattleState::GetResult() const
 void FTacticalBattleState::Reset()
 {
 	bHasEncounter = false;
+	EncounterID.Invalidate();
 	ObjectiveID = NAME_None;
 	CapturedObjectiveID = NAME_None;
 	PlayerFaction = EFactionID::None;
 	EnemyFaction = EFactionID::None;
+	AttackingFaction = EFactionID::None;
 	Outcome = ETacticalBattleOutcome::InProgress;
 	Squads.Reset();
 	SquadIndices.Reset();

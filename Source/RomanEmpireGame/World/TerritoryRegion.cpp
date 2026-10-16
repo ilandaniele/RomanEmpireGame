@@ -27,8 +27,6 @@ ATerritoryRegion::ATerritoryRegion()
 
 	// Initialize
 	WorldMapManager = nullptr;
-	bHasSettlement = false;
-	Population = 0;
 	MaxSettlementSlots = 10;
 }
 
@@ -98,14 +96,35 @@ void ATerritoryRegion::RefreshOwnershipPresentation(
 
 FFactionResourceDelta ATerritoryRegion::GetResourceProduction() const
 {
-	FFactionResourceDelta Production = GetDefinition().ResourceProduction;
-	Production.Gold += SettlementProductionBonus.Gold;
-	Production.Food += SettlementProductionBonus.Food;
-	Production.Iron += SettlementProductionBonus.Iron;
-	Production.Wood += SettlementProductionBonus.Wood;
-	Production.Stone += SettlementProductionBonus.Stone;
-	Production.Population += SettlementProductionBonus.Population;
+	FFactionResourceDelta Production;
+	if (IsValid(WorldMapManager)) WorldMapManager->TryGetTerritoryProduction(GetTerritoryID(), Production);
 	return Production;
+}
+
+bool ATerritoryRegion::HasSettlement() const
+{
+	FTerritorySettlementState Settlement;
+	return IsValid(WorldMapManager) && WorldMapManager->TryGetTerritorySettlement(GetTerritoryID(), Settlement)
+		&& Settlement.bHasSettlement;
+}
+
+FText ATerritoryRegion::GetSettlementName() const
+{
+	FTerritorySettlementState Settlement;
+	if (IsValid(WorldMapManager)) WorldMapManager->TryGetTerritorySettlement(GetTerritoryID(), Settlement);
+	return Settlement.SettlementName;
+}
+
+int32 ATerritoryRegion::GetPopulation() const
+{
+	FTerritorySettlementState Settlement;
+	if (IsValid(WorldMapManager)) WorldMapManager->TryGetTerritorySettlement(GetTerritoryID(), Settlement);
+	return Settlement.Population;
+}
+
+void ATerritoryRegion::RefreshSettlementPresentation()
+{
+	OnSettlementFounded.Broadcast(this);
 }
 
 bool ATerritoryRegion::IsContested() const
@@ -127,25 +146,20 @@ bool ATerritoryRegion::IsContested() const
 
 void ATerritoryRegion::FoundSettlement(const FText& Name)
 {
-	if (bHasSettlement)
+	if (!IsValid(WorldMapManager)) return;
+	const FSettlementFoundingResult Result = WorldMapManager->FoundTerritorySettlement(GetTerritoryID(), Name);
+	if (Result.Failure == ESettlementFoundingFailure::AlreadyFounded)
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Territory %s already has a settlement"),
 			*TerritoryDefinition.TerritoryID.ToString());
 		return;
 	}
 
-	bHasSettlement = true;
-	SettlementName = Name;
-	Population = 100; // Starting population
-
-	// Boost resource production with settlement
-	SettlementProductionBonus.Gold = 100;
-	SettlementProductionBonus.Food = 50;
-
-	OnSettlementFounded.Broadcast(this);
-	
-	UE_LOG(LogRomanEmpire, Log, TEXT("Settlement %s founded in territory %s"), 
-		*Name.ToString(), *TerritoryDefinition.TerritoryID.ToString());
+	if (Result.WasSuccessful())
+	{
+		UE_LOG(LogRomanEmpire, Log, TEXT("Settlement %s founded in territory %s"),
+			*Name.ToString(), *TerritoryDefinition.TerritoryID.ToString());
+	}
 }
 
 void ATerritoryRegion::RegisterBuilding(ABuildingBase* Building)

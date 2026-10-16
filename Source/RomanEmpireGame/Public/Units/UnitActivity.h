@@ -6,7 +6,7 @@
 
 /** Read projection, never a separately stored state machine.
  * Attacking includes both melee windup and recovery; a pending impact is consumed once.
- * Routed gameplay policy is intentionally not implied by zero morale.
+ * Routed units remain alive/vulnerable but reject command and combat initiation.
  */
 UENUM(BlueprintType)
 enum class EUnitActivity : uint8
@@ -16,5 +16,6 @@ enum class EUnitActivity : uint8
 	Commanded,
 	Attacking,
 	Dead,
-	Ended
+	Ended,
+	Routed
 };

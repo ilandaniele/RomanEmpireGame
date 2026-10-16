@@ -2,6 +2,10 @@
 
 #include "Content/RomanContentDefinitions.h"
 
+#include "AssetRegistry/AssetData.h"
+#include "Engine/AssetManager.h"
+#include "Engine/World.h"
+
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
@@ -168,6 +172,22 @@ EDataValidationResult URomanTerritoryDefinition::IsDataValid(FDataValidationCont
 		AddError(Context, TEXT("Territory definition or prototype-map location is invalid."));
 		Result = EDataValidationResult::Invalid;
 	}
+	if (!HasValidTacticalMap())
+	{
+		AddError(Context, TEXT("Territory requires an existing top-level World asset as its tactical map."));
+		Result = EDataValidationResult::Invalid;
+	}
 	return Result;
 }
 #endif
+
+bool URomanTerritoryDefinition::HasValidTacticalMap() const
+{
+	const FSoftObjectPath Path = TacticalMap.ToSoftObjectPath();
+	const UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+	if (!AssetManager || !Path.IsValid() || !Path.GetSubPathString().IsEmpty()) return false;
+	FAssetData Metadata;
+	return AssetManager->GetAssetDataForPath(Path, Metadata) &&
+		Metadata.AssetClassPath == UWorld::StaticClass()->GetClassPathName() &&
+		Metadata.GetSoftObjectPath() == Path;
+}

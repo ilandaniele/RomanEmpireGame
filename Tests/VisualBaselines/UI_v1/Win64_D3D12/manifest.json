@@ -1,0 +1,433 @@
+{
+    "schema":  1,
+    "family":  "UI_v1",
+    "engine":  "5.8.2",
+    "platform":  "Win64_D3D12",
+    "reviewedUtc":  "2026-10-09T01:10:13.3734963Z",
+    "reviewReference":  "M7_UI_VISUAL_REGRESSION_REVIEW.md; C018FUI_Candidates4/review-progress.json: all84 original native PNGs agent-reviewed; scrollable content preserved; not owner/player approval",
+    "candidatePrefix":  "C018FUI_Candidates4",
+    "sourceManifestSha256":  "bdfff5ffec856e6f8c24eda43fa1870b2174f2929d7bd4dff19701bdb1aefd57",
+    "scope":  "Native responsive UMG:12 resolution/DPI/text layouts x7 screens. Owned PIE static scene; no resizing, masking, automatic approval, player or performance claim.",
+    "images":  [
+                   {
+                       "view":  "1280x720_100_Text100_Settings",
+                       "sha256":  "3cc858f40838b35c53db8cdbb491fcb76a44532a464c5972399b01a2f603c170",
+                       "sha1":  "ec0245a56bcb618b3431cc28267095515900dcc6"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_BindingCapture",
+                       "sha256":  "a813c8214463acb86479cb0b88e89f36584cd259dc6c4f781fe375d20f40eab9",
+                       "sha1":  "73e27f4efa076fb9d98dc0308139df4ffbaf9023"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_Tactical",
+                       "sha256":  "855fbfba4de4c5a6d66c8492f1c81ad8b7badeb8561e39a30139dafd199001e3",
+                       "sha1":  "46e03ceb9f16f049e439082d66d2bfe854ceaf6a"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_Construction",
+                       "sha256":  "81b3f1ff20ef3023e6fcdb57d01ee7a6a99d74ecd31679e2398328003a7ce012",
+                       "sha1":  "4e583167a90638dccd04cbf601db2a4a3c067b16"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_Strategic",
+                       "sha256":  "cc52165a9d2cb0bb581f0ac5b75c20403d2c1cee48b863e5ec7a5c21b17f1eb0",
+                       "sha1":  "a6276702dde011ace6f628a6ec2137911df07850"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_Possession",
+                       "sha256":  "b9cdb12c1451d15e287a4d20ea5c034d63c18a8869e6b494bf5be5bd7fe4b09f",
+                       "sha1":  "a74fcb4bf68f5d99545231c3cd03f4631332605e"
+                   },
+                   {
+                       "view":  "1280x720_100_Text100_Outcome",
+                       "sha256":  "06e919979fb899e21531e9a348277b11f7e943d0fec12cca6356d0117d735740",
+                       "sha1":  "4d751c453d36a02e4bdaea72f9d68f1410356eaa"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Settings",
+                       "sha256":  "47c1e7e7f24c1710a2ee3bc6a027ca4abad9096b22d1d95c70a166aa9284b652",
+                       "sha1":  "7fc9e69781a7941650c0c9d05c0f28cca9178317"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_BindingCapture",
+                       "sha256":  "e070eb13a564e095524821062a22019e54c3f6afd1c86c5fe41cf58155b2fff8",
+                       "sha1":  "20acda1b12a8abe4d67a0a20045a580e497f7a13"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Tactical",
+                       "sha256":  "f3623a993b438367b87f0b710b1d594fd7546bc393b32276de7495de4c7b9ef0",
+                       "sha1":  "f1b4e8d082eb814a745b1cf7a27275340d4a0f74"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Construction",
+                       "sha256":  "a260f89a13b09bbfa7cc828de3aa7f674b519ea7becf860e60cf249bd3346f82",
+                       "sha1":  "61e9afdacfe6ad2aa1022722833a3f8db0f5e0d6"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Strategic",
+                       "sha256":  "fe21046b1481319b3140eeeeb2704d726ca06784c8e5cbe897d7632c4a095fd0",
+                       "sha1":  "feec90eb9542c1dd927ac9de95f9daa902ef1d80"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Possession",
+                       "sha256":  "012e3146ddffff8a65e7aa37f50d277fb24758af5975d640f5862113589e5340",
+                       "sha1":  "30b6622775b1d247ab04da557a1ea379931d39be"
+                   },
+                   {
+                       "view":  "1280x720_100_Text200_Outcome",
+                       "sha256":  "022e22679bb4781128925facccee08fab762db7ee6e09d49bfd136167c7c1f0a",
+                       "sha1":  "2f902cdf41b1c522be9ea9f375bb36a3827beaca"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Settings",
+                       "sha256":  "1f6b919bd06246dcc5b3e918f212671b0180b1ce1af1ad24176ae97aa787b56e",
+                       "sha1":  "a64364fd0a39aaa8ccea0ab581509b60df5831ad"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_BindingCapture",
+                       "sha256":  "0c184a90831f6d3cfd25a82bb82ea29ef22c541d4b3ecb3ac800d55d46c7cf11",
+                       "sha1":  "1eda776a61cc8c3dfde8cded960402f16439ec08"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Tactical",
+                       "sha256":  "0e9cd8bc8faa51ade3a48febd458d1098ac409b89526db934e1bf8aa1d1be27f",
+                       "sha1":  "5cc3d94860a9e348573b7d327b1c6f5bc3969d74"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Construction",
+                       "sha256":  "3f992f024eeff8ea0f7beab7709ec7a52e7cc94b207d7358c547e99893a08243",
+                       "sha1":  "0113658ad29a174e86642779b9b413b3c5ff51ea"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Strategic",
+                       "sha256":  "72726113f385dbb3f6f80f9336c4ed0a05b5a1e380ab01df61095ef369df3c03",
+                       "sha1":  "14a2c23f26536d984021341ef5d0498999e97695"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Possession",
+                       "sha256":  "1dfd446a1090820d3c555aafb24fb2bc8489ad4ec474f0167e44f8720c31fccf",
+                       "sha1":  "1064750831a0e648c55224507f89b03ece160f37"
+                   },
+                   {
+                       "view":  "1280x720_125_Text100_Outcome",
+                       "sha256":  "cb1514c3ecffd542a3d4ea58278fc2841b9112e63b71b2cf2fe75b79a65804a3",
+                       "sha1":  "e395eafb7efd91c3e0a963a79e6025aa7976c1cb"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Settings",
+                       "sha256":  "e14c4ee82aa384bd92b7e15dcba4704b23f9122442b76eefc414c8a49b88eefd",
+                       "sha1":  "6e2c144bcc2c3af8d3abb1ae792d32dc892b1ba6"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_BindingCapture",
+                       "sha256":  "fa96930b2a50704e559ebb7ee2adb6e27080b93a3b3840b105c0b97754433345",
+                       "sha1":  "d41f7c00618722f54c92c2f1a95beb4364a021e4"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Tactical",
+                       "sha256":  "d5b12db25c1ec3f2300057fb0c5c8756a7657fa5eab1ee08223d184a1c7166e5",
+                       "sha1":  "0b9a69b11c915c383d8d4440b1ec38025ae3b755"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Construction",
+                       "sha256":  "5a5af58b5b6798b32ab9fe00a70721b74939722924738e5de912b8c5bc06cfd6",
+                       "sha1":  "6fe0822d8b9aaa782abf8e307202a535d2f81c24"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Strategic",
+                       "sha256":  "0d1bfd5d3ec246c41103f9c3ee481f68450b03590206016eaf421f3d73649b89",
+                       "sha1":  "80fffed21a81fbfe9558da80ff3c0fa79c8a3933"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Possession",
+                       "sha256":  "cdba96f27e06008ac591bb1f3a968250b56a1f5ade64ac27bb1861833c638f2f",
+                       "sha1":  "99a550d0de1a47fa9a807f2556ad3766fd358bdc"
+                   },
+                   {
+                       "view":  "1280x720_125_Text200_Outcome",
+                       "sha256":  "169add397f53d25da4b401fc9db6c2fb2c815cba5d26d9c183d3c0126271cb47",
+                       "sha1":  "876893806c6325a07251d86b2f31b2a40282420a"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Settings",
+                       "sha256":  "e6272a337091e2242418f3da747631ecb3d7f8640b3e6608c1fbb61eea6e7490",
+                       "sha1":  "776825abe96c447014240327087b13300bd99b7f"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_BindingCapture",
+                       "sha256":  "59e09e4fa03bd469474ea5515de236194d102acdb98592f6eb31989fd0f9ec78",
+                       "sha1":  "334b592fe69f0c32fa864a623cc3e1e69ae9969a"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Tactical",
+                       "sha256":  "f5263179134141f039d6b04c1eeec711447bc0fc2dc6592fa50809ca3cec9c25",
+                       "sha1":  "c3c0b5ddc767dc132dd614d725ee64ff986dde90"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Construction",
+                       "sha256":  "0e065a196695d96ae4bc3d653eaa9dd6a77e6b94eca9b48a53d94a9a56b47854",
+                       "sha1":  "767a549c73af3a8faa8b1192b535617db980b8ca"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Strategic",
+                       "sha256":  "22111c677b28d0556041d3d046f941a6398c9bcb8d1cc2dbaa0d22eaec74b6dc",
+                       "sha1":  "1161ddf398fb4c09defb091baf2efd2537289bf8"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Possession",
+                       "sha256":  "aa0e21f75f0c2f79e60fe8706eb109217c69da1a28b119a222928b82aafc459c",
+                       "sha1":  "0420924e58623b8caec30bb183201ff1ad85cc63"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text100_Outcome",
+                       "sha256":  "38ef1756ea74b9f272012ea270ad30ecbb3e295865a020d62a9b60ea31a7f257",
+                       "sha1":  "35f2d3a232a3fe801709a69ea069053fc0aa80c5"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Settings",
+                       "sha256":  "01844bd2d6c22b1042e12a5166e938517ff5ee4291b05c4e310dd9ffd59c5ddb",
+                       "sha1":  "4763c9e7d6e65061af6e76ad61f16645a6e2ac52"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_BindingCapture",
+                       "sha256":  "9b323f3f9dd8bb3ff953d223e0aed018e84ba0fb44521f5e7b0931e08ae8035b",
+                       "sha1":  "5e34fb8728cef7a250cb94b2883f412fd7ed3a88"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Tactical",
+                       "sha256":  "143932f95cdc43f49a04c3f51068e96b8b2f5fa9e3f95df7f7c76059b7ea9562",
+                       "sha1":  "d7bbf7be4902458cd06e46113b8dc7cb2dc2e39a"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Construction",
+                       "sha256":  "067f76884c2fe6483f6ecad35d72e81dd29f5d6896ca5f6ef3d253aa2eb53db4",
+                       "sha1":  "da05e4374793c91ebdd621e9ca32b3512f62cce3"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Strategic",
+                       "sha256":  "6444533671837559c4cf4549ac9bbd353ca18e22dbb4e0d392a2cac756e2718c",
+                       "sha1":  "f77e498cc4f1117d97eb9202ff962c3cfc0bc737"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Possession",
+                       "sha256":  "7891511daf109245c44c03210a6f2215785d81edd5fb9495828acd074e112343",
+                       "sha1":  "5f4f1f911a5e45d45cea2999fa4d0854cb1de537"
+                   },
+                   {
+                       "view":  "1920x1080_100_Text200_Outcome",
+                       "sha256":  "52dbfcd93345291b178fd2f0cc81d581ccd44d752e05c0293951499fe3aaeff1",
+                       "sha1":  "dab482e39b80580eac94d3f31bc599f1975625e5"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Settings",
+                       "sha256":  "8a521fcefd68ade6edb247de30b8e2f9de7de72081b2aa7040dbb04259ee3827",
+                       "sha1":  "e0a59e85a2d9316ab990f398c6205300cb6bf033"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_BindingCapture",
+                       "sha256":  "c8352486de5db42ba796184f7b6924947700159cc21cf3ec4b63e10b4b121253",
+                       "sha1":  "e1b0077ab139c9c7c9828a44d6741c51fdec0a36"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Tactical",
+                       "sha256":  "deea26546dbdff6665d23df763877c8685285fb475b29e58fbb86e96e6decec8",
+                       "sha1":  "57d056ed13a15c24f14640029db73b076aee1c88"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Construction",
+                       "sha256":  "b3f1095b58e8b62118a4437598d66ddd4f1f044d2cabee817d4433602abddb6a",
+                       "sha1":  "c0eaf17345ff10ccbab5ee7cb264cad2201d1077"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Strategic",
+                       "sha256":  "7bdb45eaae77e4cef5ea7ea7d527be3e6d3d7ac1969fc36b324292903caa11ab",
+                       "sha1":  "22b76ca034e73508894552c8e9e27a00806252a9"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Possession",
+                       "sha256":  "3dc6d896d91b41d44ad8fae34075e85c03a629027af3d10c2adc206db9a94b3d",
+                       "sha1":  "2c71dc29f3ae7d9f6bef551842b7691c15394193"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text100_Outcome",
+                       "sha256":  "ab61d8d4fed18ba22ff7e736baa9f0cb5e51a37b05ecaf020db54bcc840fe42e",
+                       "sha1":  "470286a243104f1ea9f409c06873aaaa3d7bc683"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Settings",
+                       "sha256":  "e736f8a0e052f56636aa604f98ab476dd25e468c21e6d926fcbd012b0791951c",
+                       "sha1":  "55eece0652256d6684b4ffe212fee3006ae0fb3e"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_BindingCapture",
+                       "sha256":  "08acb07006a46937993c2ab64228eeca2e47ccc847b28fa22b9323fb3f59e80b",
+                       "sha1":  "87c1f600499c37c8e0fb3b850a7a7ce074d32bf7"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Tactical",
+                       "sha256":  "e54a42b99698c1eb2b4c8ad4f7e7428663dfb13cd99cf23e6f145939bc6b3639",
+                       "sha1":  "0670d3e2a12aa2222e3fa954a786af2d1804421a"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Construction",
+                       "sha256":  "0ac5f61108b1cfd3daa5006a60b223b263d59ba26e79169c9d84ebc4dff0b0b1",
+                       "sha1":  "c0789b95181c4fbfb27e59a075f5589387f25590"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Strategic",
+                       "sha256":  "5ca1cc1a78465aeed0b6ebacd7783dd35af72c9231fdcf32c51e299fb89bd120",
+                       "sha1":  "5812c708a9ef494612c3f8d9626f7507b54a99b1"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Possession",
+                       "sha256":  "34c72ae8fba156a24d938b22a793e3e7898150e67950398d6a9006eda5d636cc",
+                       "sha1":  "70344615f9130bf9ba3f045d191f19d59d5b6aeb"
+                   },
+                   {
+                       "view":  "1920x1080_125_Text200_Outcome",
+                       "sha256":  "f0b38da345d890aa839c64810f7f5292be966f80a8558637339e658dda5eeacf",
+                       "sha1":  "d4e4c8ef3a183651723d062aa2d9f0d3b35ac5c1"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Settings",
+                       "sha256":  "4c3bea68f326c802f4455cf6efbf62028ea01df0144edeaaa3c7f7049c3c06a1",
+                       "sha1":  "a5a039ea898f8b88faf1daa7024b9bb51b98dafa"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_BindingCapture",
+                       "sha256":  "0c6b3c168559b45b990295bbdfe591743c629b7ce1db94c7cd47747215fb9b31",
+                       "sha1":  "b7596c2a0dbf67106435d93b8d99a46afb854055"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Tactical",
+                       "sha256":  "20dd06aedf15ce5458bd38b91aae12fb89a83d7cbb075c499fbdc732a8ec9f6a",
+                       "sha1":  "6b7d908649125dcb3308e22157bb0bb253c5ed2c"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Construction",
+                       "sha256":  "7ca9f0bfbaf0c320e4ef96f22e999944662a56c86a25b948e2d8efd567f82d3c",
+                       "sha1":  "ea141c1184ea6af3e50b85f8d706519de83942aa"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Strategic",
+                       "sha256":  "ad53462acd56918474be2248d0ce07e446059019498e3e9ecfd7e94d3d2595c9",
+                       "sha1":  "4fcaba8c41cc38fc5535eed431e1298daaed0db8"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Possession",
+                       "sha256":  "69ba6e49fcc5cb7dec6e6e8a1e476f2c3984c21ca5f0914faadb26fe40539a1e",
+                       "sha1":  "1e77b47aa321d135ed0ce31698235d80473108e0"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text100_Outcome",
+                       "sha256":  "cd2c4fb8e13a2f935862ef66c30003c4c052d14436598822974810c6ec787c35",
+                       "sha1":  "0200564f56f650ee9ce4aa92512c3109932de4ec"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Settings",
+                       "sha256":  "00044414450b46ee531dfac8e76273f99f111b78357fd8ffdd39e999fa64e0e2",
+                       "sha1":  "960da41dd425c76075aee529c05676da433a0d58"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_BindingCapture",
+                       "sha256":  "2334d868b08b4c55c8d42677ec12507262d7d345815f3762adf0b4ef38ddc719",
+                       "sha1":  "493d4543a0150ed29fff1edb8524f24a94b7fbe4"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Tactical",
+                       "sha256":  "a5062fab1c1b6b3b0b0d231d4b53a71fe14d8ecb721ffeca373346f36e73a256",
+                       "sha1":  "c14e7c5bfbf307569dc52158faad42b506c79fe3"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Construction",
+                       "sha256":  "779795f138796409837c30f13bb1fff7ac03fc0cfdc11c680502448cf91ae780",
+                       "sha1":  "8dfba2118ef7efd66070a5e3d17582efa87fe924"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Strategic",
+                       "sha256":  "2c951fda4dd2e123b9602d5c33d16b807f53dad95e813feabf956283d2d222c0",
+                       "sha1":  "f46fa7f3e40f4cc534bd13ffa1cf6311f27dad43"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Possession",
+                       "sha256":  "66ed1a839a55929cb24243824b778194d6b9a588aa167956d1324a4ed82df778",
+                       "sha1":  "d3593bc496d69a97e8519445ebd39dad4645fde5"
+                   },
+                   {
+                       "view":  "2560x1440_100_Text200_Outcome",
+                       "sha256":  "a284d2f17888bca417d678007f9552433f41828d6ce384e0e9c782c4da9476ff",
+                       "sha1":  "07ac312dcac60dec1e89264d18097b53a5dd8811"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Settings",
+                       "sha256":  "7dcf3d7d254c2d2271426282408fe08a09a647123a76e9bf1a6e7e4deb0edfda",
+                       "sha1":  "911d4a1ff26dc76e704275f179d36e7e5a190ac1"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_BindingCapture",
+                       "sha256":  "f4fc450ce370936c027ee73488c4f1461555e2c65b9b83054cea7c2092143670",
+                       "sha1":  "df0099d55420e0c9b5ab360a5fa1bf94ae25b033"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Tactical",
+                       "sha256":  "3b2e5426bcf9d5213d5347496b52e4d382045e6bd1ed35560843e4f584327b47",
+                       "sha1":  "7900ea866acd547c5abd219255e099599c0ea127"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Construction",
+                       "sha256":  "2161d0e1b5fc5a0309d9f01e6294760aed0f5219428acb66e62205f7630d0bdd",
+                       "sha1":  "2412f0df2fadea8500fac889aef6f9a60fb34e4a"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Strategic",
+                       "sha256":  "f4d37d7b8a0f111cbf20fe63eab0d22f7038aeb82ecdc06cb93f269d2c9a4591",
+                       "sha1":  "0cdd333e3990acf317604f659d53696d703815c4"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Possession",
+                       "sha256":  "e2326972c81a594e6fd4e4fc13b729ddc8680a8a25a1db148857d7869c4e3102",
+                       "sha1":  "a905d97a62dbb720d5bd742c8ef529626873de7b"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text100_Outcome",
+                       "sha256":  "917286cc56f386ef9951e4ae2bb20b656c28804addadd090eaeccec08f485d33",
+                       "sha1":  "5dec11638c51bbbf6aec6663fe5c7bb345dce94e"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Settings",
+                       "sha256":  "4128eee875cb8f19d909588d043ac4a3fe77b43a53bbfea0e587f4d66bef7a52",
+                       "sha1":  "9de5afa1a0ebce84add47d7cdd16601cb2468abc"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_BindingCapture",
+                       "sha256":  "dd22f58372715147ca2bc27ff748b47411a9f38aec02ccbee24b6f1215465830",
+                       "sha1":  "065fb7e8d7666aff33d9beec7065f9b35ac0555e"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Tactical",
+                       "sha256":  "fd34b5bf95b308e0c63d49dbab700670786be3f7f66c70c0e2940577207c6b6c",
+                       "sha1":  "44dd8ad950f09589127adf4a9f099e3d1f5ab0ef"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Construction",
+                       "sha256":  "e4664aef59996ecb45fd548981da8ae4d7c3c8ec7b6bdd9c170b76bb2510f7dd",
+                       "sha1":  "ef5bdf4f538e7fbe47ff1dcf0589b0095afaf13b"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Strategic",
+                       "sha256":  "8a1f30d290358aab70ea38926c4d386e65495e7804835eb4399fa3f6d9051a81",
+                       "sha1":  "3ce9a9f9076a9ff6e5ba0c535bc19c138cd28966"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Possession",
+                       "sha256":  "8bff0a556d6f00ae89fe85ff79c047ed26e16517ebbb1ce24bf6e8839263d1b9",
+                       "sha1":  "939988ad1f30aef85228c3852d7f36884adf67f8"
+                   },
+                   {
+                       "view":  "2560x1440_125_Text200_Outcome",
+                       "sha256":  "b7bcd08dbe62429aa0fa0154b22a31d8a54e816f8ee695307588daa5c271d40f",
+                       "sha1":  "a7965f22681a474042a210192e5f84e78d99953e"
+                   }
+               ]
+}

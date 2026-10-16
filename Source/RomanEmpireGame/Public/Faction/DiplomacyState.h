@@ -22,10 +22,10 @@ struct ROMANEMPIREGAME_API FDiplomaticPair
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Diplomacy")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Diplomacy")
 	EFactionID FirstFaction = EFactionID::None;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Diplomacy")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Diplomacy")
 	EFactionID SecondFaction = EFactionID::None;
 
 	bool IsValid() const;
@@ -37,10 +37,10 @@ struct ROMANEMPIREGAME_API FDiplomaticRelation
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Diplomacy")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Diplomacy")
 	FDiplomaticPair Pair;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Diplomacy")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Diplomacy")
 	EDiplomaticStatus Status = EDiplomaticStatus::Neutral;
 };
 
@@ -52,7 +52,8 @@ enum class EDiplomaticChangeFailure : uint8
 	SelfRelationship UMETA(DisplayName = "Self Relationship"),
 	InvalidStatus	UMETA(DisplayName = "Invalid Status"),
 	IllegalTransition UMETA(DisplayName = "Illegal Transition"),
-	AlreadyInStatus	UMETA(DisplayName = "Already In Status")
+	AlreadyInStatus	UMETA(DisplayName = "Already In Status"),
+	MutationInProgress UMETA(DisplayName = "Mutation In Progress")
 };
 
 USTRUCT(BlueprintType)
@@ -87,6 +88,9 @@ struct ROMANEMPIREGAME_API FDiplomacyState
 		EFactionID FactionB,
 		EDiplomaticStatus NewStatus);
 	int32 GetStoredRelationCount() const { return RelationsByPair.Num(); }
+	TArray<FDiplomaticRelation> GetSnapshot() const;
+	/** Stored non-neutral normalized pairs only. Atomic replacement, not a transition command. */
+	bool ReplaceFromSnapshot(const TArray<FDiplomaticRelation>& Snapshot);
 	void Reset() { RelationsByPair.Reset(); }
 
 private:

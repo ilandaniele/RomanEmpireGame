@@ -15,18 +15,19 @@ public class RomanEmpireGame : ModuleRules
 			"CoreUObject", 
 			"Engine", 
 			"EnhancedInput",
+			"InputCore",
 			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"AnimGraphRuntime", // Cooked blend/evaluator/slot nodes; Editor graph tools stay test-only.
 			"AIModule",
 			"NavigationSystem",
-			"InputCore",
+			"GameplayTags",
 			"Slate",
 			"SlateCore",
 			"HTTP",
-			"Json",
-			"ProceduralMeshComponent"
+			"Json"
 		});
 	}
 }

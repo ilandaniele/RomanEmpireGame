@@ -7,6 +7,12 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Content/RomanContentRegistry.h"
+#include "Core/RomanEmpirePlayerController.h"
+#include "Input/RomanInputConfig.h"
+#include "Input/RomanInputRemapping.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 #include "RomanEmpireGame.h"
 #include "Styling/SlateTypes.h"
 
@@ -116,6 +122,7 @@ void UBuildingMenuWidget::PopulateBuildingList()
 		}
 	}
 	ApplyFilter();
+	RefreshShortcutLabels();
 }
 
 void UBuildingMenuWidget::CreateBuildingButton(
@@ -152,6 +159,21 @@ void UBuildingMenuWidget::CreateBuildingButton(
 	BuildingButtons.Add(Button);
 }
 
+void UBuildingMenuWidget::RefreshShortcutLabels()
+{
+	const auto* Controller=GetOwningPlayer<ARomanEmpirePlayerController>();
+	const auto* Config=Controller?Controller->GetInputConfiguration():nullptr;
+	const auto* Subsystem=Controller?ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(Controller->GetLocalPlayer()):nullptr;
+	const auto* Registry=URomanContentRegistrySubsystem::Get(this);
+	if(!Config || !Registry) return;
+	for(URomanBuildingButton* Button:BuildingButtons)
+	{
+		const auto* Definition=Registry->FindBuilding(Button->GetBuildingID());
+		if(!Definition || !Config->BuildingSlots.IsValidIndex(Definition->QuickSlot-1)) continue;
+		const FString Key=RomanInputRemapping::DescribeKeys(Config->TacticalContext,Config->BuildingSlots[Definition->QuickSlot-1],Subsystem?Subsystem->GetUserSettings():nullptr);
+		if(auto* Label=Cast<UTextBlock>(Button->GetContent())) Label->SetText(FText::FromString(FString::Printf(TEXT("[%s] %s  |  %s"),*Key,*Definition->Definition.DisplayName.ToString(),*RomanEmpireEconomy::DescribeResourceCost(Definition->Definition.Cost))));
+	}
+}
 void UBuildingMenuWidget::FilterByCategory(EBuildingCategory Category)
 {
 	CurrentCategory = Category;

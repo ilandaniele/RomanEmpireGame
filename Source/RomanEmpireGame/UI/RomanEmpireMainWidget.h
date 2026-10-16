@@ -10,7 +10,9 @@
 #include "Campaign/CampaignTurn.h"
 #include "Core/GameplayMode.h"
 #include "Faction/FactionData.h"
+#include "Faction/DiplomacyState.h"
 #include "TimerManager.h"
+#include "UI/RomanTextScaleProjection.h"
 #include "RomanEmpireMainWidget.generated.h"
 
 class ABuildingBase;
@@ -22,7 +24,19 @@ class UBorder;
 class UBuildingMenuWidget;
 class UButton;
 class UCanvasPanel;
+class UMinimapWidget;
+class USizeBox;
 class UTextBlock;
+class UUniformGridPanel;
+class URomanTerritoryButton;
+class URomanArmyButton;
+class UCampaignSessionSubsystem;
+class UCampaignSaveSubsystem;
+class UHorizontalBox;
+class UScrollBox;
+class UVerticalBox;
+class URomanPlayerSettingsSubsystem;
+class UEnhancedInputUserSettings;
 
 /**
  * Production UMG root. It observes authoritative gameplay objects and never
@@ -57,9 +71,131 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Diagnostics")
 	void SetDiagnosticVisible(bool bVisible);
 
+	/** Local inspection only; does not change campaign or tactical selection. */
+	UFUNCTION(BlueprintCallable, Category = "UI|Territories")
+	bool SelectTerritory(FName TerritoryID);
+	UFUNCTION(BlueprintPure, Category = "UI|Territories")
+	FName GetSelectedTerritoryID() const { return SelectedTerritoryID; }
+	UFUNCTION(BlueprintCallable, Category = "UI|Armies") bool SelectCampaignArmy(FGuid ArmyID);
+	UFUNCTION(BlueprintPure, Category = "UI|Armies") FGuid GetSelectedCampaignArmyID() const { return SelectedArmyID; }
+	UFUNCTION(BlueprintCallable, Category = "UI|Armies") bool SetCampaignActionCount(int32 Count);
+	UFUNCTION(BlueprintPure, Category = "UI|Armies") int32 GetCampaignActionCount() const { return CampaignActionCount; }
+	UFUNCTION(BlueprintCallable, Category = "UI|Armies") bool SelectCampaignActionUnit(FName UnitID);
+	UFUNCTION(BlueprintPure, Category = "UI|Armies") FName GetCampaignActionUnitID() const { return CampaignActionUnitID; }
+	UFUNCTION(BlueprintPure, Category = "UI|Armies") FGuid GetAssignmentTargetArmyID() const { return AssignmentTargetArmyID; }
+
 private:
+	TWeakObjectPtr<URomanPlayerSettingsSubsystem> PreferencesSource;
+	TWeakObjectPtr<UEnhancedInputUserSettings> BindingSettingsSource;
+	FDelegateHandle PreferencesChangedHandle;
+	FRomanTextScaleProjection TextScaleProjection;
+	void BindPreferences();
+	void UnbindPreferences();
+	void RefreshTextScale();
+	void RefreshInputLabels();
+	UFUNCTION() void HandleBindingsChanged(UEnhancedInputUserSettings* Settings);
+	UFUNCTION() void HandleSettingsClicked();
+	static constexpr int32 MaxCampaignActionCount = 100; // HUD batch limit; canonical backend validates its own range.
+	UPROPERTY(Transient) int32 CampaignActionCount = 1;
+	UPROPERTY(Transient) FName CampaignActionUnitID;
+	UPROPERTY(Transient) FGuid AssignmentTargetArmyID;
+	UPROPERTY(Transient) TObjectPtr<UVerticalBox> CampaignArmyActionsPanel;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CampaignActionCountText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CampaignRecruitmentQuoteText;
+	UPROPERTY(Transient) TObjectPtr<UButton> CampaignUnitChoiceButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> CampaignCountDecreaseButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> CampaignCountIncreaseButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> RecruitNewArmyButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> RecruitSelectedArmyButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> AssignmentTargetButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> AssignArmyUnitsButton;
+	void BuildCampaignArmyActionControls(UVerticalBox* Details);
+	void RefreshCampaignArmyActions();
+	TArray<FGuid> GetAssignmentTargetChoices() const;
+	void ExecuteCampaignRecruitment(FGuid DestinationArmyID);
+	UFUNCTION() void HandleCampaignUnitChoiceClicked();
+	UFUNCTION() void HandleCampaignCountDecreaseClicked();
+	UFUNCTION() void HandleCampaignCountIncreaseClicked();
+	UFUNCTION() void HandleRecruitNewArmyClicked();
+	UFUNCTION() void HandleRecruitSelectedArmyClicked();
+	UFUNCTION() void HandleAssignmentTargetClicked();
+	UFUNCTION() void HandleAssignArmyUnitsClicked();
+	UPROPERTY(Transient) TObjectPtr<UCampaignSessionSubsystem> CachedSession;
+	UPROPERTY(Transient) TObjectPtr<UCampaignSaveSubsystem> CachedSave;
+	UPROPERTY(Transient) TObjectPtr<UBorder> CampaignSavePanel;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CampaignSaveStatus;
+	UPROPERTY(Transient) TObjectPtr<UButton> SaveCampaignButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> LoadCampaignButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> LoadAutosaveButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> AutosaveToggleButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> ConfirmSaveActionButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> CancelSaveActionButton;
+	UPROPERTY(Transient) TObjectPtr<UHorizontalBox> SaveConfirmationRow;
+	FTimerHandle SaveRefreshTimer;
+	int32 PendingSaveAction = 0, PendingSaveTurn = 0;
+	FText CampaignSaveNotice;
+	void BuildCampaignSaveControls();
+	void BindSaveEvents();
+	void UnbindSaveEvents();
+	bool IsLiveSaveUI() const;
+	void RefreshSaveControls();
+	void RequestSaveUIAction(int32 Action);
+	UFUNCTION() void ScheduleSaveRefresh();
+	UFUNCTION() void HandleSaveCampaignClicked();
+	UFUNCTION() void HandleLoadCampaignClicked();
+	UFUNCTION() void HandleLoadAutosaveClicked();
+	UFUNCTION() void HandleAutosaveToggleClicked();
+	UFUNCTION() void HandleConfirmSaveActionClicked();
+	UFUNCTION() void HandleCancelSaveActionClicked();
+	UPROPERTY(Transient) TObjectPtr<UButton> EnterCampaignButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> ContinueCampaignButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> RetryCampaignButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> MoveArmyButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> StartBattleButton;
+	UPROPERTY(Transient) TObjectPtr<UBorder> CampaignRecoveryPanel;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CampaignRecoveryText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ArmyDetailText;
+	UPROPERTY(Transient) TObjectPtr<UScrollBox> ArmyList;
+	UPROPERTY(Transient) TArray<TObjectPtr<URomanArmyButton>> ArmyButtons;
+	UPROPERTY(Transient) FGuid SelectedArmyID;
+	void BuildCampaignControls(UVerticalBox* Commands, UVerticalBox* Outcome, UVerticalBox* Details);
+	void BindSessionEvents();
+	void UnbindSessionEvents();
+	bool IsLiveCampaignUI(bool bRequireReady = true) const;
+	void RefreshCampaignControls();
+	void RefreshCampaignArmies();
+	UFUNCTION() void HandleCampaignSessionChanged();
+	UFUNCTION() void HandleCampaignArmiesChanged();
+	UFUNCTION() void HandleArmyClicked(FGuid ArmyID);
+	UFUNCTION() void HandleDiplomacyChanged(FDiplomaticPair Pair, EDiplomaticStatus Status);
+	UFUNCTION() void HandleEnterCampaignClicked();
+	UFUNCTION() void HandleContinueCampaignClicked();
+	UFUNCTION() void HandleRetryCampaignClicked();
+	UFUNCTION() void HandleMoveArmyClicked();
+	UFUNCTION() void HandleStartBattleClicked();
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> StrategicPanel;
+	UPROPERTY(Transient)
+	TObjectPtr<UUniformGridPanel> TerritoryGrid;
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TerritoryDetailText;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<URomanTerritoryButton>> TerritoryButtons;
+	UPROPERTY(Transient)
+	FName SelectedTerritoryID = NAME_None;
+	void RefreshStrategicTerritories();
+	UFUNCTION()
+	void HandleTerritoryClicked(FName TerritoryID);
+	UFUNCTION()
+	void HandleTerritoryOwnerChanged(FName TerritoryID, EFactionID PreviousOwner, EFactionID NewOwner);
+	UFUNCTION()
+	void HandleTerritorySettlementChanged(FName TerritoryID);
+
 	UPROPERTY(Transient)
 	TObjectPtr<UCanvasPanel> RootCanvas;
+	UPROPERTY(Transient) TObjectPtr<UMinimapWidget> TacticalMinimap;
+	UPROPERTY(Transient) TObjectPtr<UMinimapWidget> StrategicMinimap;
+	UPROPERTY(Transient) TObjectPtr<USizeBox> TacticalMinimapFrame;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> ResourceText;
@@ -90,6 +226,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> PossessionText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> PossessionPanel;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> CrosshairText;
@@ -126,6 +265,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> TrainButton;
 	UPROPERTY(Transient)
+	TObjectPtr<UButton> CancelTrainingButton;
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> RestartEncounterButton;
+	UPROPERTY(Transient)
 	TObjectPtr<UButton> StopButton;
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> HoldButton;
@@ -154,6 +297,7 @@ private:
 	bool bCanonicalEventsBound = false;
 
 	void BuildNativeWidgetTree();
+	void BuildResponsiveShell();
 	void BindCanonicalEvents();
 	void UnbindCanonicalEvents();
 	void BindSelectionEvents(const TArray<AUnitBase*>& Units, ABuildingBase* Building);
@@ -220,6 +364,10 @@ private:
 
 	UFUNCTION()
 	void HandleTrainClicked();
+	UFUNCTION()
+	void HandleCancelTrainingClicked();
+	UFUNCTION()
+	void HandleRestartEncounterClicked();
 	UFUNCTION()
 	void HandleStopClicked();
 	UFUNCTION()

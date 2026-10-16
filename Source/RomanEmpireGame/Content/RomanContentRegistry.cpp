@@ -224,6 +224,7 @@ FContentDefinitionValidationReport RomanEmpireContent::ValidateDefinitionSet(
 	}
 
 	TSet<FName> TerritoryIDs;
+	TMap<FName, const URomanTerritoryDefinition*> TerritoryAssetsByID;
 	for (const URomanTerritoryDefinition* Asset : Territories)
 	{
 		if (!Asset)
@@ -234,6 +235,7 @@ FContentDefinitionValidationReport RomanEmpireContent::ValidateDefinitionSet(
 		}
 
 		const FTerritoryDefinition& Definition = Asset->Definition;
+		TerritoryAssetsByID.FindOrAdd(Definition.TerritoryID, Asset);
 		AddUniqueOrReport(TerritoryIDs, Definition.TerritoryID, Report, Asset, Definition.TerritoryID,
 			EContentDefinitionFailure::DuplicateStableID, TEXT("territory stable ID"));
 		if (!Definition.IsValid() || Asset->MapLocation.ContainsNaN())
@@ -245,6 +247,27 @@ FContentDefinitionValidationReport RomanEmpireContent::ValidateDefinitionSet(
 		{
 			Report.Add(EContentDefinitionFailure::InvalidFactionReference, Asset, Definition.TerritoryID, NAME_None,
 				TEXT("Territory starting owner has no faction definition."));
+		}
+		if (!Asset->HasValidTacticalMap())
+		{
+			Report.Add(EContentDefinitionFailure::InvalidTacticalMap, Asset, Definition.TerritoryID,
+				Asset->TacticalMap.ToSoftObjectPath().GetAssetFName(),
+				TEXT("Territory requires an existing top-level World asset as its tactical map."));
+		}
+	}
+
+	for (const URomanTerritoryDefinition* Asset : Territories)
+	{
+		if (!Asset) continue;
+		for (FName NeighborID : Asset->Definition.AdjacentTerritoryIDs)
+		{
+			const URomanTerritoryDefinition* const* Neighbor = TerritoryAssetsByID.Find(NeighborID);
+			if (!Neighbor || !(*Neighbor)->Definition.AdjacentTerritoryIDs.Contains(Asset->Definition.TerritoryID))
+			{
+				Report.Add(EContentDefinitionFailure::InvalidTerritoryReference, Asset,
+					Asset->Definition.TerritoryID, NeighborID,
+					TEXT("Campaign neighbor must exist and reference this territory back."));
+			}
 		}
 	}
 
@@ -329,6 +352,8 @@ const TCHAR* RomanEmpireContent::GetDefinitionFailureName(EContentDefinitionFail
 	case EContentDefinitionFailure::MissingFactoryClass: return TEXT("MissingFactoryClass");
 	case EContentDefinitionFailure::InvalidFactionReference: return TEXT("InvalidFactionReference");
 	case EContentDefinitionFailure::InvalidUnitReference: return TEXT("InvalidUnitReference");
+	case EContentDefinitionFailure::InvalidTerritoryReference: return TEXT("InvalidTerritoryReference");
+	case EContentDefinitionFailure::InvalidTacticalMap: return TEXT("InvalidTacticalMap");
 	default: return TEXT("Unknown");
 	}
 }

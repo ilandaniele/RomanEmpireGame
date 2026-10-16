@@ -31,6 +31,7 @@ const TCHAR* RomanEmpireCampaign::GetTurnStepName(ECampaignTurnStep Step)
 	case ECampaignTurnStep::IncrementTurn: return TEXT("IncrementTurn");
 	case ECampaignTurnStep::BroadcastTurnCompleted: return TEXT("BroadcastTurnCompleted");
 	case ECampaignTurnStep::Autosave: return TEXT("Autosave");
+	case ECampaignTurnStep::AITacticalTravel: return TEXT("AITacticalTravel");
 	default: return TEXT("Unknown");
 	}
 }
@@ -47,6 +48,9 @@ const TCHAR* RomanEmpireCampaign::GetTurnFailureName(ECampaignTurnFailure Failur
 	case ECampaignTurnFailure::ResourceTransactionFailed: return TEXT("ResourceTransactionFailed");
 	case ECampaignTurnFailure::AutosaveFailed: return TEXT("AutosaveFailed");
 	case ECampaignTurnFailure::TurnAlreadyProcessing: return TEXT("TurnAlreadyProcessing");
+	case ECampaignTurnFailure::EncounterResolved: return TEXT("EncounterResolved");
+	case ECampaignTurnFailure::EncounterPending: return TEXT("EncounterPending");
+	case ECampaignTurnFailure::AITacticalTravelFailed: return TEXT("AITacticalTravelFailed");
 	default: return TEXT("Unknown");
 	}
 }

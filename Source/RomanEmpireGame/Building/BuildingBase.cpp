@@ -1,6 +1,10 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingBase.h"
+#include "Audio/RomanFeedbackSubsystem.h"
+#include "Core/RomanEmpireGameState.h"
+#include "Battle/TacticalBattleSubsystem.h"
+#include "Engine/World.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "Components/BoxComponent.h"
@@ -8,7 +12,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 ABuildingBase::ABuildingBase()
@@ -50,11 +54,32 @@ ABuildingBase::ABuildingBase()
 	CurrentHealth = 0;
 	bIsSelected = false;
 
-	// Default materials will be set in Blueprint
-	ValidPlacementMaterial = nullptr;
-	InvalidPlacementMaterial = nullptr;
-	ConstructionMaterial = nullptr;
-	CompleteMaterial = nullptr;
+	// Reflected class references make the presentation assets reachable during cooking.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Valid(TEXT("/Game/Materials/RomanVisual/MI_PreviewValid"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Invalid(TEXT("/Game/Materials/RomanVisual/MI_PreviewInvalid"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Construction(TEXT("/Game/Materials/RomanVisual/MI_Construction"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Complete(TEXT("/Game/Materials/RomanVisual/MI_Surface"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Damaged(TEXT("/Game/Materials/RomanVisual/MI_Damaged"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Indicator(TEXT("/Game/Materials/RomanVisual/MI_Selection"));
+	ValidPlacementMaterial = Valid.Object;
+	InvalidPlacementMaterial = Invalid.Object;
+	ConstructionMaterial = Construction.Object;
+	CompleteMaterial = Complete.Object;
+	DamagedMaterial = Damaged.Object;
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		UStaticMeshComponent* Edge = CreateDefaultSubobject<UStaticMeshComponent>(
+			*FString::Printf(TEXT("SelectionOutline%d"), Index));
+		Edge->SetupAttachment(RootScene);
+		Edge->SetStaticMesh(CubeMesh.Object);
+		Edge->SetMaterial(0, Indicator.Object);
+		Edge->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Edge->SetCanEverAffectNavigation(false);
+		Edge->SetCastShadow(false);
+		Edge->SetVisibility(false);
+		Edge->SetHiddenInGame(true);
+		SelectionOutline.Add(Edge);
+	}
 }
 
 void ABuildingBase::BeginPlay()
@@ -76,7 +101,7 @@ void ABuildingBase::BeginPlay()
 void ABuildingBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	bBuildingEndingPlay = true;
-	bIsSelected = false;
+	SetSelected(false);
 	// Remove local selection even for level removal, which need not fire OnDestroyed.
 	OnBuildingStateChanged.Broadcast(this);
 	Super::EndPlay(EndPlayReason);
@@ -122,20 +147,25 @@ void ABuildingBase::ApplyDefinitionPresentation()
 	}
 
 	BuildingMesh->SetRelativeScale3D(BuildingData.PrototypeScale);
-	UMaterial* Base = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
-	UMaterialInstanceDynamic* MID = Base ? UMaterialInstanceDynamic::Create(Base, this) : nullptr;
-	if (MID)
+	const float HalfX = FMath::Max(BuildingData.FootprintSize.X * 50.0f, BuildingData.PrototypeScale.X * 50.0f) + 8.0f;
+	const float HalfY = FMath::Max(BuildingData.FootprintSize.Y * 50.0f, BuildingData.PrototypeScale.Y * 50.0f) + 8.0f;
+	const float BaseZ = -BuildingData.PrototypeScale.Z * 50.0f + 3.0f;
+	for (int32 Index = 0; Index < SelectionOutline.Num(); ++Index)
 	{
-		MID->SetVectorParameterValue(TEXT("Color"), BuildingData.PrototypeColor);
-		BuildingMesh->SetMaterial(0, MID);
+		const bool bHorizontal = Index < 2;
+		const float Sign = Index % 2 == 0 ? -1.0f : 1.0f;
+		SelectionOutline[Index]->SetRelativeLocation(bHorizontal ? FVector(0, Sign * HalfY, BaseZ) : FVector(Sign * HalfX, 0, BaseZ));
+		SelectionOutline[Index]->SetRelativeScale3D(bHorizontal ? FVector((HalfX * 2 + 8) / 100, 0.08f, 0.04f) : FVector(0.08f, HalfY * 2 / 100, 0.04f));
 	}
+	UpdateVisuals();
 }
 
 void ABuildingBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (CurrentState == EBuildingState::Constructing)
+	const UTacticalBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	if (CurrentState == EBuildingState::Constructing && !(Battle && Battle->IsResolved()))
 	{
 		UpdateConstruction(DeltaSeconds);
 	}
@@ -164,6 +194,7 @@ void ABuildingBase::SetOwnerFaction(EFactionID NewOwner)
 		return;
 	}
 	OwnerFaction = NewOwner;
+	UpdateVisuals();
 	OnBuildingStateChanged.Broadcast(this);
 	UE_LOG(LogRomanEmpire, Log, TEXT("Building %s now owned by faction %d"), 
 		*GetName(), static_cast<int32>(NewOwner));
@@ -241,6 +272,10 @@ void ABuildingBase::OnConstructionFinished()
 	UpdateVisuals();
 	OnConstructionComplete.Broadcast(this);
 	OnBuildingStateChanged.Broadcast(this);
+	UWorld* World = GetWorld();
+	const auto* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+	if (!IsActorBeingDestroyed() && CurrentState == EBuildingState::Complete && State && OwnerFaction == State->GetPlayerFaction())
+		if (auto* Audio = World->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Complete);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Construction complete: %s"), 
 		*BuildingData.DisplayName.ToString());
@@ -248,7 +283,8 @@ void ABuildingBase::OnConstructionFinished()
 
 void ABuildingBase::ApplyBuildingDamage(float Damage, AActor* DamageSource)
 {
-	if (CurrentState == EBuildingState::Destroyed)
+	const UTacticalBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	if (CurrentState == EBuildingState::Destroyed || (Battle && Battle->IsResolved()) || !FMath::IsFinite(Damage) || Damage <= 0.0f)
 	{
 		return;
 	}
@@ -256,6 +292,7 @@ void ABuildingBase::ApplyBuildingDamage(float Damage, AActor* DamageSource)
 	// Apply armor reduction
 	float ActualDamage = FMath::Max(0.0f, Damage - BuildingData.Armor);
 	CurrentHealth = FMath::Max(0, CurrentHealth - FMath::RoundToInt(ActualDamage));
+	UpdateVisuals();
 
 	OnBuildingDamaged.Broadcast(this, ActualDamage);
 
@@ -270,8 +307,8 @@ void ABuildingBase::ApplyBuildingDamage(float Damage, AActor* DamageSource)
 		{
 			CurrentState = EBuildingState::Damaged;
 		}
-		UpdateVisuals();
 	}
+	UpdateVisuals();
 	OnBuildingStateChanged.Broadcast(this);
 }
 
@@ -287,14 +324,15 @@ void ABuildingBase::Repair(float Amount)
 	if (CurrentHealth > BuildingData.MaxHealth / 2 && CurrentState == EBuildingState::Damaged)
 	{
 		CurrentState = EBuildingState::Complete;
-		UpdateVisuals();
 	}
+	UpdateVisuals();
 	OnBuildingStateChanged.Broadcast(this);
 }
 
 void ABuildingBase::OnDestroyed()
 {
 	CurrentState = EBuildingState::Destroyed;
+	SetSelected(false);
 	OnBuildingDestroyed.Broadcast(this);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Building destroyed: %s"), 
@@ -331,7 +369,11 @@ bool ABuildingBase::CanPlaceAt(const FVector& Location) const
 void ABuildingBase::SetSelected(bool bNewSelected)
 {
 	bIsSelected = bNewSelected;
-	// TODO: Show selection indicator
+	for (UStaticMeshComponent* Edge : SelectionOutline)
+	{
+		Edge->SetVisibility(bIsSelected);
+		Edge->SetHiddenInGame(!bIsSelected);
+	}
 }
 
 void ABuildingBase::SetPlacementMode(bool bPlacing, bool bValidPlacement)
@@ -342,12 +384,8 @@ void ABuildingBase::SetPlacementMode(bool bPlacing, bool bValidPlacement)
 	{
 		CurrentState = EBuildingState::Placing;
 		
-		// Set ghost material
-		UMaterialInterface* MaterialToUse = bValidPlacement ? ValidPlacementMaterial : InvalidPlacementMaterial;
-		if (MaterialToUse && BuildingMesh)
-		{
-			BuildingMesh->SetMaterial(0, MaterialToUse);
-		}
+		bPlacementVisualValid = bValidPlacement;
+		UpdateVisuals();
 		
 		// Disable collision during placement
 		SetActorEnableCollision(false);
@@ -363,7 +401,7 @@ void ABuildingBase::SetPlacementMode(bool bPlacing, bool bValidPlacement)
 
 void ABuildingBase::UpdateVisuals()
 {
-	if (!BuildingMesh)
+	if (!BuildingMesh || !bBuildingInitialized || bBuildingEndingPlay)
 	{
 		return;
 	}
@@ -373,14 +411,16 @@ void ABuildingBase::UpdateVisuals()
 	switch (CurrentState)
 	{
 		case EBuildingState::Placing:
-			MaterialToUse = ValidPlacementMaterial;
+			MaterialToUse = bPlacementVisualValid ? ValidPlacementMaterial : InvalidPlacementMaterial;
 			break;
 		case EBuildingState::Constructing:
 			MaterialToUse = ConstructionMaterial;
 			break;
 		case EBuildingState::Complete:
-		case EBuildingState::Damaged:
 			MaterialToUse = CompleteMaterial;
+			break;
+		case EBuildingState::Damaged:
+			MaterialToUse = DamagedMaterial;
 			break;
 		default:
 			break;
@@ -388,7 +428,23 @@ void ABuildingBase::UpdateVisuals()
 	
 	if (MaterialToUse)
 	{
-		BuildingMesh->SetMaterial(0, MaterialToUse);
+		UMaterialInstanceDynamic* MID = VisualMaterials.FindRef(MaterialToUse);
+		if (!MID)
+		{
+			MID = UMaterialInstanceDynamic::Create(MaterialToUse, this);
+			if (!MID) return;
+			VisualMaterials.Add(MaterialToUse, MID);
+		}
+		if (CurrentState == EBuildingState::Complete || CurrentState == EBuildingState::Damaged)
+		{
+			FLinearColor Color = BuildingData.PrototypeColor;
+			const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+			const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(OwnerFaction) : nullptr;
+			if (Faction) Color = FMath::Lerp(Color, Faction->Definition.FactionColor, 0.25f);
+			MID->SetVectorParameterValue(TEXT("Color"), Color);
+			MID->SetScalarParameterValue(TEXT("Damage"), 1.0f - GetHealthPercent());
+		}
+		BuildingMesh->SetMaterial(0, MID);
 	}
 }
 

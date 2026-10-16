@@ -23,6 +23,17 @@ public:
 	virtual void BeginPlay() override;
 
 	// Faction access
+	/** Runtime participants, distinct from the registry's extensible authored catalog. */
+	UFUNCTION(BlueprintPure, Category = "Faction")
+	bool IsFactionActive(EFactionID FactionID) const;
+
+	UFUNCTION(BlueprintPure, Category = "Faction")
+	TArray<EFactionID> GetActiveFactions() const;
+
+	/** Deterministic active participants other than the canonical player faction. */
+	UFUNCTION(BlueprintPure, Category = "Faction|AI")
+	TArray<EFactionID> GetAIFactions() const;
+
 	UFUNCTION(BlueprintPure, Category = "Faction")
 	FFactionInfo GetFactionInfo(EFactionID FactionID) const;
 
@@ -104,6 +115,8 @@ protected:
 	EFactionID PlayerFaction;
 
 private:
+	friend class ACampaignManager;
+	bool bCampaignTransferPending = false;
 	bool InitializeFactionsFromContent();
 	void InitializeDefaultDiplomacy();
 	void ProcessAIFactionTurn(EFactionID FactionID);

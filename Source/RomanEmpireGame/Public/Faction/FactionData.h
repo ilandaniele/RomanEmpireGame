@@ -51,7 +51,8 @@ enum class EResourceTransactionFailure : uint8
 	InsufficientWood	UMETA(DisplayName = "Insufficient Wood"),
 	InsufficientStone	UMETA(DisplayName = "Insufficient Stone"),
 	InsufficientPopulation UMETA(DisplayName = "Insufficient Population"),
-	ArithmeticOverflow	UMETA(DisplayName = "Arithmetic Overflow")
+	ArithmeticOverflow	UMETA(DisplayName = "Arithmetic Overflow"),
+	MutationInProgress UMETA(DisplayName = "Mutation In Progress")
 };
 
 /**
@@ -63,22 +64,22 @@ struct ROMANEMPIREGAME_API FFactionResourceAmounts
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Gold = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Food = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Iron = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Wood = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Stone = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Population = 0;
 
 	bool IsZero() const;
@@ -93,22 +94,22 @@ struct ROMANEMPIREGAME_API FFactionResourceDelta
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Gold = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Food = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Iron = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Wood = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Stone = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Resources")
 	int32 Population = 0;
 
 	bool IsZero() const;

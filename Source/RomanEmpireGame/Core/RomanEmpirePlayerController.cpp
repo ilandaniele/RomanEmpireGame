@@ -1,7 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpirePlayerController.h"
+#include "Audio/RomanFeedbackSubsystem.h"
 #include "RomanEmpireGameMode.h"
+#include "World/CampaignManager.h"
 #include "Core/RomanEmpireGameState.h"
 #include "RomanEmpireGame.h"
 #include "Content/RomanContentRegistry.h"
@@ -20,6 +22,8 @@
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
+#include "UI/RomanPlayerSettingsSubsystem.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedPlayerInput.h"
 #include "EnhancedInputSubsystems.h"
@@ -28,6 +32,7 @@
 #include "InputKeyEventArgs.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "Input/RomanInputRemapping.h"
 #include "Input/RomanInputConfig.h"
 #include "Engine/GameViewportClient.h"
 #include "UnrealClient.h"
@@ -77,6 +82,14 @@ bool ARomanEmpirePlayerController::LoadInputConfiguration()
 	return true;
 }
 
+void ARomanEmpirePlayerController::GetAudioListenerPosition(FVector& OutLocation, FVector& OutFrontDir, FVector& OutRightDir) const
+{
+	Super::GetAudioListenerPosition(OutLocation, OutFrontDir, OutRightDir);
+	// RTS listens at the ground focus, not thousands of units up the zoom arm.
+	// Possession retains the engine's actual first-person listener/orientation.
+	if (const auto* Focus = Cast<ASeamlessZoomCamera>(GetPawn())) OutLocation = Focus->GetActorLocation();
+}
+
 void ARomanEmpirePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -89,6 +102,8 @@ void ARomanEmpirePlayerController::BeginPlay()
 	{
 		PublicGameState->OnGameplayInitialized.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
+		PublicGameState->OnTacticalBattleChanged.AddUniqueDynamic(
+			this, &ARomanEmpirePlayerController::HandleTacticalBattleChanged);
 		PublicGameState->OnGameplayModeChanged.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
 		PublicGameState->OnPlayerFactionChanged.AddUniqueDynamic(
@@ -134,11 +149,13 @@ void ARomanEmpirePlayerController::BeginPlay()
 	SetInputMode(InputMode);
 	
 	UE_LOG(LogRomanEmpire, Log, TEXT("Player Controller initialized with authored mode-specific input"));
+	HandleTacticalBattleChanged(FTacticalBattleResult());
 }
 
 void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	bControllerEndingPlay = true;
+	CloseSettings();
 	ExitFirstPersonMode();
 	CancelTransientInput();
 	RemoveOwnedInputContexts();
@@ -146,6 +163,8 @@ void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayRea
 	{
 		PublicGameState->OnGameplayInitialized.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayInitialized);
+		PublicGameState->OnTacticalBattleChanged.RemoveDynamic(
+			this, &ARomanEmpirePlayerController::HandleTacticalBattleChanged);
 		PublicGameState->OnGameplayModeChanged.RemoveDynamic(
 			this, &ARomanEmpirePlayerController::HandleGameplayModeChanged);
 		PublicGameState->OnPlayerFactionChanged.RemoveDynamic(
@@ -167,6 +186,7 @@ void ARomanEmpirePlayerController::EndPlay(const EEndPlayReason::Type EndPlayRea
 		PossessedUnit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
 		PossessedUnit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
 		PossessedUnit->OnOwnerFactionChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
+		PossessedUnit->OnUnitVitalsChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -235,6 +255,9 @@ void ARomanEmpirePlayerController::ApplyInputContexts()
 	{
 		return;
 	}
+	// Registration populates all menu rows, including inactive modes; removing a gameplay
+	// context must not unregister the user's saved key identities.
+	RomanInputRemapping::RegisterContexts(InputConfiguration,Subsystem->GetUserSettings());
 	UInputMappingContext* Desired = InputConfiguration->GetContextForMode(PublicGameState->GetCurrentGameplayMode());
 	if (Desired == ActiveGameplayContext && HasActiveModeContext())
 	{
@@ -259,7 +282,7 @@ bool ARomanEmpirePlayerController::HasActiveModeContext() const
 {
 	const UEnhancedInputLocalPlayerSubsystem* Subsystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-	return !bControllerEndingPlay && IsLocalController() && PublicGameState && PublicGameState->IsGameplayInitialized() && InputConfiguration &&
+	return !bControllerEndingPlay && !IsSettingsOpen() && !IsPaused() && IsLocalController() && PublicGameState && PublicGameState->IsGameplayInitialized() && InputConfiguration &&
 		ActiveGameplayContext && ActiveGameplayContext == InputConfiguration->GetContextForMode(PublicGameState->GetCurrentGameplayMode()) &&
 		Subsystem && Subsystem->HasMappingContext(ActiveGameplayContext) &&
 		Subsystem->HasMappingContext(InputConfiguration->SharedContext);
@@ -267,14 +290,26 @@ bool ARomanEmpirePlayerController::HasActiveModeContext() const
 
 bool ARomanEmpirePlayerController::CanIssueTacticalCommands() const
 {
+	const auto* Session = GetCurrentCampaignSession();
+	if (Session && (Session->HasPendingTransfer() || (Session->HasSession() && Session->GetPhase() == ECampaignTransferPhase::Strategic))) return false;
 	return HasActiveModeContext() && PublicGameState->GetCurrentGameplayMode() == EGameplayMode::Tactical &&
-		PublicGameState && PublicGameState->IsCampaignActive();
+		PublicGameState && PublicGameState->IsCampaignActive() && !PublicGameState->GetTacticalBattleResult().IsResolved();
 }
 
 bool ARomanEmpirePlayerController::CanEndTurn() const
 {
+	const auto* Session = GetCurrentCampaignSession();
+	if (Session && Session->HasPendingTransfer()) return false;
+	if (Session && Session->HasSession() && PublicGameState && PublicGameState->GetCurrentGameplayMode() != EGameplayMode::Strategic) return false;
 	return HasActiveModeContext() && PublicGameState->GetCurrentGameplayMode() != EGameplayMode::Possessed &&
-		PublicGameState && PublicGameState->IsCampaignActive();
+		PublicGameState && PublicGameState->IsCampaignActive() && !PublicGameState->GetTacticalBattleResult().IsResolved();
+}
+
+bool ARomanEmpirePlayerController::IsAwaitingAITacticalTravel() const
+{
+	const auto* Session = GetCurrentCampaignSession();
+	return Session && Session->HasSession() && !Session->HasPendingTransfer() && IsValid(GameMode) &&
+		IsValid(GameMode->GetCampaignManager()) && GameMode->GetCampaignManager()->IsAwaitingAITacticalTravel();
 }
 
 bool ARomanEmpirePlayerController::CanControlCamera() const
@@ -339,6 +374,28 @@ void ARomanEmpirePlayerController::ReconcileUnitOwnership()
 void ARomanEmpirePlayerController::HandleGameplayInitialized()
 {
 	ApplyInputContexts();
+	HandleTacticalBattleChanged(FTacticalBattleResult());
+}
+
+void ARomanEmpirePlayerController::HandleTacticalBattleChanged(FTacticalBattleResult Result)
+{
+	(void)Result;
+	if (bControllerEndingPlay || !PublicGameState || !PublicGameState->IsGameplayInitialized() ||
+		!PublicGameState->GetTacticalBattleResult().IsResolved()) return;
+	ExitFirstPersonMode();
+	CancelTransientInput();
+	ClearSelectedActors();
+}
+
+bool ARomanEmpirePlayerController::CanRestartEncounter() const
+{
+	return !bControllerEndingPlay && IsLocalController() && PublicGameState &&
+		PublicGameState->IsGameplayInitialized() && GameMode && GameMode->CanRestartEncounter();
+}
+
+bool ARomanEmpirePlayerController::RestartEncounter()
+{
+	return CanRestartEncounter() && GameMode->RestartEncounter();
 }
 
 void ARomanEmpirePlayerController::HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode)
@@ -387,19 +444,25 @@ void ARomanEmpirePlayerController::CaptureHeldMovementKeys(UInputMappingContext*
 	const UEnhancedPlayerMappableKeyProfile* Profile = Settings ? Settings->GetActiveKeyProfile() : nullptr;
 	const FString ProfileID = Profile ? Profile->GetProfileIdString() : FString();
 	// UE's rebuild ignore-held option only covers Boolean actions. Movement is Axis2D.
-	// Inspect authored/profile mappings so this policy also follows future key remaps.
+	// Authored profile overrides are not user remaps. Resolve each row against the local profile.
 	for (const FEnhancedActionKeyMapping& Mapping : DestinationContext->GetMappingsForProfile(ProfileID))
 	{
-		if ((Mapping.Action == InputConfiguration->CameraPan || Mapping.Action == InputConfiguration->SoldierMove) &&
-			Mapping.Key.IsDigital() && IsInputKeyDown(Mapping.Key))
+		if (Mapping.Action == InputConfiguration->CameraPan || Mapping.Action == InputConfiguration->SoldierMove)
 		{
-			MovementKeysAwaitingRelease.Add(Mapping.Key);
+			for(const FKey& Key:RomanInputRemapping::EffectiveKeys(Mapping,Profile))
+				if(Key.IsDigital() && IsInputKeyDown(Key)) MovementKeysAwaitingRelease.Add(Key);
 		}
 	}
 }
 
 bool ARomanEmpirePlayerController::InputKey(const FInputKeyEventArgs& Params)
 {
+	// Reserved system-menu shortcut, not a gameplay mapping or legacy BindKey.
+	if(Params.Key==EKeys::F10)
+	{
+		if(Params.Event==IE_Pressed) { if(IsSettingsOpen()) CloseSettings(); else OpenSettings(); }
+		return true;
+	}
 	if (Params.Event == IE_Released)
 	{
 		MovementKeysAwaitingRelease.Remove(Params.Key);
@@ -546,9 +609,12 @@ void ARomanEmpirePlayerController::SelectUnits(const TArray<AUnitBase*>& Units)
 			Unit->OnUnitDied.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitDied);
 			Unit->OnDestroyed.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 			Unit->OnOwnerFactionChanged.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitOwnerChanged);
+			Unit->OnUnitVitalsChanged.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitOwnerChanged);
 		}
 	}
 	UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected %d units"), SelectedUnits.Num());
+	if (IsLocalController() && CanIssueTacticalCommands() && !SelectedUnits.IsEmpty())
+		if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Select);
 	BroadcastSelectionChanged();
 }
 
@@ -633,6 +699,8 @@ void ARomanEmpirePlayerController::SelectBuilding(ABuildingBase* Building)
 		SelectedBuilding->AActor::OnDestroyed.AddUniqueDynamic(
 			this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 		UE_LOG(LogRomanEmpire, Verbose, TEXT("Selected building: %s"), *SelectedBuilding->GetName());
+		if (IsLocalController() && CanIssueTacticalCommands())
+			if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Select);
 	}
 	BroadcastSelectionChanged();
 }
@@ -647,6 +715,7 @@ void ARomanEmpirePlayerController::ClearSelectedActors()
 			Unit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitDied);
 			Unit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedActorDestroyed);
 			Unit->OnOwnerFactionChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitOwnerChanged);
+			Unit->OnUnitVitalsChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandleSelectedUnitOwnerChanged);
 		}
 	}
 	SelectedUnits.Empty();
@@ -704,12 +773,15 @@ void ARomanEmpirePlayerController::CommandSelectedUnitsMove(const FVector& Desti
 	}
 	const uint64 Revision = ++TacticalCommandRevision;
 	ReportInteractionFeedback(FText::GetEmpty());
+	bool bDispatched = false;
 	for (int32 Index = 0; Index < Snapshot.Num(); ++Index)
 	{
 		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands()) return;
 		AUnitBase* Unit = Snapshot[Index].Get();
-		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandMoveTo(Destinations[Index]);
+		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) { Unit->CommandMoveTo(Destinations[Index]); bDispatched = true; }
 	}
+	if (bDispatched && IsLocalController())
+		if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Order);
 }
 
 void ARomanEmpirePlayerController::CommandSelectedUnitsAttack(AUnitBase* Target)
@@ -727,12 +799,15 @@ void ARomanEmpirePlayerController::CommandSelectedUnitsAttack(AUnitBase* Target)
 	const TWeakObjectPtr<AUnitBase> TargetHandle(Target);
 	const uint64 Revision = ++TacticalCommandRevision;
 	ReportInteractionFeedback(FText::GetEmpty());
+	bool bDispatched = false;
 	for (const TWeakObjectPtr<AUnitBase>& Member : Snapshot)
 	{
 		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands() || !TargetHandle.IsValid()) return;
 		AUnitBase* Unit = Member.Get();
-		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) Unit->CommandAttack(TargetHandle.Get());
+		if (IsPlayerUnitEligible(Unit) && SelectedUnits.Contains(Unit)) { Unit->CommandAttack(TargetHandle.Get()); bDispatched = true; }
 	}
+	if (bDispatched && IsLocalController())
+		if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Order);
 }
 
 void ARomanEmpirePlayerController::CommandSelectedUnitsStop()
@@ -752,6 +827,7 @@ void ARomanEmpirePlayerController::DispatchSelectedUnitCancellation(bool bHold)
 	for (AUnitBase* Unit : SelectedUnits) Snapshot.Add(Unit);
 	const uint64 Revision = ++TacticalCommandRevision;
 	ReportInteractionFeedback(FText::GetEmpty());
+	bool bDispatched = false;
 	for (const TWeakObjectPtr<AUnitBase>& Member : Snapshot)
 	{
 		if (TacticalCommandRevision != Revision || !CanIssueTacticalCommands()) return;
@@ -759,7 +835,10 @@ void ARomanEmpirePlayerController::DispatchSelectedUnitCancellation(bool bHold)
 		if (!IsPlayerUnitEligible(Unit) || !SelectedUnits.Contains(Unit)) continue;
 		if (bHold) Unit->CommandHold();
 		else Unit->CommandStop();
+		bDispatched = true;
 	}
+	if (bDispatched && IsLocalController())
+		if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Order);
 }
 
 void ARomanEmpirePlayerController::HandleSelectedUnitDied(AUnitBase* Unit)
@@ -859,6 +938,7 @@ void ARomanEmpirePlayerController::EnterFirstPersonMode(AUnitBase* UnitToPossess
 	UnitToPossess->OnUnitDied.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
 	UnitToPossess->OnDestroyed.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
 	UnitToPossess->OnOwnerFactionChanged.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
+	UnitToPossess->OnUnitVitalsChanged.AddUniqueDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
 	auto IsEntryCurrent = [this, UnitToPossess]()
 	{
 		return PossessedUnit == UnitToPossess && IsPlayerUnitEligible(UnitToPossess) && UnitToPossess->IsPossessedByPlayer();
@@ -918,6 +998,7 @@ void ARomanEmpirePlayerController::ExitFirstPersonMode()
 			PreviousUnit->OnUnitDied.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitDied);
 			PreviousUnit->OnDestroyed.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedActorDestroyed);
 			PreviousUnit->OnOwnerFactionChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
+			PreviousUnit->OnUnitVitalsChanged.RemoveDynamic(this, &ARomanEmpirePlayerController::HandlePossessedUnitOwnerChanged);
 			PreviousUnit->SetPossessedByPlayer(false);
 		}
 
@@ -1125,7 +1206,9 @@ void ARomanEmpirePlayerController::OnCameraPanInput(const FInputActionValue& Val
 {
 	if (CanControlCamera() && MovementKeysAwaitingRelease.IsEmpty())
 	{
-		CastChecked<ASeamlessZoomCamera>(GetPawn())->PanCamera(Value.Get<FVector2D>());
+		const URomanPlayerSettingsSubsystem* Settings = GetGameInstance() ? GetGameInstance()->GetSubsystem<URomanPlayerSettingsSubsystem>() : nullptr;
+		const float Sensitivity = Settings ? Settings->GetPreferences().PanSensitivity : 1.f;
+		CastChecked<ASeamlessZoomCamera>(GetPawn())->PanCamera(Value.Get<FVector2D>() * Sensitivity);
 	}
 }
 
@@ -1142,6 +1225,12 @@ void ARomanEmpirePlayerController::OnLookInput(const FInputActionValue& Value)
 	if (CanControlSoldier())
 	{
 		FVector2D LookValue = Value.Get<FVector2D>();
+		if (const URomanPlayerSettingsSubsystem* Settings = GetGameInstance() ? GetGameInstance()->GetSubsystem<URomanPlayerSettingsSubsystem>() : nullptr)
+		{
+			const FRomanPlayerPreferences Preferences = Settings->GetPreferences();
+			LookValue *= Preferences.LookSensitivity;
+			if (Preferences.bInvertLookY) LookValue.Y *= -1;
+		}
 		PossessedUnit->LookInput(LookValue);
 	}
 }
@@ -1260,6 +1349,8 @@ bool ARomanEmpirePlayerController::RequestEndTurn()
 		return false;
 	}
 	const FCampaignTurnResult Result = GameMode->EndTurn();
+	if (Result.Failure == ECampaignTurnFailure::AITacticalTravelFailed)
+		ReportInteractionFeedback(FText::FromString(TEXT("Defense travel failed. Repair the reported session error, then RETRY DEFENSE; this does not run another turn.")));
 	return Result.WasSuccessful();
 }
 
@@ -1361,4 +1452,16 @@ bool ARomanEmpirePlayerController::OnTrainButtonClicked()
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
 		FString::Printf(TEXT("%s training request rejected"), *UnitName));
 	return false;
+}
+
+bool ARomanEmpirePlayerController::CanCancelSelectedTraining() const
+{
+	const ABarracks* Barracks = Cast<ABarracks>(SelectedBuilding);
+	return IsPlayerBuildingEligible(Barracks) && CanIssueTacticalCommands() && Barracks->IsTraining();
+}
+
+bool ARomanEmpirePlayerController::CancelSelectedTraining()
+{
+	if (!CanCancelSelectedTraining()) return false;
+	return CastChecked<ABarracks>(SelectedBuilding)->TryCancelTraining();
 }

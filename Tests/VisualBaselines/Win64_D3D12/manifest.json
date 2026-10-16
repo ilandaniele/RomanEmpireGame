@@ -1,0 +1,29 @@
+﻿{
+    "schema":  1,
+    "engine":  "5.8.2",
+    "platform":  "Win64_D3D12",
+    "width":  1280,
+    "height":  720,
+    "reviewedUtc":  "2026-10-08T20:26:17.3086597Z",
+    "reviewReference":  "M7_RENDERING_REGRESSION_REVIEW.md",
+    "candidatePrefix":  "C018F_Candidates1",
+    "sourceManifestSha256":  "883e0d2ac63810ee2ba7a3185cddfd6e11f8b154c2131d829e4fcddb035b8d5e",
+    "scope":  "Static canonical character profiles, RTS and possession. Motion blur/exposure/temporal AA disabled in owned PIE view only.",
+    "images":  [
+                   {
+                       "view":  "CharacterProfiles",
+                       "sha256":  "4076672bc3bc942cda8071221d978333c87bd2a44c9f9c5f0a966e744f320836",
+                       "sha1":  "274ed4907fd0edb72dbb10109af0fdb36a7e477e"
+                   },
+                   {
+                       "view":  "CharacterRTS",
+                       "sha256":  "a516de390cff44743467acfa115b18fb0f4f3d151f4da3b53c407253b7b9b9d3",
+                       "sha1":  "06f78beed48db11acb647ea15949d4e7652ce48f"
+                   },
+                   {
+                       "view":  "CharacterPossession",
+                       "sha256":  "0a71fdaf273bb80e78c8c05fdd3fff4ca4041fbefcc79b12887dea596ab57bdd",
+                       "sha1":  "71ffdd42851a1a16b654740a67655c52399e27cc"
+                   }
+               ]
+}

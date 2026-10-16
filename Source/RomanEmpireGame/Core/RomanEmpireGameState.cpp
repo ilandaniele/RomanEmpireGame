@@ -3,6 +3,7 @@
 #include "Core/RomanEmpireGameState.h"
 #include "Core/RomanEmpireGameMode.h"
 #include "Battle/TacticalBattleSubsystem.h"
+#include "Content/RomanContentRegistry.h"
 #include "Engine/World.h"
 #include "Faction/FactionManager.h"
 #include "RomanEmpireGame.h"
@@ -35,11 +36,16 @@ void ARomanEmpireGameState::HandleGameplayInitialized()
 	WorldMap = Rules->GetWorldMapManager();
 	TacticalBattle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
 	if (!Factions.IsValid() || !Campaign.IsValid() || !WorldMap.IsValid()) return;
+	WorldMap->OnTerritoryOwnerChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleTerritoryOwnerChanged);
+	WorldMap->OnTerritorySettlementChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleTerritorySettlementChanged);
 	Factions->OnFactionResourcesChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleResourcesChanged);
 	Factions->OnPlayerFactionChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandlePlayerFactionChanged);
+	Factions->OnDiplomaticStatusChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleDiplomacyChanged);
 	Campaign->OnTurnStepStarted.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleTurnStepStarted);
 	Campaign->OnTurnProcessed.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleTurnProcessed);
 	Campaign->OnCampaignStarted.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleCampaignStarted);
+	Campaign->OnCampaignArmiesChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleCampaignArmiesChanged);
+	Campaign->OnCampaignEncounterChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleCampaignEncounterChanged);
 	Campaign->OnCampaignObjectivesChanged.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleObjectivesChanged);
 	Campaign->OnVictory.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleVictory);
 	Campaign->OnDefeat.AddUniqueDynamic(this, &ARomanEmpireGameState::HandleDefeat);
@@ -64,12 +70,15 @@ void ARomanEmpireGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		Factions->OnFactionResourcesChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleResourcesChanged);
 		Factions->OnPlayerFactionChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandlePlayerFactionChanged);
+		Factions->OnDiplomaticStatusChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleDiplomacyChanged);
 	}
 	if (Campaign.IsValid())
 	{
 		Campaign->OnTurnStepStarted.RemoveDynamic(this, &ARomanEmpireGameState::HandleTurnStepStarted);
 		Campaign->OnTurnProcessed.RemoveDynamic(this, &ARomanEmpireGameState::HandleTurnProcessed);
 		Campaign->OnCampaignStarted.RemoveDynamic(this, &ARomanEmpireGameState::HandleCampaignStarted);
+		Campaign->OnCampaignArmiesChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleCampaignArmiesChanged);
+		Campaign->OnCampaignEncounterChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleCampaignEncounterChanged);
 		Campaign->OnCampaignObjectivesChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleObjectivesChanged);
 		Campaign->OnVictory.RemoveDynamic(this, &ARomanEmpireGameState::HandleVictory);
 		Campaign->OnDefeat.RemoveDynamic(this, &ARomanEmpireGameState::HandleDefeat);
@@ -78,6 +87,11 @@ void ARomanEmpireGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		TacticalBattle->OnTacticalBattleChanged.RemoveDynamic(
 			this, &ARomanEmpireGameState::HandleTacticalBattleChanged);
+	}
+	if (WorldMap.IsValid())
+	{
+		WorldMap->OnTerritoryOwnerChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleTerritoryOwnerChanged);
+		WorldMap->OnTerritorySettlementChanged.RemoveDynamic(this, &ARomanEmpireGameState::HandleTerritorySettlementChanged);
 	}
 	bObserversBound = false;
 	Rules.Reset();
@@ -92,6 +106,11 @@ bool ARomanEmpireGameState::IsGameplayInitialized() const
 {
 	return bObserversBound && Rules.IsValid() && Rules->IsGameplayInitialized() &&
 		Factions.IsValid() && Campaign.IsValid() && WorldMap.IsValid();
+}
+
+void ARomanEmpireGameState::HandleDiplomacyChanged(FDiplomaticPair Pair, EDiplomaticStatus Status)
+{
+	if (IsGameplayInitialized()) OnDiplomacyChanged.Broadcast(Pair, Factions->GetDiplomaticStatus(Pair.FirstFaction, Pair.SecondFaction));
 }
 
 EGameplayMode ARomanEmpireGameState::GetCurrentGameplayMode() const
@@ -139,9 +158,108 @@ FTacticalBattleResult ARomanEmpireGameState::GetTacticalBattleResult() const
 	return TacticalBattle.IsValid() ? TacticalBattle->GetResult() : FTacticalBattleResult();
 }
 
+TArray<FCampaignArmy> ARomanEmpireGameState::GetCampaignArmies() const
+{
+	return IsGameplayInitialized() && Campaign->GetWorld() == GetWorld()
+		? Campaign->GetCampaignArmies() : TArray<FCampaignArmy>();
+}
+
+bool ARomanEmpireGameState::TryGetCampaignArmy(FGuid ArmyID, FCampaignArmy& OutArmy) const
+{
+	OutArmy = FCampaignArmy();
+	return IsGameplayInitialized() && Campaign->GetWorld() == GetWorld() && Campaign->TryGetCampaignArmy(ArmyID, OutArmy);
+}
+
+void ARomanEmpireGameState::HandleCampaignArmiesChanged()
+{
+	if (IsGameplayInitialized() && Campaign->GetWorld() == GetWorld()) OnCampaignArmiesChanged.Broadcast();
+}
+
+FCampaignEncounterPlan ARomanEmpireGameState::GetCampaignEncounterPlan() const
+{
+	return IsGameplayInitialized() && Campaign->GetWorld() == GetWorld()
+		? Campaign->GetCampaignEncounterPlan() : FCampaignEncounterPlan();
+}
+
+bool ARomanEmpireGameState::HasAppliedCampaignEncounter(FGuid EncounterID) const
+{
+	return IsGameplayInitialized() && Campaign->GetWorld() == GetWorld() && Campaign->HasAppliedCampaignEncounter(EncounterID);
+}
+
+void ARomanEmpireGameState::HandleCampaignEncounterChanged()
+{
+	if (IsGameplayInitialized() && Campaign->GetWorld() == GetWorld()) OnCampaignEncounterChanged.Broadcast();
+}
+
+bool ARomanEmpireGameState::TryGetTerritorySnapshot(
+	FName TerritoryID, FTerritoryPresentationSnapshot& OutSnapshot) const
+{
+	OutSnapshot = FTerritoryPresentationSnapshot();
+	if (!IsGameplayInitialized() || WorldMap->GetWorld() != GetWorld() || Factions->GetWorld() != GetWorld()) return false;
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	if (!Registry || !Registry->IsReady()) return false;
+	const URomanTerritoryDefinition* Asset = Registry->FindTerritory(TerritoryID);
+	const FTerritoryDefinition Definition = WorldMap->GetTerritoryDefinition(TerritoryID);
+	if (!Asset || TerritoryID.IsNone() || Definition.TerritoryID != TerritoryID) return false;
+	FTerritorySettlementState Settlement;
+	FFactionResourceDelta EffectiveProduction;
+	if (!WorldMap->TryGetTerritorySettlement(TerritoryID, Settlement) ||
+		!WorldMap->TryGetTerritoryProduction(TerritoryID, EffectiveProduction)) return false;
+
+	OutSnapshot.TerritoryID = TerritoryID;
+	OutSnapshot.DisplayName = Definition.DisplayName;
+	OutSnapshot.Description = Definition.Description;
+	OutSnapshot.TerrainType = Definition.TerrainType;
+	OutSnapshot.MapLocation = Asset->MapLocation;
+	OutSnapshot.BaseResourceProduction = Definition.ResourceProduction;
+	OutSnapshot.Settlement = MoveTemp(Settlement);
+	OutSnapshot.EffectiveResourceProduction = EffectiveProduction;
+	OutSnapshot.BonusResource = Definition.BonusResource;
+	OutSnapshot.AdjacentTerritoryIDs = WorldMap->GetAdjacentTerritoryIDs(TerritoryID);
+	OutSnapshot.OwnerFaction = WorldMap->GetTerritoryOwner(TerritoryID);
+	OutSnapshot.bOwnerActive = Factions->IsFactionActive(OutSnapshot.OwnerFaction);
+	if (const URomanFactionDefinition* OwnerAsset = Registry->FindFaction(OutSnapshot.OwnerFaction))
+	{
+		OutSnapshot.OwnerDisplayName = OwnerAsset->Definition.DisplayName;
+		OutSnapshot.OwnerColor = OwnerAsset->Definition.FactionColor;
+	}
+	return true;
+}
+
+TArray<FTerritoryPresentationSnapshot> ARomanEmpireGameState::GetTerritorySnapshots() const
+{
+	TArray<FTerritoryPresentationSnapshot> Result;
+	if (!IsGameplayInitialized() || WorldMap->GetWorld() != GetWorld()) return Result;
+	for (FName ID : WorldMap->GetTerritoryIDs())
+	{
+		FTerritoryPresentationSnapshot Snapshot;
+		// Fail closed instead of silently returning a partial catalog.
+		if (!TryGetTerritorySnapshot(ID, Snapshot)) return {};
+		Result.Add(MoveTemp(Snapshot));
+	}
+	return Result;
+}
+
+void ARomanEmpireGameState::HandleTerritoryOwnerChanged(
+	FName TerritoryID, EFactionID PreviousOwner, EFactionID NewOwner)
+{
+	(void)NewOwner;
+	FTerritoryPresentationSnapshot Current;
+	if (TryGetTerritorySnapshot(TerritoryID, Current))
+	{
+		OnTerritoryOwnerChanged.Broadcast(TerritoryID, PreviousOwner, Current.OwnerFaction);
+	}
+}
+
 void ARomanEmpireGameState::HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode)
 {
 	OnGameplayModeChanged.Broadcast(OldMode, NewMode);
+}
+
+void ARomanEmpireGameState::HandleTerritorySettlementChanged(FName TerritoryID)
+{
+	FTerritoryPresentationSnapshot Current;
+	if (TryGetTerritorySnapshot(TerritoryID, Current)) OnTerritorySettlementChanged.Broadcast(TerritoryID);
 }
 
 void ARomanEmpireGameState::HandleResourcesChanged(EFactionID FactionID, FFactionResourceAmounts NewBalance)

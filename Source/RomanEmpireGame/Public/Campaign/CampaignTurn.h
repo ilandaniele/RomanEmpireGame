@@ -17,10 +17,13 @@ enum class ECampaignTurnStep : uint8
 	VictoryEvaluation	UMETA(DisplayName = "Victory Evaluation"),
 	IncrementTurn		UMETA(DisplayName = "Increment Turn"),
 	BroadcastTurnCompleted UMETA(DisplayName = "Broadcast Turn Completed"),
-	Autosave			UMETA(DisplayName = "Autosave")
+	Autosave			UMETA(DisplayName = "Autosave"),
+	/** Post-pipeline dispatch, not one of the nine turn stages. */
+	AITacticalTravel UMETA(DisplayName = "AI Tactical Travel")
 };
 
-/** Typed failure returned without advancing the canonical turn counter. */
+/** Typed failure; the audit result records progress, never an implicit rollback.
+ * AI travel can fail after a committed turn and be retried without running stages. */
 UENUM(BlueprintType)
 enum class ECampaignTurnFailure : uint8
 {
@@ -31,7 +34,10 @@ enum class ECampaignTurnFailure : uint8
 	MissingWorldMapManager	UMETA(DisplayName = "Missing World Map Manager"),
 	ResourceTransactionFailed UMETA(DisplayName = "Resource Transaction Failed"),
 	AutosaveFailed			UMETA(DisplayName = "Autosave Failed"),
-	TurnAlreadyProcessing	UMETA(DisplayName = "Turn Already Processing")
+	TurnAlreadyProcessing	UMETA(DisplayName = "Turn Already Processing"),
+	EncounterResolved		UMETA(DisplayName = "Encounter Resolved"),
+	EncounterPending		UMETA(DisplayName = "Encounter Pending"),
+	AITacticalTravelFailed UMETA(DisplayName = "AI Tactical Travel Failed")
 };
 
 /** Audit result for one attempted campaign turn. */
@@ -54,6 +60,8 @@ struct ROMANEMPIREGAME_API FCampaignTurnResult
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign|Turn")
 	TArray<ECampaignTurnStep> CompletedSteps;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campaign|Turn")
+	bool bWasAITacticalTravelRetry = false;
 
 	bool WasSuccessful() const { return Failure == ECampaignTurnFailure::None; }
 };

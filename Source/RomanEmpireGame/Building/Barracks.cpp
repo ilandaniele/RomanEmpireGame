@@ -8,9 +8,11 @@
 #include "Faction/FactionManager.h"
 #include "Units/UnitBase.h"
 #include "Units/RomanUnitRegistry.h"
+#include "World/CampaignManager.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Templates/UnrealTemplate.h"
+#include "Misc/ScopeExit.h"
 
 ABarracks::ABarracks()
 {
@@ -21,14 +23,14 @@ ABarracks::ABarracks()
 	bIsTraining = false;
 	TrainingProgress = 0.0f;
 	TrainingTime = 0.0f;
-	CurrentlyTrainingID = NAME_None;
 	SpawnOffset = FVector(300.0f, 0.0f, 0.0f);
 	MaxQueueSize = 5;
 }
 
 void ABarracks::Tick(float DeltaSeconds)
 {
-	if (bIsUpdatingProduction)
+	const UTacticalBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	if (bIsUpdatingProduction || (Battle && Battle->IsResolved()))
 	{
 		return;
 	}
@@ -40,19 +42,37 @@ void ABarracks::Tick(float DeltaSeconds)
 	}
 	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
 
+	if (bAwaitingFailureRefund)
+	{
+		if (TryRefundReservation(ActiveTrainingOrder)) FinishCurrentOrder(EProductionEventType::Failed);
+		return;
+	}
+
 	// Progress training
 	TrainingProgress += DeltaSeconds / TrainingTime;
 
 	if (TrainingProgress >= 1.0f)
 	{
 		const bool bSpawnedUnit = SpawnTrainedUnit();
-		FinishCurrentOrder(bSpawnedUnit ? EProductionEventType::Completed : EProductionEventType::Failed);
+		if (bSpawnedUnit)
+		{
+			FinishCurrentOrder(EProductionEventType::Completed);
+		}
+		else
+		{
+			// Never discard a paid receipt or attempt a second spawn while credit is blocked.
+			bAwaitingFailureRefund = true;
+			TrainingProgress = 1.0f;
+			if (TryRefundReservation(ActiveTrainingOrder)) FinishCurrentOrder(EProductionEventType::Failed);
+			else BroadcastProductionEvent(EProductionEventType::RefundPending, GetCurrentlyTrainingID());
+		}
 	}
 }
 
 bool ABarracks::TrainUnit(FName UnitID)
 {
-	if (bIsUpdatingProduction)
+	const UTacticalBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	if (bIsUpdatingProduction || (Battle && Battle->IsResolved()))
 	{
 		return false;
 	}
@@ -83,8 +103,16 @@ bool ABarracks::TrainUnit(FName UnitID)
 		return false;
 	}
 
-	const FUnitData& UnitDefinition = UnitAsset->Definition;
-	if (UnitDefinition.TrainingTime <= 0.0f)
+	// Resource observers may edit definitions or ownership synchronously.
+	const FUnitData UnitDefinition = UnitAsset->Definition;
+	FTrainingReservation Reservation;
+	Reservation.UnitID = UnitID;
+	Reservation.PayingFaction = OwnerFaction;
+	Reservation.PaidCost = UnitDefinition.TrainingCost;
+	Reservation.ReceiptID = FGuid::NewGuid();
+	ACampaignManager* Campaign = GameMode->GetCampaignManager();
+	if (Campaign && !Campaign->PrepareTrainingReservation(Reservation)) return false;
+	if (!FMath::IsFinite(UnitDefinition.TrainingTime) || UnitDefinition.TrainingTime <= 0.0f)
 	{
 		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot train unit: %s has a non-positive training time"),
 			*UnitID.ToString());
@@ -92,7 +120,7 @@ bool ABarracks::TrainUnit(FName UnitID)
 	}
 
 	const FFactionResourceTransactionResult SpendResult =
-		FactionManager->TrySpendFactionResources(OwnerFaction, UnitDefinition.TrainingCost);
+		FactionManager->TrySpendFactionResources(Reservation.PayingFaction, Reservation.PaidCost);
 	if (!SpendResult.WasSuccessful())
 	{
 		UE_LOG(LogRomanEmpire, Warning, TEXT("Cannot train unit: resource transaction failed (%s)"),
@@ -103,7 +131,7 @@ bool ABarracks::TrainUnit(FName UnitID)
 	if (!bIsTraining)
 	{
 		// Start training immediately
-		CurrentlyTrainingID = UnitID;
+		ActiveTrainingOrder = Reservation;
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
 		TrainingTime = UnitDefinition.TrainingTime;
@@ -114,7 +142,7 @@ bool ABarracks::TrainUnit(FName UnitID)
 	else
 	{
 		// Add to queue
-		TrainingQueue.Add(UnitID);
+		TrainingQueue.Add(Reservation);
 		BroadcastProductionEvent(EProductionEventType::Queued, UnitID);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Added to queue: %s (Queue size: %d)"), 
 			*UnitID.ToString(), TrainingQueue.Num());
@@ -125,37 +153,51 @@ bool ABarracks::TrainUnit(FName UnitID)
 
 void ABarracks::CancelTraining()
 {
-	if (bIsUpdatingProduction)
-	{
-		return;
-	}
-	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
+	TryCancelTraining();
+}
 
-	if (bIsTraining)
-	{
-		// Accepted orders consume their full reservation. A cancellation-refund policy is deferred.
-		FinishCurrentOrder(EProductionEventType::Cancelled);
-	}
+bool ABarracks::TryCancelTraining()
+{
+	if (bIsUpdatingProduction || !bIsTraining || !IsValid(this)) return false;
+	TGuardValue<bool> UpdatingProductionGuard(bIsUpdatingProduction, true);
+	if (!TryRefundReservation(ActiveTrainingOrder)) return false;
+	FinishCurrentOrder(EProductionEventType::Cancelled);
+	return true;
+}
+
+bool ABarracks::TryRefundReservation(const FTrainingReservation& Reservation)
+{
+	const ARomanEmpireGameMode* GameMode = Cast<ARomanEmpireGameMode>(UGameplayStatics::GetGameMode(this));
+	AFactionManager* FactionManager = GameMode ? GameMode->GetFactionManager() : nullptr;
+	if (!IsValid(FactionManager) || FactionManager->GetWorld() != GetWorld()) return false;
+	const FFactionResourceAmounts& Paid = Reservation.PaidCost;
+	FFactionResourceDelta Refund;
+	Refund.Gold = Paid.Gold; Refund.Food = Paid.Food; Refund.Iron = Paid.Iron;
+	Refund.Wood = Paid.Wood; Refund.Stone = Paid.Stone; Refund.Population = Paid.Population;
+	const FFactionResourceTransactionResult Result =
+		FactionManager->ApplyFactionResourceDelta(Reservation.PayingFaction, Refund);
+	return Result.WasSuccessful();
 }
 
 bool ABarracks::SpawnTrainedUnit()
 {
 	UWorld* World = GetWorld();
-	if (!World || CurrentlyTrainingID.IsNone())
+	if (!World || GetCurrentlyTrainingID().IsNone())
 	{
 		return false;
 	}
 
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
-	const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(CurrentlyTrainingID) : nullptr;
+	const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(GetCurrentlyTrainingID()) : nullptr;
 	UClass* UnitClass = UnitAsset ? UnitAsset->UnitClass.Get() : nullptr;
 	if (!UnitClass)
 	{
 		UE_LOG(LogRomanEmpire, Error, TEXT("Cannot spawn trained unit %s: factory class is unavailable"),
-			*CurrentlyTrainingID.ToString());
+			*GetCurrentlyTrainingID().ToString());
 		return false;
 	}
 
+	if (OwnerFaction != ActiveTrainingOrder.PayingFaction) return false;
 	const FVector SpawnLocation = GetActorLocation() + GetActorRotation().RotateVector(SpawnOffset);
 	const FRotator SpawnRotation = GetActorRotation();
 	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
@@ -165,55 +207,59 @@ bool ABarracks::SpawnTrainedUnit()
 		this,
 		nullptr,
 		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	bool bCommitted = false;
+	ON_SCOPE_EXIT { if (!bCommitted && IsValid(NewUnit)) NewUnit->Destroy(); };
 	
-	if (NewUnit && NewUnit->InitializeUnit(CurrentlyTrainingID, OwnerFaction))
+	if (NewUnit && NewUnit->InitializeUnit(GetCurrentlyTrainingID(), OwnerFaction))
 	{
 		UGameplayStatics::FinishSpawningActor(NewUnit, SpawnTransform);
 		if (IsValid(NewUnit) && NewUnit->IsAlive())
 		{
-			if (URomanUnitRegistrySubsystem* Units = World->GetSubsystem<URomanUnitRegistrySubsystem>())
+			URomanUnitRegistrySubsystem* Units = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			if (!Units || !Units->CreateSquad({ NewUnit }).IsValid()) return false;
+			ARomanEmpireGameMode* Mode = World->GetAuthGameMode<ARomanEmpireGameMode>();
+			ACampaignManager* Campaign = Mode ? Mode->GetCampaignManager() : nullptr;
+			UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>();
+			if (ActiveTrainingOrder.EncounterID.IsValid())
 			{
-				const FGuid SquadID = Units->CreateSquad({ NewUnit });
-				if (SquadID.IsValid())
-				{
-					if (UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>())
-					{
-						Battle->RegisterReinforcement(NewUnit);
-					}
-				}
+				if (!Campaign || !Campaign->EnrollTrainedUnit(this, NewUnit, ActiveTrainingOrder)) return false;
 			}
+			else if (Battle && Battle->HasEncounter() && !Battle->RegisterReinforcement(NewUnit)) return false;
+			bCommitted = true;
 			UE_LOG(LogRomanEmpire, Log, TEXT("Trained unit: %s"), *NewUnit->GetName());
 			return true;
 		}
 	}
-	else if (NewUnit)
-	{
-		NewUnit->Destroy();
-	}
-	UE_LOG(LogRomanEmpire, Warning, TEXT("Training failed to create unit %s"), *CurrentlyTrainingID.ToString());
+	UE_LOG(LogRomanEmpire, Warning, TEXT("Training failed to create unit %s"), *GetCurrentlyTrainingID().ToString());
 	return false;
 }
 
-FName ABarracks::StartNextInQueue(TArray<FName>& FailedOrders)
+FName ABarracks::StartNextInQueue()
 {
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
-	while (!TrainingQueue.IsEmpty())
+	if (!TrainingQueue.IsEmpty())
 	{
-		const FName NextUnitID = TrainingQueue[0];
+		const FTrainingReservation NextOrder = TrainingQueue[0];
+		const FName NextUnitID = NextOrder.UnitID;
 		TrainingQueue.RemoveAt(0);
 
 		const URomanUnitDefinition* UnitAsset = Registry ? Registry->FindUnit(NextUnitID) : nullptr;
-		if (!UnitAsset || !UnitAsset->UnitClass.Get() || UnitAsset->Definition.TrainingTime <= 0.0f)
-		{
-			FailedOrders.Add(NextUnitID);
-			UE_LOG(LogRomanEmpire, Warning, TEXT("Queued production definition %s is unavailable"),
-				*NextUnitID.ToString());
-			continue;
-		}
-		CurrentlyTrainingID = NextUnitID;
+		ActiveTrainingOrder = NextOrder;
 		bIsTraining = true;
 		TrainingProgress = 0.0f;
-		TrainingTime = UnitAsset->Definition.TrainingTime;
+		if (!UnitAsset || !UnitAsset->UnitClass.Get() || !FMath::IsFinite(UnitAsset->Definition.TrainingTime) || UnitAsset->Definition.TrainingTime <= 0.0f)
+		{
+			// Promote the receipt, not an unchecked definition. Retry only its refund on Tick.
+			bAwaitingFailureRefund = true;
+			TrainingProgress = 1.0f;
+			TrainingTime = 0.0f;
+			UE_LOG(LogRomanEmpire, Warning, TEXT("Queued production definition %s is unavailable"),
+				*NextUnitID.ToString());
+		}
+		else
+		{
+			TrainingTime = UnitAsset->Definition.TrainingTime;
+		}
 		return NextUnitID;
 	}
 	return NAME_None;
@@ -221,21 +267,17 @@ FName ABarracks::StartNextInQueue(TArray<FName>& FailedOrders)
 
 void ABarracks::FinishCurrentOrder(EProductionEventType Type)
 {
-	const FName FinishedUnitID = CurrentlyTrainingID;
+	const FName FinishedUnitID = GetCurrentlyTrainingID();
 	bIsTraining = false;
 	TrainingProgress = 0.0f;
 	TrainingTime = 0.0f;
-	CurrentlyTrainingID = NAME_None;
+	ActiveTrainingOrder = FTrainingReservation();
+	bAwaitingFailureRefund = false;
 
-	TArray<FName> FailedOrders;
-	const FName StartedUnitID = StartNextInQueue(FailedOrders);
+	const FName StartedUnitID = StartNextInQueue();
 
 	// Every observer sees the next active order and final pending count, never a half-advanced queue.
 	BroadcastProductionEvent(Type, FinishedUnitID);
-	for (const FName FailedUnitID : FailedOrders)
-	{
-		BroadcastProductionEvent(EProductionEventType::Failed, FailedUnitID);
-	}
 	if (!StartedUnitID.IsNone())
 	{
 		BroadcastProductionEvent(EProductionEventType::Started, StartedUnitID);

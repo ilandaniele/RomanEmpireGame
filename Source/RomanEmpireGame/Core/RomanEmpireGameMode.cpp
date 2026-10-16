@@ -2,12 +2,15 @@
 
 #include "RomanEmpireGameMode.h"
 #include "RomanEmpireGame.h"
+#include "Campaign/CampaignSessionSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Building/Barracks.h"
 #include "Battle/TacticalBattleSubsystem.h"
 #include "Content/RomanContentRegistry.h"
 #include "Faction/FactionManager.h"
 #include "World/WorldMapManager.h"
 #include "World/CampaignManager.h"
+#include "Battle/TacticalObjective.h"
 #include "Camera/SeamlessZoomCamera.h"
 #include "RomanEmpirePlayerController.h"
 #include "RomanEmpireHUD.h"
@@ -46,28 +49,59 @@ void ARomanEmpireGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	PrototypeRandomStream.Initialize(PrototypeRandomSeed);
+	UCampaignSessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSessionSubsystem>() : nullptr;
+	const bool bIncomingSession = Session && Session->ExpectsIncomingWorld(GetWorld());
+	if (bIncomingSession) bStartWithPrototypeEncounter = false;
 	
 	InitializeManagers();
 	UE_LOG(LogRomanEmpire, Log, TEXT("Roman Empire Game Mode started - Turn %d"), GetCurrentTurn());
 	SpawnWorldTerrain();
-	SpawnInitialUnits();
+	if (bStartWithPrototypeEncounter) SpawnInitialUnits();
 	SpawnInitialBuildings();
+	if (bIncomingSession && !Session->RestoreIncomingWorld(GetWorld(), OptionsString)) return;
+	const bool bTacticalSession = bIncomingSession && Session->GetPhase() == ECampaignTransferPhase::TacticalDeployment;
 	
 	// Set camera to city/tactical zoom so units are visible
 	ASeamlessZoomCamera* CameraPawn = Cast<ASeamlessZoomCamera>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (CameraPawn)
 	{
 		const FZoomConfiguration& Zoom = RomanEmpireCamera::GetDefaultZoomConfiguration();
-		CameraPawn->SetZoomLevel(Zoom.DefaultTactical);
+		const float InitialZoom = (bStartWithPrototypeEncounter || bTacticalSession) ? Zoom.DefaultTactical : Zoom.StrategicMaximum;
+		CameraPawn->SetZoomLevel(InitialZoom);
 		CameraPawn->SetActorLocation(FVector(0.0f, 0.0f, 0.0f));
+		if (bTacticalSession && CampaignManager->GetCampaignEncounterPlan().PlayerFaction == CampaignManager->GetCampaignEncounterPlan().Defender)
+			if (const auto* Objective = GetWorld()->GetSubsystem<UTacticalBattleSubsystem>()->GetObjectiveActor()) CameraPawn->SetActorLocation(Objective->GetActorLocation());
 		SetExplorationModeForZoomLevel(CameraPawn->GetZoomLevelEnum());
-		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to tactical zoom %.2f"), Zoom.DefaultTactical);
+		UE_LOG(LogRomanEmpire, Log, TEXT("Camera set to %s zoom %.2f"), bStartWithPrototypeEncounter ? TEXT("tactical") : TEXT("strategic"), InitialZoom);
 	}
+	if (!bStartWithPrototypeEncounter) SetGameplayMode(bTacticalSession ? EGameplayMode::Tactical : EGameplayMode::Strategic);
 	bGameplayInitialized = FactionManager && WorldMapManager && CampaignManager;
 	if (bGameplayInitialized)
 	{
 		OnGameplayInitialized.Broadcast();
+		if (bIncomingSession) Session->OnSessionChanged.Broadcast();
 	}
+}
+
+bool ARomanEmpireGameMode::CanRestartEncounter() const
+{
+	const UWorld* World = GetWorld();
+	const UCampaignSessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSessionSubsystem>() : nullptr;
+	if (Session && (Session->HasSession() || Session->HasPendingTransfer())) return false;
+	const UTacticalBattleSubsystem* Battle = World ? World->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	return bGameplayInitialized && !bEncounterTravelPending && !IsActorBeingDestroyed() &&
+		CampaignManager && CampaignManager->IsCampaignActive() && Battle && Battle->IsResolved();
+}
+
+bool ARomanEmpireGameMode::RestartEncounter()
+{
+	if (!CanRestartEncounter()) return false;
+	const FString LevelName = UGameplayStatics::GetCurrentLevelName(this, true);
+	if (LevelName.IsEmpty()) return false;
+	// Reload the sandbox. Persistent campaign return is a separate contract.
+	bEncounterTravelPending = true;
+	UGameplayStatics::OpenLevel(this, FName(*LevelName));
+	return true;
 }
 
 void ARomanEmpireGameMode::SetGameplayMode(EGameplayMode NewMode)
@@ -128,9 +162,8 @@ void ARomanEmpireGameMode::InitializeManagers()
 
 static UStaticMesh* GetEngineMesh(const TCHAR* Path)
 {
-	static TMap<FString, UStaticMesh*> Cache;
-	UStaticMesh** Found = Cache.Find(Path);
-	if (Found) return *Found;
+	static TMap<FString, TWeakObjectPtr<UStaticMesh>> Cache;
+	if (const auto* Found = Cache.Find(Path); Found && Found->IsValid()) return Found->Get();
 	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Path);
 	if (Mesh) Cache.Add(Path, Mesh);
 	return Mesh;
@@ -355,39 +388,32 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	// Spawn Roman Legionaries in formation near the Roman camp
-	FVector RomanBase = FVector(0.0f, 0.0f, 50.0f);
 	TArray<AUnitBase*> RomanUnits;
 	TArray<AUnitBase*> CarthaginianUnits;
-	
-	// Formation: 3 rows of 5
-	for (int32 Row = 0; Row < 3; Row++)
+	// Strategic inventory owns starting quantities/content IDs. These actors and
+	// squad GUIDs are encounter-local materialization, not campaign army identities.
+	const TArray<FCampaignArmy> Armies = CampaignManager ? CampaignManager->GetCampaignArmies() : TArray<FCampaignArmy>();
+	for (const FCampaignArmy& Army : Armies)
 	{
-		for (int32 Col = 0; Col < 5; Col++)
+		if (Army.Faction != EFactionID::Rome && Army.Faction != EFactionID::Carthage) continue;
+		for (const FCampaignArmyUnitStack& Stack : Army.Units)
 		{
-			FVector SpawnLoc = RomanBase + FVector(Col * 200.0f - 400.0f, Row * 200.0f - 200.0f, 0.0f);
-			
-			if (AUnitBase* Unit = SpawnUnitFromDefinition(
-				TEXT("Legionary"),
-				EFactionID::Rome,
-				FTransform(FRotator::ZeroRotator, SpawnLoc))) RomanUnits.Add(Unit);
+			for (int32 Index = 0; Index < Stack.Count; ++Index)
+			{
+				const bool bRoman = Army.Faction == EFactionID::Rome;
+				const int32 FormationIndex = RomanUnits.Num();
+				const FVector SpawnLoc = bRoman
+					? FVector((FormationIndex % 5) * 200.0f - 400.0f, (FormationIndex / 5) * 200.0f - 200.0f, 50.0f)
+					: FVector(3000.0f + PrototypeRandomStream.FRandRange(-400.0f, 400.0f),
+						PrototypeRandomStream.FRandRange(-400.0f, 400.0f), 50.0f);
+				if (AUnitBase* Unit = SpawnUnitFromDefinition(Stack.UnitID, Army.Faction,
+					FTransform(FRotator(0.0f, bRoman ? 0.0f : 180.0f, 0.0f), SpawnLoc)))
+				{
+					if (bRoman) RomanUnits.Add(Unit);
+					else CarthaginianUnits.Add(Unit);
+				}
+			}
 		}
-	}
-	
-	// Spawn enemy Legionaries (Carthage) further away
-	FVector EnemyBase = FVector(3000.0f, 0.0f, 50.0f);
-	for (int32 i = 0; i < 10; i++)
-	{
-		FVector SpawnLoc = EnemyBase + FVector(
-			PrototypeRandomStream.FRandRange(-400.0f, 400.0f),
-			PrototypeRandomStream.FRandRange(-400.0f, 400.0f),
-			0.0f
-		);
-		
-		if (AUnitBase* Unit = SpawnUnitFromDefinition(
-			TEXT("Legionary"),
-			EFactionID::Carthage,
-			FTransform(FRotator(0.0f, 180.0f, 0.0f), SpawnLoc))) CarthaginianUnits.Add(Unit);
 	}
 	if (URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>())
 	{
@@ -400,7 +426,41 @@ void ARomanEmpireGameMode::SpawnInitialUnits()
 		}
 	}
 
-	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned 15 Roman + 10 Carthaginian units"));
+	UE_LOG(LogRomanEmpire, Log, TEXT("Spawned %d Roman + %d Carthaginian units from campaign inventory"), RomanUnits.Num(), CarthaginianUnits.Num());
+}
+
+bool ARomanEmpireGameMode::MaterializeCampaignDeployment(FCampaignEncounterState& Deployment, TArray<AUnitBase*>& SpawnedUnits)
+{
+	UWorld* World = GetWorld();
+	URomanUnitRegistrySubsystem* Registry = World ? World->GetSubsystem<URomanUnitRegistrySubsystem>() : nullptr;
+	if (!Registry || !SpawnedUnits.IsEmpty()) return false;
+	const FCampaignEncounterPlan Plan = Deployment.GetPlan();
+	int32 AttackerIndex = 0, DefenderIndex = 0;
+	for (const FCampaignArmy& Army : Plan.Armies)
+	{
+		const bool bAttacker = Army.Faction == Plan.Attacker;
+		for (const FCampaignArmyUnitStack& Stack : Army.Units)
+		{
+			TArray<AUnitBase*> Members;
+			for (int32 Index = 0; Index < Stack.Count; ++Index)
+			{
+				int32& FormationIndex = bAttacker ? AttackerIndex : DefenderIndex;
+				const FVector Position((bAttacker ? 0.0 : 3000.0) + (FormationIndex % 5) * 200.0 - 400.0,
+					(FormationIndex / 5) * 200.0 + (!bAttacker && Plan.PlayerFaction == Plan.Defender ? 550.0 : -200.0), 50.0);
+				++FormationIndex;
+				AUnitBase* Unit = SpawnUnitFromDefinition(Stack.UnitID, Army.Faction,
+					FTransform(FRotator(0.0, bAttacker ? 0.0 : 180.0, 0.0), Position));
+				if (!IsValid(Unit)) return false;
+				SpawnedUnits.Add(Unit); Members.Add(Unit);
+				Unit->CommandHold();
+			}
+			FCampaignSquadBinding Binding;
+			Binding.SquadID = Registry->CreateSquad(Members); Binding.ArmyID = Army.ArmyID;
+			Binding.UnitID = Stack.UnitID; Binding.UnitCount = Stack.Count;
+			if (Deployment.BindSquad(Plan.EncounterID, Binding) != ECampaignEncounterFailure::None) return false;
+		}
+	}
+	return true;
 }
 
 AUnitBase* ARomanEmpireGameMode::SpawnUnitFromDefinition(
@@ -594,14 +654,12 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 	}
 
 	// --- ENEMY CAMP (Carthaginian) ---
-	AStaticMeshActor* EnemyHQ = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector(3000, 0, 150), FRotator::ZeroRotator, SP);
+	ATacticalObjective* EnemyHQ = World->SpawnActor<ATacticalObjective>(ATacticalObjective::StaticClass(), FVector(3000, 0, 0), FRotator::ZeroRotator, SP);
 	if (EnemyHQ)
 	{
-		EnemyHQ->GetStaticMeshComponent()->SetStaticMesh(CubeMesh);
-		EnemyHQ->SetActorScale3D(FVector(3.5f, 5.0f, 3.0f));
-		EnemyHQ->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		EnemyHQ->GetObjectiveMesh()->SetStaticMesh(CubeMesh);
 		UMaterialInstanceDynamic* Mat = MakeColorMaterial(EnemyHQ, FLinearColor(0.3f, 0.15f, 0.4f));
-		if (Mat) EnemyHQ->GetStaticMeshComponent()->SetMaterial(0, Mat);
+		if (Mat) EnemyHQ->GetObjectiveMesh()->SetMaterial(0, Mat);
 	}
 
 	UE_LOG(LogRomanEmpire, Log, TEXT("Buildings spawned: barracks, temple, 8 houses, walls, watchtower, enemy HQ"));

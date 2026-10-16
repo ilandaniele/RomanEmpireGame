@@ -115,6 +115,7 @@ const TCHAR* RomanEmpireEconomy::GetTransactionFailureName(EResourceTransactionF
 	case EResourceTransactionFailure::InsufficientStone: return TEXT("InsufficientStone");
 	case EResourceTransactionFailure::InsufficientPopulation: return TEXT("InsufficientPopulation");
 	case EResourceTransactionFailure::ArithmeticOverflow: return TEXT("ArithmeticOverflow");
+	case EResourceTransactionFailure::MutationInProgress: return TEXT("MutationInProgress");
 	default: return TEXT("Unknown");
 	}
 }

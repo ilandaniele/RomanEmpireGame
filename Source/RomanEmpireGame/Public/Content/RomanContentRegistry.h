@@ -19,7 +19,9 @@ enum class EContentDefinitionFailure : uint8
 	DuplicateQuickSlot	UMETA(DisplayName = "Duplicate Quick Slot"),
 	MissingFactoryClass	UMETA(DisplayName = "Missing Factory Class"),
 	InvalidFactionReference UMETA(DisplayName = "Invalid Faction Reference"),
-	InvalidUnitReference	UMETA(DisplayName = "Invalid Unit Reference")
+	InvalidUnitReference	UMETA(DisplayName = "Invalid Unit Reference"),
+	InvalidTerritoryReference UMETA(DisplayName = "Invalid Territory Reference"),
+	InvalidTacticalMap UMETA(DisplayName = "Invalid Tactical Map")
 };
 
 USTRUCT(BlueprintType)

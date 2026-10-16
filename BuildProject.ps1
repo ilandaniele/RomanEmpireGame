@@ -247,46 +247,7 @@ function Assert-PackagingInputs {
     }
 }
 
-function Assert-AutomationReportPassed {
-    param([string]$ReportDirectory)
-
-    $reportPath = Join-Path $ReportDirectory 'index.json'
-    if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
-        throw "Automation completed without creating the expected report: $reportPath"
-    }
-
-    try {
-        $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        throw "Automation report is not valid JSON: $reportPath ($($_.Exception.Message))"
-    }
-
-    $failedProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq 'failed' } | Select-Object -First 1
-    $succeededProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq 'succeeded' } | Select-Object -First 1
-    if (-not $failedProperty -or -not $succeededProperty) {
-        throw "Automation report schema is unsupported; expected succeeded/failed counts in $reportPath"
-    }
-
-    $failed = [int]$failedProperty.Value
-    $succeeded = [int]$succeededProperty.Value
-    $warningProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq 'succeededWithWarnings' } | Select-Object -First 1
-    $succeededWithWarnings = if ($warningProperty) { [int]$warningProperty.Value } else { 0 }
-    foreach ($unfinishedState in @('notRun', 'inProcess')) {
-        $unfinishedProperty = $report.PSObject.Properties | Where-Object { $_.Name -ieq $unfinishedState } | Select-Object -First 1
-        if (-not $unfinishedProperty -or [int]$unfinishedProperty.Value -ne 0) {
-            throw "Automation report must contain zero $unfinishedState tests. Inspect $reportPath"
-        }
-    }
-    if ($failed -gt 0) {
-        throw "Automation reported $failed failed test(s). Inspect $reportPath"
-    }
-    if (($succeeded + $succeededWithWarnings) -lt 1) {
-        throw "Automation did not execute any successful RomanEmpireGame tests. Inspect $reportPath"
-    }
-
-    Write-Host "Automation report passed: $($succeeded + $succeededWithWarnings) succeeded ($succeededWithWarnings with warnings), $failed failed." -ForegroundColor Green
-}
+. (Join-Path $projectRoot 'Tools\AutomationReport.ps1')
 
 $repositoryValidator = Join-Path $projectRoot 'Tools\validate_repository.ps1'
 $powerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
@@ -377,7 +338,29 @@ switch ($Action) {
             "-ReportExportPath=$reportDirectory",
             '-stdout', '-FullStdOutLogOutput', '-log'
         ) + $editorStartupArguments)
-        Assert-AutomationReportPassed -ReportDirectory $reportDirectory
+        Assert-AutomationReportPassed -ReportDirectory $reportDirectory -RequiredTests @(
+            'RomanEmpireGame.Content.Definitions.PrimaryAssetDiscovery',
+            'RomanEmpireGame.Input.RemappingMenuPIE',
+            'RomanEmpireGame.Rules.Campaign.StableAdjacency',
+            'RomanEmpireGame.Campaign.SaveDisk.StorageConflicts',
+            'RomanEmpireGame.Rules.SaveGame.PayloadValidation',
+            'RomanEmpireGame.Functional.MapsReadback',
+            'RomanEmpireGame.Functional.Scenarios.FT_Navigation',
+            'RomanEmpireGame.Functional.Scenarios.FT_Combat',
+            'RomanEmpireGame.Functional.Scenarios.FT_Production',
+            'RomanEmpireGame.Functional.Scenarios.FT_Possession',
+            'RomanEmpireGame.Functional.Scenarios.FT_Victory',
+            'RomanEmpireGame.Functional.Scenarios.FailurePropagation',
+            'RomanEmpireGame.Functional.Scenarios.FT_CampaignHandoff',
+            'RomanEmpireGame.Functional.Scenarios.LogCaptureAfterPhase',
+            'RomanEmpireGame.Functional.Scenarios.CampaignGateFailure',
+            'RomanEmpireGame.Performance.Encounter50PIE',
+            'RomanEmpireGame.Performance.Encounter100PIE',
+            'RomanEmpireGame.VisualRegression.UIIdentities',
+            'RomanEmpireGame.VisualRegression.ComparisonContract',
+            'RomanEmpireGame.VisualRegression.FileComparisonContract',
+            'RomanEmpireGame.Functional.LogPolicy'
+        )
     }
     'Cook' {
         Assert-PackagingInputs

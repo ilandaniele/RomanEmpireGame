@@ -34,6 +34,7 @@ public:
 
 	/** Presentation callback used only after the canonical campaign state changes. */
 	void RefreshOwnershipPresentation(EFactionID PreviousOwner, EFactionID NewOwner);
+	void RefreshSettlementPresentation();
 
 	// Info
 	UFUNCTION(BlueprintPure, Category = "Territory")
@@ -60,16 +61,16 @@ public:
 
 	// Settlement
 	UFUNCTION(BlueprintPure, Category = "Territory|Settlement")
-	bool HasSettlement() const { return bHasSettlement; }
+	bool HasSettlement() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Territory|Settlement")
 	void FoundSettlement(const FText& SettlementName);
 
 	UFUNCTION(BlueprintPure, Category = "Territory|Settlement")
-	FText GetSettlementName() const { return SettlementName; }
+	FText GetSettlementName() const;
 
 	UFUNCTION(BlueprintPure, Category = "Territory|Settlement")
-	int32 GetPopulation() const { return Population; }
+	int32 GetPopulation() const;
 
 	// Buildings in this territory
 	UFUNCTION(BlueprintPure, Category = "Territory|Buildings")
@@ -93,19 +94,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|State")
 	TObjectPtr<AWorldMapManager> WorldMapManager;
-
-	// Settlement
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
-	bool bHasSettlement;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
-	FText SettlementName;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
-	int32 Population;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
-	FFactionResourceDelta SettlementProductionBonus;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Territory|Settlement")
 	int32 MaxSettlementSlots; // How many buildings can be placed

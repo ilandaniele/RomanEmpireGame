@@ -35,6 +35,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "World|Territory")
 	FTerritoryDefinition GetTerritoryDefinition(FName TerritoryID) const;
 
+	/** Registered canonical IDs; no dependency on actor validity or placement. */
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	TArray<FName> GetTerritoryIDs() const;
+
+	UFUNCTION(BlueprintCallable, Category = "World|Settlement")
+	FSettlementFoundingResult FoundTerritorySettlement(FName TerritoryID, const FText& Name);
+	UFUNCTION(BlueprintPure, Category = "World|Settlement")
+	bool TryGetTerritorySettlement(FName TerritoryID, FTerritorySettlementState& OutSettlement) const;
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	bool TryGetTerritoryProduction(FName TerritoryID, FFactionResourceDelta& OutProduction) const;
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTerritorySettlementChanged, FName, TerritoryID);
+	UPROPERTY(BlueprintAssignable, Category = "World|Settlement")
+	FOnTerritorySettlementChanged OnTerritorySettlementChanged;
+
 	UFUNCTION(BlueprintPure, Category = "World|Territory")
 	EFactionID GetTerritoryOwner(FName TerritoryID) const;
 
@@ -51,6 +65,12 @@ public:
 	void GenerateDefaultMap();
 
 	// Adjacency
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	TArray<FName> GetAdjacentTerritoryIDs(FName TerritoryID) const;
+
+	UFUNCTION(BlueprintPure, Category = "World|Territory")
+	bool AreTerritoryIDsAdjacent(FName FirstID, FName SecondID) const;
+
 	UFUNCTION(BlueprintPure, Category = "World")
 	TArray<ATerritoryRegion*> GetAdjacentTerritories(ATerritoryRegion* Territory) const;
 
@@ -84,6 +104,10 @@ protected:
 	FTerritoryCampaignState CampaignTerritoryState;
 
 private:
+	friend class ACampaignManager;
+	// Only the campaign coordinator may stage a paired army/territory transaction.
+	bool bCampaignTransactionActive = false;
+	void PublishOwnershipChange(const FTerritoryOwnershipChangeResult& Result);
 	UPROPERTY()
 	TMap<FName, TObjectPtr<ATerritoryRegion>> TerritoryActorsByID;
 

@@ -92,6 +92,29 @@ FDiplomaticChangeResult FDiplomacyState::TrySetStatus(
 	return Result;
 }
 
+TArray<FDiplomaticRelation> FDiplomacyState::GetSnapshot() const
+{
+	TArray<FDiplomaticRelation> Result;
+	RelationsByPair.GenerateValueArray(Result);
+	Result.Sort([](const FDiplomaticRelation& A, const FDiplomaticRelation& B)
+	{ return RomanEmpireDiplomacy::GetPairKey(A.Pair) < RomanEmpireDiplomacy::GetPairKey(B.Pair); });
+	return Result;
+}
+
+bool FDiplomacyState::ReplaceFromSnapshot(const TArray<FDiplomaticRelation>& Snapshot)
+{
+	TMap<int32, FDiplomaticRelation> Candidate;
+	for (const FDiplomaticRelation& Row : Snapshot)
+	{
+		if (!Row.Pair.IsValid() || (Row.Status != EDiplomaticStatus::War && Row.Status != EDiplomaticStatus::Allied)) return false;
+		const int32 Key = RomanEmpireDiplomacy::GetPairKey(Row.Pair);
+		if (Candidate.Contains(Key)) return false;
+		Candidate.Add(Key, Row);
+	}
+	RelationsByPair = MoveTemp(Candidate);
+	return true;
+}
+
 bool RomanEmpireDiplomacy::IsValidFaction(EFactionID FactionID)
 {
 	return FactionID != EFactionID::None &&

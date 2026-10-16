@@ -1,0 +1,12 @@
+# C016D — Combined native first-playable campaign journey
+
+Status: final directed2 clean and strict IWYU verified 2026-10-06; full95 verified clean. Uncommitted. This is in-process Editor/PIE, NOT packaged-player proof or whole milestone completion.
+
+- Reuses the already verified native army-action fixture with an optional persistence variant; original Victory/Defeat UI tests retain default false and their prior semantics. No new gameplay/module/assets/config/dependencies.
+- Both combined journeys start a real campaign from sandbox through native Slate entry; purchase/assign canonical quantities and IDs; toggle autosave off; perform native disk save; advance one nine-stage production/AI turn; launch chosen mapped battle; materialize actual squads; control casualties and physical result; confirm actual terminal Continue; verify surviving army identity/resources/ownership.
+- Then save the complete post-battle canonical value to the fixed Manual slot with native overwrite confirmation; execute another nine-stage turn; confirm native load and compare EVERY restored detached campaign value, stable IDs, RNG seeds and consumed-result ledger against the actual disk record. Tests only use isolated automation slots.
+- Human defeat leaves weaker defenders, so the canonical AI may immediately attack at the second turn. The test completes that real defense and native Continue before loading the prior save. It does not change planner thresholds, disable AI or permit tactical loading.
+- Initial targeted run1/2 succeeded; Defeat fixture incorrectly expected the second turn to stay strategic and tried to find a hidden load button. Corrected the fixture for the legitimate mapped AI attack, preserving gameplay contracts. Final directed2/2 clean exit0: `Artifacts/Automation/C016D_Targeted_Final`, `Artifacts/C016D-Targeted-Final.log`.
+- Builds: `Artifacts/C016D-Editor.log` and `C016D-Editor-Final.log` succeeded; strict IWYU91 succeeded `C016D-IWYU.log`. Runtime UI strict IWYU/Shipping and final layout builds verified under C016C; D itself changes only Editor tests.
+
+Final full95/95 clean exit0: Artifacts/Automation/C016D_Full, Artifacts/C016D-Full.log; includes all final runtime/layout/rooting and test changes. C016D closed. Packaged first-playable gate remains unverified due historical unsigned-player Code Integrity; no identical launch or Windows security change. C-017/M6–M8 production content/UX/performance/distribution remain open.

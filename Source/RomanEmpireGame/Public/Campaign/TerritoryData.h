@@ -44,6 +44,10 @@ struct ROMANEMPIREGAME_API FTerritoryDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Campaign")
 	EFactionID StartingOwner = EFactionID::None;
 
+	/** Authored undirected campaign connections; actor placement is presentation only. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Campaign")
+	TArray<FName> AdjacentTerritoryIDs;
+
 	bool IsValid() const;
 };
 
@@ -74,7 +78,8 @@ enum class ETerritoryOwnershipFailure : uint8
 {
 	None			UMETA(DisplayName = "None"),
 	UnknownTerritory UMETA(DisplayName = "Unknown Territory"),
-	InvalidOwner	UMETA(DisplayName = "Invalid Owner")
+	InvalidOwner	UMETA(DisplayName = "Invalid Owner"),
+	TransactionInProgress UMETA(DisplayName = "Transaction In Progress")
 };
 
 USTRUCT(BlueprintType)
@@ -100,7 +105,60 @@ struct ROMANEMPIREGAME_API FTerritoryOwnershipChangeResult
 	bool WasSuccessful() const { return Failure == ETerritoryOwnershipFailure::None; }
 };
 
-/** Canonical serializable campaign territory state. Presentation actors never own ownership. */
+/** Live campaign value, independent of settlement/building presentation actors. */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FTerritorySettlementState
+{
+	GENERATED_BODY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	bool bHasSettlement = false;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	FText SettlementName;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	int32 Population = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	FFactionResourceDelta ProductionBonus;
+};
+
+/** Player-entered city name is durable text, not an Editor-generated localization key. */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FTerritorySettlementSnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Settlement") bool bHasSettlement = false;
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Settlement") FString SettlementName;
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Settlement") int32 Population = 0;
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Settlement") FFactionResourceDelta ProductionBonus;
+};
+
+/** Mutable campaign values only; definitions/adjacency are rebuilt from the current catalog. */
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FTerritoryRuntimeSnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Territory") FName TerritoryID = NAME_None;
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Territory") EFactionID Owner = EFactionID::None;
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Territory") FTerritorySettlementSnapshot Settlement;
+};
+
+UENUM(BlueprintType)
+enum class ESettlementFoundingFailure : uint8
+{
+	None, UnknownTerritory, InvalidName, AlreadyFounded, ProductionOverflow, TransactionInProgress
+};
+
+USTRUCT(BlueprintType)
+struct ROMANEMPIREGAME_API FSettlementFoundingResult
+{
+	GENERATED_BODY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	ESettlementFoundingFailure Failure = ESettlementFoundingFailure::UnknownTerritory;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settlement")
+	FName TerritoryID = NAME_None;
+	bool WasSuccessful() const { return Failure == ESettlementFoundingFailure::None; }
+};
+
+/** Canonical serializable campaign territory state. Actors never own live campaign values. */
 USTRUCT(BlueprintType)
 struct ROMANEMPIREGAME_API FTerritoryCampaignState
 {
@@ -108,10 +166,20 @@ struct ROMANEMPIREGAME_API FTerritoryCampaignState
 
 	FTerritoryRegistrationResult RegisterTerritory(const FTerritoryDefinition& Definition);
 	FTerritoryOwnershipChangeResult ChangeOwner(FName TerritoryID, EFactionID NewOwner);
+	FSettlementFoundingResult FoundSettlement(FName TerritoryID, const FText& Name);
+	bool TryGetSettlement(FName TerritoryID, FTerritorySettlementState& OutSettlement) const;
+	bool TryGetResourceProduction(FName TerritoryID, FFactionResourceDelta& OutProduction) const;
 	bool TryGetDefinition(FName TerritoryID, FTerritoryDefinition& OutDefinition) const;
 	bool TryGetOwner(FName TerritoryID, EFactionID& OutOwner) const;
 	int32 GetFactionTerritoryCount(EFactionID FactionID) const;
 	int32 GetTerritoryCount() const { return TerritoryDefinitions.Num(); }
+	TArray<FName> GetTerritoryIDs() const;
+	bool HasValidAdjacency() const;
+	bool AreAdjacent(FName FirstID, FName SecondID) const;
+	TArray<FName> GetAdjacentIDs(FName TerritoryID) const;
+	TArray<FTerritoryRuntimeSnapshot> GetRuntimeSnapshot() const;
+	/** Exact coverage of registered IDs, valid settlements/yields; failure changes nothing. */
+	bool ReplaceRuntimeSnapshot(const TArray<FTerritoryRuntimeSnapshot>& Snapshot);
 	void Reset();
 
 private:
@@ -120,6 +188,9 @@ private:
 
 	UPROPERTY()
 	TMap<FName, EFactionID> TerritoryOwnership;
+
+	UPROPERTY()
+	TMap<FName, FTerritorySettlementState> TerritorySettlements;
 };
 
 namespace RomanEmpireTerritories

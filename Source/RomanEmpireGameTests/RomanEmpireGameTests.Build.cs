@@ -21,10 +21,22 @@ public class RomanEmpireGameTests : ModuleRules
 			"Slate",
 			"SlateCore",
 			"RenderCore", // Headless projection viewport fixture; Editor-only module.
+			"ImageCore", // Real player pixel buffer ownership; Editor-only capture fixture.
+			"ScreenShotComparisonTools", // Native reviewed-baseline comparison; Editor-only.
+			"RHI", // Verify the actual baseline renderer, not a command-line assumption.
 			"InputCore",
 			"ApplicationCore",
 			"EnhancedInput",
-			"UnrealEd"
+			"GameplayTags",
+			"UnrealEd",
+            "FunctionalTesting",
+            "AssetTools",
+            "DeveloperToolSettings",
+			"AnimGraph", // Explicit opt-in Editor-only animation asset authoring/graph verification.
+			"AnimGraphRuntime",
+			"BlueprintGraph",
+			"KismetCompiler",
+			"AssetRegistry"
 		});
 	}
 }

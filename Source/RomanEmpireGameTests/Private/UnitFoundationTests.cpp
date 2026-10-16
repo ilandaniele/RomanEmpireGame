@@ -1,5 +1,9 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 #include "UnitLifecycleProbe.h"
+#include "RomanFunctionalScenario.h"
+#include "RomanCampaignFunctional.h"
+#include "Battle/TacticalBattleSubsystem.h"
+#include "Battle/TacticalObjective.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
@@ -34,6 +38,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/WorldSettings.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/PlatformTime.h"
 #include "HAL/PlatformMemory.h"
@@ -41,7 +46,12 @@
 #include "Input/Reply.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Misc/ScopeExit.h"
+#include "ProfilingDebugging/CsvProfiler.h"
+#include "ProfilingDebugging/MiscTrace.h"
+#include "Templates/UnrealTemplate.h"
 #include "Layout/ArrangedWidget.h"
 #include "Layout/Geometry.h"
 #include "Layout/WidgetPath.h"
@@ -66,6 +76,7 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 namespace RomanEmpireUnitTests
 {
+	CSV_DEFINE_CATEGORY(RomanEncounter, true);
 	// Exercise the real reflected API without leaking runtime-private include paths.
 	struct FCall
 	{
@@ -359,6 +370,75 @@ namespace RomanEmpireUnitTests
 	}
 
 	void ObjectCommand(FAutomationTestBase& Test, UObject* Target, FName Function, FName Param, UObject* Value);
+
+	class FExerciseRoutWithdrawal : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseRoutWithdrawal(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 45.0)
+			{
+				Test.AddError(TEXT("Routed withdrawal PIE timed out")); return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			if (!Unit.IsValid())
+			{
+				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+				FNavLocation Start, End;
+				if (!Nav || Nav->IsNavigationBuildInProgress() ||
+					!Nav->ProjectPointToNavigation(FVector(-1200, -3500, 0), Start, FVector(100, 100, 300)) ||
+					!Nav->ProjectPointToNavigation(FVector(-200, -3500, 0), End, FVector(100, 100, 300))) return false;
+				UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Start.Location, End.Location);
+				if (!Path || !Path->IsValid() || Path->IsPartial()) return false;
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+					if (It->FindFunction(TEXT("CommandHold"))) Command(Test, *It, TEXT("CommandHold"));
+				const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(World);
+				URomanUnitDefinition* Asset = const_cast<URomanUnitDefinition*>(Registry ? Registry->FindUnit(TEXT("Legionary")) : nullptr);
+				if (!Test.TestNotNull(TEXT("Withdrawal fixture has unit content"), Asset)) return true;
+				FUnitStats Stats = Asset->Definition.BaseStats;
+				Stats.Morale = 1; Stats.MaxHealth = 1000; Stats.Armor = 0; Stats.MeleeDefense = 0;
+				TGuardValue<FUnitStats> StatsGuard(Asset->Definition.BaseStats, Stats);
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				if (!Test.TestNotNull(TEXT("Withdrawal has real character class"), Class)) return true;
+				FActorSpawnParameters Params;
+				Params.bDeferConstruction = true; Params.ObjectFlags |= RF_Transient;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				ACharacter* Actor = World->SpawnActor<ACharacter>(Class, FTransform(Start.Location + FVector(0, 0, 96)), Params);
+				if (!Test.TestNotNull(TEXT("Withdrawal soldier spawned"), Actor) || !Initialize(Test, Actor, TEXT("Legionary"), EFactionID::Rome)) return true;
+				Actor->FinishSpawning(Actor->GetActorTransform());
+				Unit = Actor;
+				OriginalAI = Cast<AAIController>(Actor->GetController());
+				Params.bDeferConstruction = false;
+				AStaticMeshActor* Source = World->SpawnActor<AStaticMeshActor>(Actor->GetActorLocation() - FVector(300, 0, 0), FRotator::ZeroRotator, Params);
+				if (!Test.TestNotNull(TEXT("Withdrawal has behind-the-unit damage source"), Source)) return true;
+				StartLocation = Actor->GetActorLocation();
+				Damage(Test, Actor, 20.0f, Source);
+				Test.TestTrue(TEXT("Live navigation soldier routes from real morale damage"), Bool(Test, Actor, TEXT("IsRouted")));
+				Destination = StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders")).GetDestination();
+				return false;
+			}
+			ACharacter* Actor = Unit.Get();
+			bMovedWithVelocity |= FVector::Dist2D(Actor->GetActorLocation(), StartLocation) > 200.0 && Actor->GetVelocity().Size2D() > 1.0;
+			const FUnitOrderState Orders = StoredState<FUnitOrderState>(Test, Actor, TEXT("Orders"));
+			if (Orders.HasMoveCommand()) return false;
+			Test.TestTrue(TEXT("CharacterMovement physically withdrew the routed unit"), bMovedWithVelocity);
+			Test.TestTrue(TEXT("Withdrawal reaches its bounded destination"), FVector::Dist2D(Actor->GetActorLocation(), Destination) <= 60.0);
+			Test.TestTrue(TEXT("Withdrawal arrival preserves routing and life"), Bool(Test, Actor, TEXT("IsRouted")) && Bool(Test, Actor, TEXT("IsAlive")));
+			Test.TestTrue(TEXT("Withdrawal keeps the original tactical AI controller"), OriginalAI.IsValid() && Actor->GetController() == OriginalAI.Get());
+			Test.TestFalse(TEXT("Withdrawal arrival never restores player commands or invents rally"), Bool(Test, Actor, TEXT("CanAcceptCommands")));
+			return true;
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		TWeakObjectPtr<ACharacter> Unit;
+		TWeakObjectPtr<AAIController> OriginalAI;
+		FVector StartLocation = FVector::ZeroVector, Destination = FVector::ZeroVector;
+		bool bMovedWithVelocity = false;
+	};
 
 	class FExerciseNavigation : public IAutomationLatentCommand
 	{
@@ -1295,6 +1375,85 @@ namespace RomanEmpireUnitTests
 			ObjectCommand(*Probe->Test, Probe->ObservedController.Get(), TEXT("SelectUnit"), TEXT("Unit"), Probe->ReplacementUnit.Get()); break;
 		}
 	}
+	class FExerciseObjectiveOccupation : public IAutomationLatentCommand
+	{
+	public:
+		explicit FExerciseObjectiveOccupation(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 30.0) { Test.AddError(TEXT("Occupation PIE timed out")); return true; }
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>();
+			ATacticalObjective* Objective = Battle ? Battle->GetObjectiveActor() : nullptr;
+			if (!Test.TestNotNull(TEXT("Actual camp has registered physical objective"), Objective)) return true;
+			Test.TestEqual(TEXT("Objective matches the canonical encounter stable ID"), Objective->GetObjectiveID(), Battle->GetResult().ObjectiveID);
+			if (bWaitingForCapture)
+			{
+				if (!Battle->GetResult().IsResolved()) return false;
+				const FTacticalBattleResult Result = Battle->GetResult();
+				Test.TestEqual(TEXT("Real objective timer resolves canonical tactical victory"), Result.Outcome, ETacticalBattleOutcome::PlayerVictory);
+				Test.TestEqual(TEXT("Capture records the correct winning faction"), Result.Winner, EFactionID::Rome);
+				Test.TestEqual(TEXT("Capture records stable objective ID"), Result.CapturedObjectiveID, Objective->GetObjectiveID());
+				Test.TestTrue(TEXT("Public GameState sees the same terminal result"), State->GetTacticalBattleResult().Outcome == Result.Outcome && State->GetTacticalBattleResult().CapturedObjectiveID == Result.CapturedObjectiveID);
+				Test.TestFalse(TEXT("Repeated occupation cannot re-resolve victory"), Objective->TryCapture());
+				Objective->Destroy();
+				Test.TestNull(TEXT("Destroyed objective weak registration expires"), Battle->GetObjectiveActor());
+				Test.TestFalse(TEXT("Destroyed objective cannot capture"), Objective->TryCapture());
+				Test.TestEqual(TEXT("Objective teardown preserves committed result"), Battle->GetResult().Outcome, ETacticalBattleOutcome::PlayerVictory);
+				return true;
+			}
+			ACharacter* Occupant = nullptr;
+			TArray<ACharacter*> Defenders;
+			for (TActorIterator<ACharacter> It(World); It; ++It)
+			{
+				if (!It->FindFunction(TEXT("GetOwnerFaction"))) continue;
+				Command(Test, *It, TEXT("CommandHold"));
+				const FInitializationSnapshot Snapshot(Test, *It);
+				if (Snapshot.Owner == EFactionID::Rome && !Occupant) Occupant = *It;
+				else if (Snapshot.Owner == EFactionID::Carthage) Defenders.Add(*It);
+			}
+			if (!Test.TestTrue(TEXT("Occupation fixture uses actual initial forces"), Occupant && Defenders.Num() == 10)) return true;
+			Test.TestFalse(TEXT("Living defenders prevent capture"), Objective->TryCapture());
+			FActorSpawnParameters Params; Params.ObjectFlags |= RF_Transient;
+			ATacticalObjective* Duplicate = World->SpawnActor<ATacticalObjective>(Objective->GetActorLocation(), FRotator::ZeroRotator, Params);
+			if (!Test.TestNotNull(TEXT("Duplicate objective fixture spawned"), Duplicate)) return true;
+			Test.TestTrue(TEXT("Duplicate cannot replace the registered objective"), Battle->GetObjectiveActor() == Objective);
+			Test.TestFalse(TEXT("Unregistered duplicate cannot capture"), Duplicate->TryCapture());
+			Duplicate->Destroy();
+			const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(World);
+			URomanUnitDefinition* Asset = const_cast<URomanUnitDefinition*>(Registry ? Registry->FindUnit(TEXT("Legionary")) : nullptr);
+			if (!Test.TestNotNull(TEXT("Occupation fixture has unit definition"), Asset)) return true;
+			ACharacter* RoutedEnemy = nullptr;
+			{
+				FUnitStats Stats = Asset->Definition.BaseStats;
+				Stats.Morale = 1; Stats.MaxHealth = 1000; Stats.Armor = 0; Stats.MeleeDefense = 0;
+				TGuardValue<FUnitStats> Guard(Asset->Definition.BaseStats, Stats);
+				Params.bDeferConstruction = true;
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				RoutedEnemy = World->SpawnActor<ACharacter>(Class, FTransform(FVector(150000, 150000, 100)), Params);
+				if (!Test.TestNotNull(TEXT("Unrostered live enemy spawned"), RoutedEnemy) || !Initialize(Test, RoutedEnemy, TEXT("Legionary"), EFactionID::Carthage)) return true;
+				RoutedEnemy->FinishSpawning(RoutedEnemy->GetActorTransform());
+				Damage(Test, RoutedEnemy, 20.0f);
+			}
+			for (ACharacter* Defender : Defenders) Health(Test, Defender, 0);
+			Test.TestFalse(TEXT("Kills alone never resolve the occupation objective"), Battle->GetResult().IsResolved());
+			Test.TestFalse(TEXT("No occupation never captures"), Objective->TryCapture());
+			Occupant->SetActorLocation(Objective->GetActorLocation() + FVector(0, 550, 96), false, nullptr, ETeleportType::TeleportPhysics);
+			Test.TestTrue(TEXT("Engine collision reports actual unit occupation"), Objective->IsOverlappingActor(Occupant));
+			Test.TestTrue(TEXT("Additional routed enemy is still alive"), Bool(Test, RoutedEnemy, TEXT("IsRouted")) && Bool(Test, RoutedEnemy, TEXT("IsAlive")));
+			Test.TestFalse(TEXT("Live routed enemy outside the roster/zone still prevents capture"), Objective->TryCapture());
+			Health(Test, RoutedEnemy, 0);
+			bWaitingForCapture = true;
+			return false; // The actual 0.25-second objective timer, not this test, commits capture.
+		}
+	private:
+		FAutomationTestBase& Test;
+		double StartedAt;
+		bool bWaitingForCapture = false;
+	};
+
 	class FExerciseOwnership : public IAutomationLatentCommand
 	{
 	public:
@@ -1399,8 +1558,10 @@ namespace RomanEmpireUnitTests
 			Test.TestFalse(TEXT("Unowned unit is ineligible"), Eligible(Test, Controller, Owned));
 			SetOwner(Test, Owned, EFactionID::Rome);
 			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Owned);
+			CheckRealTime(World, { Controller, OriginalCamera, Owned, Other, Enemy });
 			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Owned);
 			Test.TestTrue(TEXT("Owned possession transfers actual Pawn"), Controller->GetPawn() == Owned);
+			CheckRealTime(World, { Controller, OriginalCamera, Owned, Other, Enemy });
 			PlayerMove();
 			Test.TestEqual(TEXT("Tactical order facade rejects possession mode"), Order(Test, Owned), EUnitOrderType::None);
 			UTextBlock* PossessionStatus = Cast<UTextBlock>(Root->GetWidgetFromName(TEXT("PossessionText")));
@@ -1473,13 +1634,16 @@ namespace RomanEmpireUnitTests
 			const float TacticalPitchMax = CameraManager->ViewPitchMax;
 			AAIController* OriginalAI = Cast<AAIController>(Other->GetController());
 			Test.TestNotNull(TEXT("Repeated possession starts with tactical AI"), OriginalAI);
+			CheckRealTime(World, { Controller, OriginalCamera, Other, Enemy, OriginalAI });
 			for (int32 Cycle = 0; Cycle < 3; ++Cycle)
 			{
 				ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Other);
 				Test.TestTrue(TEXT("Repeated entry possesses the same living unit"), Controller->GetPawn() == Other);
+				CheckRealTime(World, { Controller, OriginalCamera, Other, Enemy, OriginalAI });
 				Test.TestEqual(TEXT("Possession limits downward view pitch"), CameraManager->ViewPitchMin, -80.0f);
 				Test.TestEqual(TEXT("Possession limits upward view pitch"), CameraManager->ViewPitchMax, 80.0f);
 				Command(Test, Controller, TEXT("ExitFirstPersonMode"));
+				CheckRealTime(World, { Controller, OriginalCamera, Other, Enemy, OriginalAI });
 				Test.TestEqual(TEXT("Repeated exit restores tactical minimum pitch"), CameraManager->ViewPitchMin, TacticalPitchMin);
 				Test.TestEqual(TEXT("Repeated exit restores tactical maximum pitch"), CameraManager->ViewPitchMax, TacticalPitchMax);
 				Test.TestTrue(TEXT("Repeated exit restores the tactical pawn"), Controller->GetPawn() == OriginalCamera);
@@ -1494,6 +1658,71 @@ namespace RomanEmpireUnitTests
 			Command(Test, Controller, TEXT("ClearSelection"));
 
 			SetOwner(Test, Owned, EFactionID::Rome);
+			// Use the real damage pipeline with scoped content overrides, never a stored-state write.
+			const URomanContentRegistrySubsystem* Content = URomanContentRegistrySubsystem::Get(World);
+			URomanUnitDefinition* Definition = const_cast<URomanUnitDefinition*>(Content ? Content->FindUnit(TEXT("Legionary")) : nullptr);
+			if (!Test.TestNotNull(TEXT("Routing fixture has canonical content"), Definition)) return true;
+			ACharacter* Routed = nullptr;
+			ACharacter* InitiallyRouted = nullptr;
+			{
+				FUnitStats Stats = Definition->Definition.BaseStats;
+				Stats.Morale = 1; Stats.MaxHealth = 1000; Stats.MeleeDefense = 0; Stats.Armor = 0; Stats.BlockStrength = 0.0f;
+				TGuardValue<FUnitStats> StatsGuard(Definition->Definition.BaseStats, Stats);
+				Routed = Spawn(EFactionID::Rome);
+				Definition->Definition.BaseStats.Morale = 0;
+				InitiallyRouted = Spawn(EFactionID::Rome);
+			}
+			if (!Routed || !InitiallyRouted) return true;
+			Test.TestTrue(TEXT("Zero initial morale immediately routes a live soldier"), Bool(Test, InitiallyRouted, TEXT("IsRouted")) && Bool(Test, InitiallyRouted, TEXT("IsAlive")));
+			Test.TestFalse(TEXT("Initially routed soldier rejects player commands"), Bool(Test, InitiallyRouted, TEXT("CanAcceptCommands")));
+			Test.TestEqual(TEXT("Initially routed soldier owns a withdrawal order"), Order(Test, InitiallyRouted), EUnitOrderType::Move);
+			TStrongObjectPtr<UUnitLifecycleProbe> RoutProbe(NewObject<UUnitLifecycleProbe>());
+			RoutProbe->Test = &Test; RoutProbe->ObservedUnit = Routed;
+			if (!BindProbe(Test, Routed, TEXT("OnUnitDied"), RoutProbe.Get(), TEXT("HandleDeath"))) return true;
+			URomanUnitRegistrySubsystem* LiveUnits = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			if (!Test.TestNotNull(TEXT("Routing fixture uses the live registry"), LiveUnits)) return true;
+			const int32 BeforeRoutCount = LiveUnits->GetRegisteredUnitCount();
+			AAIController* RoutAI = Cast<AAIController>(Routed->GetController());
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Routed);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Routed);
+			Command(Test, Routed, TEXT("StartBlocking"));
+			Test.TestTrue(TEXT("Routing starts from actual guarded possession"), Controller->GetPawn() == Routed && Bool(Test, Routed, TEXT("IsBlocking")));
+			const FVector BeforeRoutLocation = Routed->GetActorLocation();
+			Damage(Test, Routed, 20.0f, Enemy);
+			Test.TestTrue(TEXT("Nonlethal zero morale commits routing"), Bool(Test, Routed, TEXT("IsRouted")) && Bool(Test, Routed, TEXT("IsAlive")));
+			Test.TestEqual(TEXT("Routing projects explicit activity"), Activity(Test, Routed), EUnitActivity::Routed);
+			Test.TestFalse(TEXT("Routed soldier rejects all new command initiation"), Bool(Test, Routed, TEXT("CanAcceptCommands")));
+			Test.TestTrue(TEXT("Routed soldier remains world-active and vulnerable"), Bool(Test, Routed, TEXT("CanParticipateInWorld")));
+			CheckReturned(Controller, OriginalCamera, Root);
+			Test.TestFalse(TEXT("Routing clears guard"), Bool(Test, Routed, TEXT("IsBlocking")));
+			Test.TestFalse(TEXT("Routing clears actual possession flag"), Bool(Test, Routed, TEXT("IsPossessedByPlayer")));
+			Test.TestTrue(TEXT("Routing restores the same tactical AI"), RoutAI && Routed->GetController() == RoutAI);
+			Test.TestEqual(TEXT("Routing never emits a death"), RoutProbe->DeathEvents, 0);
+			Test.TestEqual(TEXT("Routing retains live registry membership"), LiveUnits->GetRegisteredUnitCount(), BeforeRoutCount);
+			const FUnitOrderState Withdrawal = StoredState<FUnitOrderState>(Test, Routed, TEXT("Orders"));
+			Test.TestEqual(TEXT("Routing replaces player actions with one withdrawal move"), Withdrawal.GetOrderType(), EUnitOrderType::Move);
+			Test.TestEqual(TEXT("Withdrawal destination is bounded to ten metres"), FVector::Dist2D(BeforeRoutLocation, Withdrawal.GetDestination()), 1000.0, 0.01);
+			Test.TestTrue(TEXT("Withdrawal points away from the damaging enemy"), FVector::DotProduct(Withdrawal.GetDestination() - BeforeRoutLocation, BeforeRoutLocation - Enemy->GetActorLocation()) > 0.0);
+			Move(Test, Routed); Attack(Test, Routed, Enemy); Command(Test, Routed, TEXT("CommandHold"));
+			Command(Test, Routed, TEXT("PerformAttack")); Command(Test, Routed, TEXT("StartBlocking")); Dodge(Test, Routed);
+			ObjectCommand(Test, Controller, TEXT("SelectUnit"), TEXT("Unit"), Routed);
+			ObjectCommand(Test, Controller, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Routed);
+			Test.TestTrue(TEXT("Rejected routed actions cannot replace withdrawal"), StoredState<FUnitOrderState>(Test, Routed, TEXT("Orders")).GetRevision() == Withdrawal.GetRevision());
+			Test.TestTrue(TEXT("Routed soldier cannot be selected or repossessed"), SelectedActors(Test, Controller).IsEmpty() && Controller->GetPawn() == OriginalCamera);
+			Attack(Test, Enemy, Routed);
+			Test.TestTrue(TEXT("Enemy can order an attack against a routed live target"), StoredState<FUnitOrderState>(Test, Enemy, TEXT("Orders")).GetTarget() == Routed);
+			const int32 BeforeFurtherDamage = StoredVitals(Test, Routed).GetHealth();
+			Damage(Test, Routed, 5.0f, Enemy);
+			Test.TestEqual(TEXT("Routed unit takes further real damage"), StoredVitals(Test, Routed).GetHealth(), BeforeFurtherDamage - 5);
+			Test.TestTrue(TEXT("Further damage does not restart withdrawal"), StoredState<FUnitOrderState>(Test, Routed, TEXT("Orders")).GetRevision() == Withdrawal.GetRevision());
+			Routed->Tick(0.1f); // Far transient fixture has no NavMesh; never teleport/direct-move.
+			Test.TestEqual(TEXT("Unreachable withdrawal settles in Hold"), Order(Test, Routed), EUnitOrderType::Hold);
+			Test.TestTrue(TEXT("Unreachable routed soldier remains alive at its position"), Bool(Test, Routed, TEXT("IsAlive")) && Routed->GetActorLocation().Equals(BeforeRoutLocation));
+			Health(Test, Routed, 0);
+			Test.TestEqual(TEXT("Only actual death emits one casualty notification"), RoutProbe->DeathEvents, 1);
+			Test.TestEqual(TEXT("Only actual death removes live registry membership"), LiveUnits->GetRegisteredUnitCount(), BeforeRoutCount - 1);
+			Test.TestFalse(TEXT("Dead soldier no longer projects routed activity"), Bool(Test, Routed, TEXT("IsRouted")));
+			InitiallyRouted->Destroy();
 			TStrongObjectPtr<UUnitLifecycleProbe> SelectionProbe(NewObject<UUnitLifecycleProbe>());
 			SelectionProbe->Test = &Test; SelectionProbe->ObservedUnit = Owned; SelectionProbe->ObservedController = Controller;
 			SelectionProbe->ReplacementUnit = Other; SelectionProbe->ControllerAction = EUnitControllerProbeAction::SelectReplacement;
@@ -1523,7 +1752,9 @@ namespace RomanEmpireUnitTests
 			Test.TestTrue(TEXT("Live controller observes selected ownership"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
 			Test.TestTrue(TEXT("Live controller observes possessed ownership"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandlePossessedUnitOwnerChanged")));
 			Test.TestTrue(TEXT("Live controller observes player faction"), HasListener(Test, State, TEXT("OnPlayerFactionChanged"), Controller, TEXT("HandlePlayerFactionChanged")));
+			CheckRealTime(World, { Controller, OriginalCamera, Other, Enemy });
 			Controller->RouteEndPlay(EEndPlayReason::RemovedFromWorld);
+			CheckRealTime(World, { OriginalCamera, Other, Enemy });
 			Test.TestFalse(TEXT("Controller teardown releases unit possession"), Bool(Test, Other, TEXT("IsPossessedByPlayer")));
 			Test.TestFalse(TEXT("Controller teardown releases selected ownership observer"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandleSelectedUnitOwnerChanged")));
 			Test.TestFalse(TEXT("Controller teardown releases possessed ownership observer"), HasListener(Test, Other, TEXT("OnOwnerFactionChanged"), Controller, TEXT("HandlePossessedUnitOwnerChanged")));
@@ -1531,8 +1762,24 @@ namespace RomanEmpireUnitTests
 			return true;
 		}
 	private:
+		void CheckRealTime(UWorld* World, const TArray<AActor*>& Actors)
+		{
+			AWorldSettings* Settings = World ? World->GetWorldSettings() : nullptr;
+			if (!Test.TestNotNull(TEXT("Real-time possession has world settings"), Settings)) return;
+			Test.TestFalse(TEXT("Possession never pauses the world"), World->IsPaused());
+			Test.TestEqual(TEXT("Possession keeps global time dilation normal"), Settings->TimeDilation, 1.0f);
+			Test.TestEqual(TEXT("Possession keeps cinematic time dilation normal"), Settings->CinematicTimeDilation, 1.0f);
+			Test.TestEqual(TEXT("Possession keeps replay time dilation normal"), Settings->DemoPlayTimeDilation, 1.0f);
+			Test.TestEqual(TEXT("Possession keeps effective world time dilation normal"), Settings->GetEffectiveTimeDilation(), 1.0f);
+			for (AActor* Actor : Actors)
+			{
+				if (Test.TestNotNull(TEXT("Real-time actor exists"), Actor))
+					Test.TestEqual(FString::Printf(TEXT("%s keeps normal custom time dilation"), *Actor->GetName()), Actor->CustomTimeDilation, 1.0f);
+			}
+		}
 		void CheckReturned(APlayerController* Controller, APawn* Camera, UUserWidget* Root)
 		{
+			CheckRealTime(Controller->GetWorld(), { Controller, Camera });
 			Test.TestTrue(TEXT("Original actual camera restored"), Controller->GetPawn() == Camera);
 			Test.TestFalse(TEXT("Controller no longer in possession mode"), Bool(Test, Controller, TEXT("IsInFirstPersonMode")));
 			Test.TestTrue(TEXT("Canonical selection is empty"), SelectedActors(Test, Controller).IsEmpty());
@@ -2338,6 +2585,250 @@ namespace RomanEmpireUnitTests
 		TArray<TWeakObjectPtr<ACharacter>> Members;
 	};
 
+	/** Natural ticks only: added soldiers join the canonical battle before capture starts. */
+	class FExerciseEncounterProfile : public IAutomationLatentCommand
+	{
+	public:
+		FExerciseEncounterProfile(FAutomationTestBase* InTest, int32 InTotal)
+			: Test(*InTest), Total(InTotal), StartedAt(FPlatformTime::Seconds()) {}
+		virtual ~FExerciseEncounterProfile() override { StopCapture(); }
+		virtual bool Update() override
+		{
+			if (FPlatformTime::Seconds() - StartedAt > 180.0)
+			{
+				StopCapture();
+				Test.AddError(FString::Printf(TEXT("Encounter%d timeout phase%d, last alive%d, training%d, casualties%d"),
+					Total, Phase, LastAlive, bTraining, Casualties));
+				return true;
+			}
+			UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+			const ARomanEmpireGameState* State = World ? World->GetGameState<ARomanEmpireGameState>() : nullptr;
+			if (!State || !State->IsGameplayInitialized()) return false;
+			APlayerController* Player = World->GetFirstPlayerController();
+			URomanUnitRegistrySubsystem* Registry = World->GetSubsystem<URomanUnitRegistrySubsystem>();
+			UTacticalBattleSubsystem* Battle = World->GetSubsystem<UTacticalBattleSubsystem>();
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+			if (!Player || !Registry || !Battle || !Nav || Nav->IsNavigationBuildInProgress()) return false;
+			if (Phase == 0)
+			{
+				if (!Test.TestEqual(TEXT("Fresh encounter starts with 25 total units"), Registry->GetRegisteredUnitCount(), 25) ||
+					!Test.TestTrue(TEXT("Encounter is canonical and unresolved"), Battle->HasEncounter() && !Battle->IsResolved())) return true;
+				int32 RomanIndex = 0, EnemyIndex = 0;
+				// Setup only: relocation is never used to satisfy movement, combat or occupation.
+				for (TActorIterator<ACharacter> It(World); It; ++It)
+				{
+					if (!It->FindFunction(TEXT("CommandHold"))) continue;
+					Command(Test, *It, TEXT("CommandHold"));
+					const bool bRoman = Registry->GetUnitsForFaction(EFactionID::Rome).ContainsByPredicate(
+						[&](const AUnitBase* Unit) { return static_cast<const void*>(Unit) == *It; });
+					const int32 Index = bRoman ? RomanIndex++ : EnemyIndex++;
+					It->SetActorLocation(bRoman ? RomanPosition(Index) : FVector(1000, -4800 + 240 * Index, 100), false, nullptr, ETeleportType::TeleportPhysics);
+					if (bRoman) Romans.Add(*It);
+					else { Enemies.Add(*It); InitialEnemyHealth.Add(Int(Test, *It, TEXT("GetCurrentHealth"))); }
+				}
+				UClass* Class = LoadClass<ACharacter>(nullptr, TEXT("/Script/RomanEmpireGame.Legionary"));
+				if (!Test.TestNotNull(TEXT("Encounter load class"), Class)) return true;
+				for (int32 Index = 25; Index < Total; ++Index)
+				{
+					FActorSpawnParameters Params;
+					Params.bDeferConstruction = true; Params.ObjectFlags |= RF_Transient;
+					Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					ACharacter* Unit = World->SpawnActor<ACharacter>(Class, FTransform(RomanPosition(RomanIndex++)), Params);
+					if (!Test.TestNotNull(TEXT("Encounter reinforcement spawned"), Unit)) return true;
+					Romans.Add(Unit);
+					if (!Initialize(Test, Unit, TEXT("Legionary"), EFactionID::Rome)) return true;
+					Unit->FinishSpawning(Unit->GetActorTransform());
+					Command(Test, Unit, TEXT("CommandHold"));
+					const FGuid Squad = CreateSquad(Test, Registry, {Unit});
+					const TArray<AUnitBase*> Members = Registry->GetSquadMembers(Squad);
+					if (!Test.TestTrue(TEXT("Every added unit belongs to the battle"), Members.Num() == 1 && Battle->RegisterReinforcement(Members[0]))) return true;
+				}
+				for (TActorIterator<AActor> It(World); It; ++It)
+					if (It->FindFunction(TEXT("TrainUnit"))) { Barracks = *It; break; }
+				if (!Test.TestNotNull(TEXT("Real bootstrap producer"), Barracks.Get())) return true;
+				if (APawn* Camera = Player->GetPawn())
+				{
+					Camera->SetActorLocation(FVector(-1000, -3500, 0));
+					FCall Zoom(Test, Camera, TEXT("SetZoomLevel"), 1);
+					Zoom.Set<FFloatProperty>(TEXT("NewZoomLevel"), 0.47f); Zoom.Execute();
+				}
+				if (FParse::Param(FCommandLine::Get(), TEXT("RomanCaptureEncounter")) && GEngine && GEngine->GameViewport)
+					if (FSceneViewport* Viewport = GEngine->GameViewport->GetGameViewport()) Viewport->SetViewportSize(1920, 1080);
+				InitialResult = Battle->GetResult();
+				int32 Enrolled = 0;
+				for (const auto& Squad : InitialResult.Squads) Enrolled += Squad.InitialUnits;
+				if (!Test.TestEqual(TEXT("Initial TOTAL canonical battle load"), Enrolled, Total)) return true;
+				LastAlive = Registry->GetRegisteredUnitCount(); PeakAlive = LastAlive;
+				Phase = 1; return false;
+			}
+			if (Phase == 1)
+			{
+				if (++WarmFrames < 30 || !Bool(Test, Barracks.Get(), TEXT("IsComplete"))) return false;
+				ATacticalObjective* Objective = Battle->GetObjectiveActor();
+				if (!Test.TestNotNull(TEXT("Encounter objective preflight"), Objective)) return true;
+				UNavigationPath* Approach = UNavigationSystemV1::FindPathToLocationSynchronously(World,
+					Romans[0]->GetActorLocation(), Objective->GetOccupationApproachLocation(), Romans[0].Get());
+				if (!Test.TestTrue(TEXT("Physical objective has a complete natural navigation approach"), Approach && Approach->IsValid() && !Approach->IsPartial())) return true;
+				int32 Width = 0, Height = 0; Player->GetViewportSize(Width, Height);
+				for (const auto& Unit : Romans)
+				{
+					FVector2D Screen;
+					if (Unit.IsValid() && Player->ProjectWorldLocationToScreen(Unit->GetActorLocation(), Screen) &&
+						Screen.X >= 0 && Screen.X < Width && Screen.Y >= 0 && Screen.Y < Height) ++ProjectedRomans;
+				}
+				Test.AddInfo(FString::Printf(TEXT("EncounterViewport%d: %dx%d; projected Roman centers%d/%d"), Total, Width, Height, ProjectedRomans, Romans.Num()));
+				if (FParse::Param(FCommandLine::Get(), TEXT("RomanCaptureEncounter")))
+					if (!Test.TestEqual(TEXT("Actual rendered gameplay viewport width"), Width, 1920) ||
+						!Test.TestEqual(TEXT("Actual rendered gameplay viewport height"), Height, 1080) ||
+						!Test.TestEqual(TEXT("All initial Roman centers project inside the rendered viewport"), ProjectedRomans, Romans.Num())) return true;
+				CaptureStartedAt = FPlatformTime::Seconds();
+				MemoryStart = FPlatformMemory::GetStats().UsedPhysical;
+				if (GEngine && FParse::Param(FCommandLine::Get(), TEXT("RomanCaptureEncounter")))
+				{
+					GEngine->Exec(World, TEXT("CsvProfile Start")); bCaptureActive = true;
+					TRACE_BEGIN_REGION(*FString::Printf(TEXT("RomanEncounter%d"), Total));
+				}
+				Bookmark(TEXT("Start"));
+				FCall Train(Test, Barracks.Get(), TEXT("TrainUnit"), 2);
+				Train.Set<FNameProperty>(TEXT("UnitID"), FName(TEXT("Legionary"))); Train.Execute();
+				if (!Test.TestTrue(TEXT("Natural production starts"), Train.Read<FBoolProperty, bool>())) return true;
+				bTraining = true;
+				for (int32 Index = 0; Index < Enemies.Num(); ++Index) Attack(Test, Enemies[Index].Get(), Romans[Index].Get());
+				IssueAttack(Player, Enemies[0].Get());
+				Phase = 2; return false;
+			}
+			++MeasuredFrames;
+			CSV_CUSTOM_STAT(RomanEncounter, AliveUnits, LastAlive, ECsvCustomStatOp::Set);
+			CSV_CUSTOM_STAT(RomanEncounter, TrainingActive, bTraining ? 1 : 0, ECsvCustomStatOp::Set);
+			CSV_CUSTOM_STAT(RomanEncounter, Phase, Phase, ECsvCustomStatOp::Set);
+			CSV_CUSTOM_STAT(RomanEncounter, Casualties, Casualties, ECsvCustomStatOp::Set);
+			CSV_CUSTOM_STAT(RomanEncounter, CombatDuringTraining, bCombatDuringTraining ? 1 : 0, ECsvCustomStatOp::Set);
+			if (Phase == 2 && World->GetTimeSeconds() >= NextSample)
+			{
+				NextSample = World->GetTimeSeconds() + 0.5;
+				LastAlive = Registry->GetRegisteredUnitCount();
+				PeakAlive = FMath::Max(PeakAlive, LastAlive);
+				const FTacticalBattleResult Result = Battle->GetResult();
+				Casualties = 0; int32 Enrolled = 0;
+				for (const auto& Squad : Result.Squads) { Casualties += Squad.Casualties; Enrolled += Squad.InitialUnits; }
+				bTraining = Bool(Test, Barracks.Get(), TEXT("IsTraining"));
+				if (bTraining)
+					for (int32 Index = 0; Index < Enemies.Num(); ++Index)
+						if (Enemies[Index].IsValid() && Int(Test, Enemies[Index].Get(), TEXT("GetCurrentHealth")) < InitialEnemyHealth[Index]) bCombatDuringTraining = true;
+				if (!bTraining && !bRecruited)
+				{
+					if (!Test.TestEqual(TEXT("Natural timer enrolled exactly one recruit"), Enrolled, Total + 1)) return true;
+					bRecruited = true; Bookmark(TEXT("Recruit"));
+				}
+				AActor* Enemy = nullptr;
+				for (const auto& Candidate : Enemies) if (Candidate.IsValid() && Bool(Test, Candidate.Get(), TEXT("IsAlive"))) { Enemy = Candidate.Get(); break; }
+				if (Enemy)
+				{
+					if (!AttackTarget.IsValid() || !Bool(Test, AttackTarget.Get(), TEXT("IsAlive"))) IssueAttack(Player, Enemy);
+					if (!bPossessed && MeasuredFrames >= 60)
+					{
+						ObjectCommand(Test, Player, TEXT("EnterFirstPersonMode"), TEXT("UnitToPossess"), Romans.Last().Get());
+						if (!Test.TestTrue(TEXT("Workload enters real FPS pawn"), Player->GetPawn() == Romans.Last().Get())) return true;
+						Test.TestFalse(TEXT("FPS workload is not paused"), World->IsPaused());
+						Test.TestEqual(TEXT("FPS workload stays realtime"), World->GetWorldSettings()->TimeDilation, 1.0f);
+						bPossessed = true; PossessionEndsAt = World->GetTimeSeconds() + 1.0;
+						Phase = 3; Bookmark(TEXT("FPS"));
+					}
+				}
+				else if (bRecruited)
+				{
+					if (!Test.TestTrue(TEXT("Real combat produced casualties, overlapped training and exercised FPS"), Casualties >= 10 && bPossessed && bCombatDuringTraining)) return true;
+					ATacticalObjective* Objective = Battle->GetObjectiveActor();
+					if (!Test.TestNotNull(TEXT("Physical objective remains live"), Objective)) return true;
+					TArray<AActor*> Survivors;
+					// A single real occupation order: do not demand a whole-army formation footprint at a small objective.
+					// Prefer the frontmost eligible soldier rather than one trapped behind the idle army.
+					ACharacter* Nearest = nullptr;
+					const FVector Goal = Objective->GetOccupationApproachLocation();
+					for (const auto& Unit : Romans)
+						if (Unit.IsValid() && Bool(Test, Unit.Get(), TEXT("CanAcceptCommands")) &&
+							(!Nearest || FVector::DistSquared(Unit->GetActorLocation(), Goal) < FVector::DistSquared(Nearest->GetActorLocation(), Goal))) Nearest = Unit.Get();
+					if (Nearest) Survivors.Add(Nearest);
+					if (!Test.TestEqual(TEXT("One eligible survivor issued occupation"), Survivors.Num(), 1)) return true;
+					SelectMany(Test, Player, Survivors);
+					FCall MoveCall(Test, Player, TEXT("CommandSelectedUnitsMove"), 1);
+					if (FStructProperty* Property = MoveCall.Property<FStructProperty>(TEXT("Destination")))
+						Property->CopyCompleteValue(Property->ContainerPtrToValuePtr<void>(MoveCall.Params.GetStructMemory()), &Goal);
+					MoveCall.Execute(); Phase = 4; Bookmark(TEXT("Occupation"));
+					Occupant = Cast<ACharacter>(Survivors[0]);
+					Test.AddInfo(FString::Printf(TEXT("Occupation%d order%d: start%s -> goal%s; tactical input%d; defenders%d"),
+						Total, int32(Order(Test, Occupant.Get())), *Occupant->GetActorLocation().ToString(), *Goal.ToString(),
+						Bool(Test, Player, TEXT("CanIssueTacticalCommands")), Registry->GetUnitsForFaction(EFactionID::Carthage).Num()));
+					if (!Test.TestEqual(TEXT("Occupation dispatch issued real Move"), Order(Test, Occupant.Get()), EUnitOrderType::Move)) return true;
+				}
+			}
+			if (Phase == 3 && World->GetTimeSeconds() >= PossessionEndsAt)
+			{
+				Command(Test, Player, TEXT("ExitFirstPersonMode"));
+				IssueAttack(Player, AttackTarget.Get()); Phase = 2; Bookmark(TEXT("RTS"));
+			}
+			if (Phase == 4 && Battle->IsResolved())
+			{
+				const FTacticalBattleResult Result = Battle->GetResult();
+				Test.TestEqual(TEXT("Automatic physical occupation wins the real encounter"), Result.Outcome, ETacticalBattleOutcome::PlayerVictory);
+				Test.TestEqual(TEXT("Same encounter identity throughout"), Result.EncounterID, InitialResult.EncounterID);
+				Test.TestEqual(TEXT("Physical captured objective is canonical"), Result.CapturedObjectiveID, InitialResult.ObjectiveID);
+				LastAlive = Registry->GetRegisteredUnitCount();
+				StopCapture();
+				Test.AddInfo(FString::Printf(TEXT("Encounter%d: initial TOTAL%d; added%d; peak sampled live%d; final live%d; casualties%d; natural recruit1; combat during training; FPS realtime; physical victory; %d measured PIE frames; %.3f wall seconds; projected Roman centers%d/%d (not pixel visibility); process physical memory %.1f -> %.1f MiB; Editor-only, no packaged FPS gate"),
+					Total, Total, Total - 25, PeakAlive, LastAlive, Casualties, MeasuredFrames, FPlatformTime::Seconds() - CaptureStartedAt,
+					ProjectedRomans, Romans.Num(), double(MemoryStart) / 1048576.0, double(FPlatformMemory::GetStats().UsedPhysical) / 1048576.0));
+				return true;
+			}
+			if (Phase == 4 && Occupant.IsValid() && World->GetTimeSeconds() >= NextSample)
+			{
+				NextSample = World->GetTimeSeconds() + 2.0;
+				const EUnitNavigationResult Navigation = NavigationResult(Test, Occupant.Get());
+				if (Navigation == EUnitNavigationResult::Unreachable || Navigation == EUnitNavigationResult::Arrived)
+				{
+					Test.AddError(FString::Printf(TEXT("Occupation%d settled without capture: nav%d, position%s, overlap%d, remaining defenders%d"),
+						Total, int32(Navigation), *Occupant->GetActorLocation().ToString(), Battle->GetObjectiveActor()->IsOverlappingActor(Occupant.Get()), Registry->GetUnitsForFaction(EFactionID::Carthage).Num()));
+					return true;
+				}
+			}
+			return false;
+		}
+	private:
+		static FVector RomanPosition(int32 Index) { return FVector(-3200 + 240 * (Index / 10), -4800 + 240 * (Index % 10), 100); }
+		void IssueAttack(APlayerController* Player, AActor* Target)
+		{
+			TArray<AActor*> Selection;
+			for (const auto& Unit : Romans) if (Unit.IsValid() && Bool(Test, Unit.Get(), TEXT("CanAcceptCommands"))) Selection.Add(Unit.Get());
+			SelectMany(Test, Player, Selection);
+			ObjectCommand(Test, Player, TEXT("CommandSelectedUnitsAttack"), TEXT("Target"), Target);
+			AttackTarget = Target;
+		}
+		void Bookmark(const TCHAR* Name)
+		{
+			if (GEngine && GEditor && GEditor->PlayWorld)
+				GEngine->Exec(GEditor->PlayWorld, *FString::Printf(TEXT("Trace.Bookmark RomanEncounter%d%s"), Total, Name));
+		}
+		void StopCapture()
+		{
+			if (!bCaptureActive) return;
+			TRACE_END_REGION(*FString::Printf(TEXT("RomanEncounter%d"), Total));
+			Bookmark(TEXT("End"));
+			if (GEngine && GEditor && GEditor->PlayWorld) GEngine->Exec(GEditor->PlayWorld, TEXT("CsvProfile Stop"));
+			bCaptureActive = false;
+		}
+		FAutomationTestBase& Test;
+		int32 Total;
+		double StartedAt, CaptureStartedAt = 0, NextSample = 0, PossessionEndsAt = 0;
+		uint64 MemoryStart = 0;
+		int32 Phase = 0, WarmFrames = 0, MeasuredFrames = 0, ProjectedRomans = 0, LastAlive = 0, PeakAlive = 0, Casualties = 0;
+		bool bCaptureActive = false, bTraining = false, bRecruited = false, bPossessed = false, bCombatDuringTraining = false;
+		FTacticalBattleResult InitialResult;
+		TWeakObjectPtr<AActor> Barracks, AttackTarget;
+		TWeakObjectPtr<ACharacter> Occupant;
+		TArray<TWeakObjectPtr<ACharacter>> Romans, Enemies;
+		TArray<int32> InitialEnemyHealth;
+	};
+
 	bool ClickUnitCommandThroughSlate(FAutomationTestBase& Test, UUserWidget* Root, UButton* Button)
 	{
 		if (!Test.TestTrue(TEXT("Slate pointer router initialized"), FSlateApplication::IsInitialized() && Root && Button)) return false;
@@ -2696,16 +3187,18 @@ namespace RomanEmpireUnitTests
 	class FWaitForUnitPIEEnd : public IAutomationLatentCommand
 	{
 	public:
-		explicit FWaitForUnitPIEEnd(FAutomationTestBase* InTest) : Test(*InTest), StartedAt(FPlatformTime::Seconds()) {}
+		explicit FWaitForUnitPIEEnd(FAutomationTestBase* InTest) : Test(*InTest) {}
 		virtual bool Update() override
 		{
 			if (!GEditor || !GEditor->PlayWorld) return true;
+			// Latent commands are constructed together; preceding gameplay is not teardown time.
+			if (StartedAt == 0) StartedAt = FPlatformTime::Seconds();
 			if (FPlatformTime::Seconds() - StartedAt < 60.0) return false;
 			Test.AddError(TEXT("Unit test PIE teardown timed out")); return true;
 		}
 	private:
 		FAutomationTestBase& Test;
-		double StartedAt;
+		double StartedAt = 0;
 	};
 }
 
@@ -2874,6 +3367,38 @@ void UUnitLifecycleProbe::HandleCameraActivated(UActorComponent* Component, bool
 	}
 }
 
+TSharedPtr<IAutomationLatentCommand> CreateRomanFunctionalScenario(int32 Scenario, FAutomationTestBase& Assertions)
+{
+	// The same commands remain the sole scenario implementation. No nested
+	// automation run, gameplay state copy, or separate simulated rules.
+	switch (Scenario)
+	{
+	case -1:
+		{
+			class FAssertionFailureProbe final : public IAutomationLatentCommand
+			{
+			public:
+				explicit FAssertionFailureProbe(FAutomationTestBase& InAssertions) : Test(InAssertions) {}
+				virtual bool Update() override
+				{
+					Test.TestTrue(TEXT("Deliberate functional assertion probe"), false);
+					return false; // Failure must finish even before the command completes.
+				}
+			private:
+				FAutomationTestBase& Test;
+			};
+			return MakeShared<FAssertionFailureProbe>(Assertions);
+		}
+	case 0: return MakeShared<RomanEmpireUnitTests::FExerciseNavigation>(&Assertions);
+	case 1: return MakeShared<RomanEmpireUnitTests::FExerciseUnitOrders>(&Assertions);
+	case 2: return MakeShared<RomanEmpireUnitTests::FExerciseSquadRegistry>(&Assertions);
+	case 3: return MakeShared<RomanEmpireUnitTests::FExerciseOwnership>(&Assertions);
+	case 4: return MakeShared<RomanEmpireUnitTests::FExerciseObjectiveOccupation>(&Assertions);
+	case 5: return CreateRomanFunctionalCampaignGate(Assertions);
+	default: return nullptr;
+	}
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitFoundationTest, "RomanEmpireGame.Units.FoundationPIE",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FUnitFoundationTest::RunTest(const FString& Parameters)
@@ -2899,6 +3424,30 @@ bool FUnitOrdersCombatTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Committed test map loaded"), World && World->GetName() == TEXT("L_Testbed"))) return false;
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitOrders(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FObjectiveOccupationTest, "RomanEmpireGame.Battle.ObjectiveOccupationPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FObjectiveOccupationTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseObjectiveOccupation(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitRoutWithdrawalTest, "RomanEmpireGame.Units.RoutedWithdrawalPIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FUnitRoutWithdrawalTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseRoutWithdrawal(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;
@@ -2935,6 +3484,30 @@ bool FUnitLoad100Test::RunTest(const FString& Parameters)
 	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseUnitLoadProfile(this, 100));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounter50Test, "RomanEmpireGame.Performance.Encounter50PIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FEncounter50Test::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseEncounterProfile(this, 50));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounter100Test, "RomanEmpireGame.Performance.Encounter100PIE",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FEncounter100Test::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Editor required"), GEditor) || !TestNull(TEXT("Test owns fresh PIE"), GEditor->PlayWorld)) return false;
+	FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/Maps/L_Testbed"));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FExerciseEncounterProfile(this, 100));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	ADD_LATENT_AUTOMATION_COMMAND(RomanEmpireUnitTests::FWaitForUnitPIEEnd(this));
 	return true;

@@ -63,6 +63,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Building Menu")
 	void PopulateBuildingList();
+	/** Query effective profile keys without rebuilding buttons or storing another key authority. */
+	void RefreshShortcutLabels();
 
 	UFUNCTION(BlueprintCallable, Category = "Building Menu")
 	void FilterByCategory(EBuildingCategory Category);

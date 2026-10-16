@@ -42,6 +42,10 @@ void AWorldMapManager::BeginPlay()
 		}
 	}
 	
+	if (!CampaignTerritoryState.HasValidAdjacency())
+	{
+		UE_LOG(LogRomanEmpire, Error, TEXT("Campaign adjacency references must be known and reciprocal"));
+	}
 	UE_LOG(LogRomanEmpire, Log, TEXT("World Map Manager initialized with %d territories"), Territories.Num());
 }
 
@@ -128,7 +132,7 @@ ATerritoryRegion* AWorldMapManager::GetTerritoryByID(FName TerritoryID) const
 {
 	if (const TObjectPtr<ATerritoryRegion>* Territory = TerritoryActorsByID.Find(TerritoryID))
 	{
-		return Territory->Get();
+		return IsValid(Territory->Get()) ? Territory->Get() : nullptr;
 	}
 	return nullptr;
 }
@@ -138,6 +142,11 @@ FTerritoryDefinition AWorldMapManager::GetTerritoryDefinition(FName TerritoryID)
 	FTerritoryDefinition Definition;
 	CampaignTerritoryState.TryGetDefinition(TerritoryID, Definition);
 	return Definition;
+}
+
+TArray<FName> AWorldMapManager::GetTerritoryIDs() const
+{
+	return CampaignTerritoryState.GetTerritoryIDs();
 }
 
 EFactionID AWorldMapManager::GetTerritoryOwner(FName TerritoryID) const
@@ -151,22 +160,34 @@ FTerritoryOwnershipChangeResult AWorldMapManager::ChangeTerritoryOwner(
 	FName TerritoryID,
 	EFactionID NewOwner)
 {
+	if (bCampaignTransactionActive)
+	{
+		FTerritoryOwnershipChangeResult Rejected;
+		Rejected.TerritoryID = TerritoryID;
+		Rejected.Failure = ETerritoryOwnershipFailure::TransactionInProgress;
+		return Rejected;
+	}
 	FTerritoryOwnershipChangeResult Result =
 		CampaignTerritoryState.ChangeOwner(TerritoryID, NewOwner);
+	PublishOwnershipChange(Result);
+	return Result;
+}
+
+void AWorldMapManager::PublishOwnershipChange(const FTerritoryOwnershipChangeResult& Result)
+{
 	if (Result.WasSuccessful() && Result.bOwnershipChanged)
 	{
-		if (ATerritoryRegion* Territory = GetTerritoryByID(TerritoryID))
+		if (ATerritoryRegion* Territory = GetTerritoryByID(Result.TerritoryID))
 		{
 			Territory->RefreshOwnershipPresentation(Result.PreviousOwner, Result.NewOwner);
 		}
 		OnTerritoryOwnerChanged.Broadcast(
-			TerritoryID, Result.PreviousOwner, Result.NewOwner);
+			Result.TerritoryID, Result.PreviousOwner, Result.NewOwner);
 		UE_LOG(LogRomanEmpire, Log, TEXT("Territory %s changed owner from %d to %d"),
-			*TerritoryID.ToString(),
+			*Result.TerritoryID.ToString(),
 			static_cast<int32>(Result.PreviousOwner),
 			static_cast<int32>(Result.NewOwner));
 	}
-	return Result;
 }
 
 int32 AWorldMapManager::GetFactionTerritoryCount(EFactionID FactionID) const
@@ -194,14 +215,53 @@ bool AWorldMapManager::RegisterExistingTerritory(ATerritoryRegion* Territory)
 
 	Territories.Add(Territory);
 	TerritoryActorsByID.Add(Definition.TerritoryID, Territory);
+	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
+	const URomanTerritoryDefinition* Asset = Registry && Registry->IsReady()
+		? Registry->FindTerritory(Definition.TerritoryID) : nullptr;
+	if (Asset && !Asset->StartingSettlementName.IsEmpty())
+	{
+		FoundTerritorySettlement(Definition.TerritoryID, Asset->StartingSettlementName);
+	}
 	return true;
+}
+
+FSettlementFoundingResult AWorldMapManager::FoundTerritorySettlement(FName TerritoryID, const FText& Name)
+{
+	if (bCampaignTransactionActive)
+	{
+		FSettlementFoundingResult Rejected;
+		Rejected.TerritoryID = TerritoryID;
+		Rejected.Failure = ESettlementFoundingFailure::TransactionInProgress;
+		return Rejected;
+	}
+	const FSettlementFoundingResult Result = CampaignTerritoryState.FoundSettlement(TerritoryID, Name);
+	if (Result.WasSuccessful())
+	{
+		// State is committed before any observer, including legacy actor observers.
+		if (ATerritoryRegion* Territory = GetTerritoryByID(TerritoryID); IsValid(Territory))
+		{
+			Territory->RefreshSettlementPresentation();
+		}
+		OnTerritorySettlementChanged.Broadcast(TerritoryID);
+	}
+	return Result;
+}
+
+bool AWorldMapManager::TryGetTerritorySettlement(FName TerritoryID, FTerritorySettlementState& OutSettlement) const
+{
+	return CampaignTerritoryState.TryGetSettlement(TerritoryID, OutSettlement);
+}
+
+bool AWorldMapManager::TryGetTerritoryProduction(FName TerritoryID, FFactionResourceDelta& OutProduction) const
+{
+	return CampaignTerritoryState.TryGetResourceProduction(TerritoryID, OutProduction);
 }
 
 ATerritoryRegion* AWorldMapManager::GetTerritoryAtLocation(const FVector& Location) const
 {
 	for (ATerritoryRegion* Territory : Territories)
 	{
-		if (!Territory)
+		if (!IsValid(Territory))
 		{
 			continue;
 		}
@@ -219,20 +279,27 @@ ATerritoryRegion* AWorldMapManager::GetTerritoryAtLocation(const FVector& Locati
 	return nullptr;
 }
 
+TArray<FName> AWorldMapManager::GetAdjacentTerritoryIDs(FName TerritoryID) const
+{
+	return CampaignTerritoryState.GetAdjacentIDs(TerritoryID);
+}
+
+bool AWorldMapManager::AreTerritoryIDsAdjacent(FName FirstID, FName SecondID) const
+{
+	return CampaignTerritoryState.AreAdjacent(FirstID, SecondID);
+}
+
 TArray<ATerritoryRegion*> AWorldMapManager::GetAdjacentTerritories(ATerritoryRegion* Territory) const
 {
 	TArray<ATerritoryRegion*> Adjacent;
-	
-	if (!Territory)
+	if (!IsValid(Territory) || GetTerritoryByID(Territory->GetTerritoryID()) != Territory)
 	{
 		return Adjacent;
 	}
 
-	FVector Location = Territory->GetActorLocation();
-	
-	for (ATerritoryRegion* Other : Territories)
+	for (FName NeighborID : GetAdjacentTerritoryIDs(Territory->GetTerritoryID()))
 	{
-		if (Other && Other != Territory && AreTerritoriesAdjacent(Territory, Other))
+		if (ATerritoryRegion* Other = GetTerritoryByID(NeighborID); IsValid(Other))
 		{
 			Adjacent.Add(Other);
 		}
@@ -243,14 +310,13 @@ TArray<ATerritoryRegion*> AWorldMapManager::GetAdjacentTerritories(ATerritoryReg
 
 bool AWorldMapManager::AreTerritoriesAdjacent(ATerritoryRegion* Territory1, ATerritoryRegion* Territory2) const
 {
-	if (!Territory1 || !Territory2)
+	if (!IsValid(Territory1) || !IsValid(Territory2) ||
+		GetTerritoryByID(Territory1->GetTerritoryID()) != Territory1 ||
+		GetTerritoryByID(Territory2->GetTerritoryID()) != Territory2)
 	{
 		return false;
 	}
 
-	float Distance = FVector::Distance(Territory1->GetActorLocation(), Territory2->GetActorLocation());
-	
-	// Adjacent if within 1.5 territory sizes (allows for diagonal)
-	return Distance <= TerritorySize * 1.5f;
+	return AreTerritoryIDsAdjacent(Territory1->GetTerritoryID(), Territory2->GetTerritoryID());
 }
 

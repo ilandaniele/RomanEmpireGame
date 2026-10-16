@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Camera/ZoomConfiguration.h"
 #include "Campaign/CampaignTurn.h"
+#include "Campaign/CampaignEncounterState.h"
 #include "Core/GameplayMode.h"
 #include "Faction/FactionData.h"
 #include "GameFramework/GameModeBase.h"
@@ -29,6 +30,11 @@ public:
 	ARomanEmpireGameMode();
 
 	virtual void BeginPlay() override;
+
+	UFUNCTION(BlueprintPure, Category = "Battle")
+	bool CanRestartEncounter() const;
+	UFUNCTION(BlueprintCallable, Category = "Battle")
+	bool RestartEncounter();
 
 	// Explicit gameplay mode. Possession is never inferred from a raw zoom value.
 	UFUNCTION(BlueprintCallable, Category = "Gameplay Mode")
@@ -75,6 +81,9 @@ public:
 	bool IsGameplayInitialized() const { return bGameplayInitialized; }
 
 protected:
+	/** Sandbox fallback. Strategic/session worlds suppress prototype unit seeding. */
+	UPROPERTY(EditDefaultsOnly, Category = "Campaign|Bootstrap")
+	bool bStartWithPrototypeEncounter = true;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Gameplay Mode")
 	EGameplayMode CurrentGameplayMode;
 
@@ -89,7 +98,10 @@ protected:
 	TObjectPtr<ACampaignManager> CampaignManager;
 
 private:
+	friend class ACampaignManager;
+	bool MaterializeCampaignDeployment(FCampaignEncounterState& Deployment, TArray<AUnitBase*>& SpawnedUnits);
 	bool bGameplayInitialized = false;
+	bool bEncounterTravelPending = false;
 	static constexpr int32 PrototypeRandomSeed = 1337;
 	FRandomStream PrototypeRandomStream;
 

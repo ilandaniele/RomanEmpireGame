@@ -22,6 +22,23 @@ bool FPublicGameStateDefaultsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("An uninitialized state has no turn"), State->GetCurrentTurn(), 0);
 	TestEqual(TEXT("An uninitialized state has no player faction"), State->GetPlayerFaction(), EFactionID::None);
 	TestEqual(TEXT("An uninitialized state has no controlled territories"), State->GetFactionTerritoryCount(EFactionID::Rome), 0);
+	TestTrue(TEXT("Uninitialized territorial catalog is empty"), State->GetTerritorySnapshots().IsEmpty());
+	TestTrue(TEXT("Uninitialized army catalog is empty"), State->GetCampaignArmies().IsEmpty());
+	TestFalse(TEXT("Uninitialized encounter has no identity"), State->GetCampaignEncounterPlan().EncounterID.IsValid());
+	TestFalse(TEXT("Uninitialized encounter has no consumed identity"), State->HasAppliedCampaignEncounter(FGuid::NewGuid()));
+	FCampaignArmy StaleArmy;
+	StaleArmy.ArmyID = FGuid::NewGuid(); StaleArmy.TerritoryID = TEXT("Stale");
+	TestFalse(TEXT("Uninitialized army lookup rejects"), State->TryGetCampaignArmy(StaleArmy.ArmyID, StaleArmy));
+	const FCampaignArmy EmptyArmy;
+	TestTrue(TEXT("Failed army lookup clears detached output"), FCampaignArmy::StaticStruct()->CompareScriptStruct(&StaleArmy, &EmptyArmy, 0));
+	FTerritoryPresentationSnapshot StaleTerritory;
+	StaleTerritory.TerritoryID = TEXT("Stale");
+	StaleTerritory.OwnerFaction = EFactionID::Rome;
+	StaleTerritory.AdjacentTerritoryIDs.Add(TEXT("StaleNeighbor"));
+	TestFalse(TEXT("Uninitialized territorial lookup fails"), State->TryGetTerritorySnapshot(TEXT("Rome"), StaleTerritory));
+	const FTerritoryPresentationSnapshot EmptyTerritory;
+	TestTrue(TEXT("Failed territorial lookup clears detached output"),
+		FTerritoryPresentationSnapshot::StaticStruct()->CompareScriptStruct(&StaleTerritory, &EmptyTerritory, 0));
 	const FFactionResourceAmounts EmptyWallet;
 	const FFactionResourceAmounts Wallet = State->GetFactionResources(EFactionID::Rome);
 	TestTrue(TEXT("Uninitialized wallet fields are all zero"),
@@ -33,7 +50,9 @@ bool FPublicGameStateDefaultsTest::RunTest(const FString& Parameters)
 	for (const FName FunctionName : { FName(TEXT("IsGameplayInitialized")), FName(TEXT("GetCurrentGameplayMode")),
 		FName(TEXT("GetCurrentTurn")), FName(TEXT("GetPlayerFaction")), FName(TEXT("GetFactionResources")),
 		FName(TEXT("GetObjectiveState")), FName(TEXT("IsCampaignActive")), FName(TEXT("GetFactionTerritoryCount")),
-		FName(TEXT("GetResolvedVictoryCondition")) })
+		FName(TEXT("GetResolvedVictoryCondition")), FName(TEXT("GetTerritorySnapshots")),
+		FName(TEXT("TryGetTerritorySnapshot")), FName(TEXT("GetCampaignArmies")), FName(TEXT("TryGetCampaignArmy")),
+		FName(TEXT("GetCampaignEncounterPlan")), FName(TEXT("HasAppliedCampaignEncounter")) })
 	{
 		const UFunction* Function = State->FindFunction(FunctionName);
 		TestTrue(*FString::Printf(TEXT("%s is an exported pure read"), *FunctionName.ToString()),

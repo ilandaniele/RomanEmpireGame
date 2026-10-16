@@ -21,6 +21,9 @@ class UCameraComponent;
 class USpringArmComponent;
 class UDecalComponent;
 class ARomanUnitAIController;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class URomanCharacterPresentation;
 
 /**
  * Base class for all military units in the game
@@ -38,6 +41,8 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void UnPossessed() override;
 	/** Restore the parked controller after direct control, or create the initial controller. */
 	void RestoreTacticalController();
 	UFUNCTION(BlueprintPure, Category = "Unit|Navigation")
@@ -65,6 +70,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
 	bool CanAcceptCommands() const;
+	/** World/life readiness independent of player-command eligibility; routed units remain targets. */
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	bool CanParticipateInWorld() const;
+	bool IsTacticalBattleResolved() const;
+	/** Stop encounter actions without killing, unregistering or disabling living collision. */
+	void StopForBattleResolution();
+	UFUNCTION(BlueprintPure, Category = "Unit|State")
+	bool IsRouted() const { return Vitals.IsRouted(); }
 
 	UFUNCTION(BlueprintPure, Category = "Unit|State")
 	EUnitActivity GetActivity() const;
@@ -222,7 +235,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UDecalComponent> SelectionDecal;
 
-	// Selection ring (visible green disc under selected units)
+	// Selection ring (white geometric disc under selected units)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> SelectionRingMesh;
 
@@ -273,9 +286,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Unit|Lifecycle", meta=(ClampMin="0.01"))
 	float CorpseLifetimeSeconds = 3.0f;
 
-	// Walk animation
-	float WalkAnimTime;
-
 	// Internal
 	virtual void UpdateStamina(float DeltaSeconds);
 	virtual void OnDeath();
@@ -286,6 +296,20 @@ protected:
 
 private:
 	friend class ARomanUnitAIController;
+	UPROPERTY(EditDefaultsOnly, Category = "Unit|Visuals")
+	TObjectPtr<UMaterialInterface> SurfaceMaterial;
+	UPROPERTY(EditDefaultsOnly, Category = "Unit|Visuals")
+	TMap<EFactionID, TObjectPtr<UMaterialInterface>> FactionMaterials;
+	UPROPERTY(Transient)
+	TMap<UStaticMeshComponent*, TObjectPtr<UMaterialInstanceDynamic>> VisualMaterials;
+	UPROPERTY(EditDefaultsOnly, Category = "Unit|Visuals")
+	TObjectPtr<URomanCharacterPresentation> CharacterPresentation;
+	UPROPERTY(Transient)
+	TMap<int32, TObjectPtr<UMaterialInstanceDynamic>> SkeletalVisualMaterials;
+	void ConfigureCharacterPresentation();
+	void RefreshPossessionHeadVisibility();
+	void PlayAttackPresentation(float WindupSeconds);
+	void RefreshDamageVisuals();
 	enum class EPendingMeleeKind : uint8 { None, Ordered, Direct };
 	void CancelPendingMelee();
 	void ResolveMeleeImpact();
@@ -317,5 +341,6 @@ private:
 	// Event delivery guard, not a second life/health state.
 	bool bDeathNotified = false;
 	void StopAllActions();
+	void BeginRout(AActor* DamageSource);
 };
 

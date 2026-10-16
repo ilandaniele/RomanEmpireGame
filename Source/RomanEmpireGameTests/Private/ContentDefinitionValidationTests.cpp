@@ -4,6 +4,8 @@
 
 #include "Content/RomanContentRegistry.h"
 #include "Engine/AssetManager.h"
+#include "Engine/World.h"
+#include "Misc/DataValidation.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UObjectGlobals.h"
 
@@ -94,6 +96,7 @@ bool FContentDefinitionFailureValidationTest::RunTest(const FString& Parameters)
 	Territory->Definition.TerritoryID = TEXT("Rome");
 	Territory->Definition.DisplayName = FText::FromString(TEXT("Italia"));
 	Territory->Definition.StartingOwner = EFactionID::Rome;
+	Territory->TacticalMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice")));
 
 	TArray<URomanFactionDefinition*> Factions = { Faction };
 	TArray<URomanUnitDefinition*> Units = { Unit };
@@ -132,6 +135,33 @@ bool FContentDefinitionFailureValidationTest::RunTest(const FString& Parameters)
 	Building->Definition.Cost.Gold = 0;
 
 	const TArray<URomanUnitDefinition*> MissingUnits;
+	Territory->Definition.AdjacentTerritoryIDs = { TEXT("MissingTerritory") };
+	TestTrue(TEXT("Unknown campaign neighbors are reported"), ContainsFailure(
+		RomanEmpireContent::ValidateDefinitionSet(Factions, Units, Buildings, Territories),
+		EContentDefinitionFailure::InvalidTerritoryReference));
+	URomanTerritoryDefinition* Neighbor = NewObject<URomanTerritoryDefinition>();
+	Neighbor->Definition.TerritoryID = TEXT("Sicily");
+	Neighbor->Definition.DisplayName = FText::FromString(TEXT("Sicily"));
+	Neighbor->TacticalMap = Territory->TacticalMap;
+	Territories.Add(Neighbor);
+	Territory->Definition.AdjacentTerritoryIDs = { TEXT("Sicily") };
+	TestTrue(TEXT("One-way campaign edges are reported"), ContainsFailure(
+		RomanEmpireContent::ValidateDefinitionSet(Factions, Units, Buildings, Territories),
+		EContentDefinitionFailure::InvalidTerritoryReference));
+	Neighbor->Definition.AdjacentTerritoryIDs = { TEXT("Rome") };
+	TestTrue(TEXT("Known reciprocal campaign edges pass content validation"),
+		RomanEmpireContent::ValidateDefinitionSet(Factions, Units, Buildings, Territories).IsValid());
+	Territory->Definition.AdjacentTerritoryIDs = { TEXT("Sicily"), TEXT("Sicily") };
+	TestTrue(TEXT("Duplicate campaign neighbors fail local validation"), ContainsFailure(
+		RomanEmpireContent::ValidateDefinitionSet(Factions, Units, Buildings, Territories),
+		EContentDefinitionFailure::InvalidDefinition));
+	Territory->Definition.AdjacentTerritoryIDs.Reset();
+	Territories.Pop();
+	Territory->TacticalMap.Reset();
+	TestTrue(TEXT("Missing tactical map is reported"), ContainsFailure(
+		RomanEmpireContent::ValidateDefinitionSet(Factions, Units, Buildings, Territories),
+		EContentDefinitionFailure::InvalidTacticalMap));
+	Territory->TacticalMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice")));
 	const FContentDefinitionValidationReport MissingTypeReport =
 		RomanEmpireContent::ValidateDefinitionSet(Factions, MissingUnits, Buildings, Territories);
 	TestTrue(
@@ -176,6 +206,31 @@ bool FPrimaryContentDefinitionDiscoveryTest::RunTest(const FString& Parameters)
 			*Issue.Details));
 	}
 	TestTrue(TEXT("Authored Primary Data Assets pass cross-content validation"), Report.IsValid());
+
+	FTerritoryCampaignState CampaignGraph;
+	for (const URomanTerritoryDefinition* Territory : Territories)
+	{
+		if (!Territory) continue;
+		CampaignGraph.RegisterTerritory(Territory->Definition);
+		TestEqual(TEXT("Slice territories explicitly reference the existing tactical map"),
+			Territory->TacticalMap.ToSoftObjectPath().ToString(), FString(TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice")));
+	}
+	TestTrue(TEXT("All authored campaign connections validate together"), CampaignGraph.HasValidAdjacency());
+	int32 DirectedEdges = 0;
+	for (const URomanTerritoryDefinition* First : Territories)
+	{
+		if (!First) continue;
+		DirectedEdges += First->Definition.AdjacentTerritoryIDs.Num();
+		for (const URomanTerritoryDefinition* Second : Territories)
+		{
+			if (!Second) continue;
+			const bool bLegacyNeighbor = First != Second &&
+				FVector::Distance(First->MapLocation, Second->MapLocation) <= 15000.0;
+			TestEqual(TEXT("Migration preserves each original map connection"),
+				CampaignGraph.AreAdjacent(First->Definition.TerritoryID, Second->Definition.TerritoryID), bLegacyNeighbor);
+		}
+	}
+	TestTrue(TEXT("Campaign has actual connections, not an empty migration"), DirectedEdges > 0);
 
 	const URomanFactionDefinition* Rome = nullptr;
 	for (const URomanFactionDefinition* Candidate : Factions)
@@ -244,4 +299,35 @@ bool FPrimaryContentDefinitionDiscoveryTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTacticalMapReferenceTest,
+	"RomanEmpireGame.Content.Definitions.TacticalMapReference",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+
+bool FTacticalMapReferenceTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	URomanTerritoryDefinition* Territory = NewObject<URomanTerritoryDefinition>();
+	Territory->Definition.TerritoryID = TEXT("Rome");
+	Territory->Definition.DisplayName = FText::FromString(TEXT("Italia"));
+	for (const TCHAR* Invalid : { TEXT(""), TEXT("/Game/Maps/Missing.Missing"),
+		TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice:PersistentLevel"),
+		TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice_C"),
+		TEXT("/Game/Data/Territories/PDA_Territory_Rome.PDA_Territory_Rome") })
+	{
+		Territory->TacticalMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(Invalid));
+		TestFalse(FString::Printf(TEXT("Invalid World reference rejects: %s"), Invalid), Territory->HasValidTacticalMap());
+		FDataValidationContext Context;
+		TestTrue(TEXT("Editor data validation also rejects invalid map"),
+			Territory->IsDataValid(Context) == EDataValidationResult::Invalid);
+	}
+	const FSoftObjectPath MapPath(TEXT("/Game/Maps/L_VerticalSlice.L_VerticalSlice"));
+	Territory->TacticalMap = TSoftObjectPtr<UWorld>(MapPath);
+	UObject* Before = MapPath.ResolveObject();
+	TestTrue(TEXT("Existing top-level World is valid without loading it"), Territory->HasValidTacticalMap());
+	FDataValidationContext Context;
+	TestTrue(TEXT("Editor data validation accepts the complete territory"),
+		Territory->IsDataValid(Context) == EDataValidationResult::Valid);
+	TestTrue(TEXT("Both validators leave World residency unchanged"), MapPath.ResolveObject() == Before);
+	return true;
+}
 #endif

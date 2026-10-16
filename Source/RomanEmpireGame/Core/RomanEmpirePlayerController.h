@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Battle/TacticalBattleResult.h"
 #include "Camera/ZoomConfiguration.h"
+#include "Campaign/CampaignSessionSubsystem.h"
 #include "Core/GameplayMode.h"
 #include "Core/SelectionOperation.h"
 #include "Faction/FactionData.h"
@@ -23,6 +25,8 @@ class UBuildingPlacementComponent;
 class ASeamlessZoomCamera;
 class APlayerCameraManager;
 class URomanEmpireMainWidget;
+class URomanSettingsWidget;
+class UUserWidget;
 
 /**
  * Selection mode for the player
@@ -52,18 +56,47 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetAudioListenerPosition(FVector& OutLocation, FVector& OutFrontDir, FVector& OutRightDir) const override;
 	virtual void FlushPressedKeys() override;
 	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 	virtual bool ShouldFlushKeysWhenViewportFocusChanges() const override { return true; }
+	UFUNCTION(BlueprintCallable, Category="Preferences") bool OpenSettings();
+	UFUNCTION(BlueprintCallable, Category="Preferences") void CloseSettings();
+	UFUNCTION(BlueprintPure, Category="Preferences") bool IsSettingsOpen() const;
+	UFUNCTION(BlueprintPure, Category="Preferences") UUserWidget* GetSettingsWidget() const;
+	/** UI-only key tracking retains movement-release safety across focus changes. */
+	void ObserveSettingsKey(FKey Key,bool bPressed);
 
 	UFUNCTION(BlueprintPure, Category = "Input")
 	bool CanIssueTacticalCommands() const;
 
 	UFUNCTION(BlueprintPure, Category = "Input")
 	bool CanEndTurn() const;
+	UFUNCTION(BlueprintPure, Category = "Campaign|AI")
+	bool IsAwaitingAITacticalTravel() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	bool RequestEndTurn();
+
+	UFUNCTION(BlueprintPure, Category = "Battle")
+	bool CanRestartEncounter() const;
+	UFUNCTION(BlueprintCallable, Category = "Battle")
+	bool RestartEncounter();
+	UFUNCTION(BlueprintPure, Category = "Campaign") bool CanEnterCampaignSession() const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign") ECampaignSessionFailure EnterCampaignSession();
+	UFUNCTION(BlueprintPure, Category = "Campaign") bool CanContinueCampaign() const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign") ECampaignSessionFailure ContinueCampaign();
+	UFUNCTION(BlueprintPure, Category = "Campaign") bool CanRetryCampaignTransfer() const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign") ECampaignSessionFailure RetryCampaignTransfer();
+	UFUNCTION(BlueprintPure, Category = "Campaign") bool CanMoveCampaignArmy(FGuid ArmyID, FName TargetTerritoryID) const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign") FCampaignArmyMutationResult RequestMoveCampaignArmy(FGuid ArmyID, FName TargetTerritoryID);
+	UFUNCTION(BlueprintPure, Category = "Campaign") bool CanStartCampaignBattle(FGuid ArmyID, FName TargetTerritoryID) const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign") ECampaignSessionFailure RequestStartCampaignBattle(FGuid ArmyID, FName TargetTerritoryID);
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies") TArray<FName> GetCampaignUnitChoices() const;
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies") FCampaignRecruitmentQuote GetCampaignRecruitmentQuote(FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID) const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Armies") FCampaignArmyMutationResult RequestRecruitCampaignUnits(FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID);
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies") bool CanAssignCampaignArmyUnits(FGuid SourceArmyID, FGuid DestinationArmyID, FName UnitID, int32 Count) const;
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Armies") FCampaignArmyMutationResult RequestAssignCampaignArmyUnits(FGuid SourceArmyID, FGuid DestinationArmyID, FName UnitID, int32 Count);
 
 	UFUNCTION(BlueprintCallable, Category = "Building")
 	bool StartBuildingPlacementByQuickSlot(int32 QuickSlot);
@@ -190,6 +223,10 @@ public:
 
 	// Building select / training
 	bool OnTrainButtonClicked();
+	UFUNCTION(BlueprintPure, Category = "Building")
+	bool CanCancelSelectedTraining() const;
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	bool CancelSelectedTraining();
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	URomanEmpireMainWidget* GetMainWidget() const { return MainWidget; }
@@ -259,6 +296,8 @@ protected:
 	void HandleEdgeScroll(float DeltaTime);
 
 private:
+	UCampaignSessionSubsystem* GetCurrentCampaignSession() const;
+	bool CanIssueCampaignActions() const;
 	// Box selection
 	FVector2D BoxSelectStart;
 	bool bIsBoxSelecting;
@@ -278,9 +317,13 @@ private:
 	bool CanControlCamera() const;
 	void CaptureHeldMovementKeys(UInputMappingContext* DestinationContext);
 	TSet<FKey> MovementKeysAwaitingRelease;
+	UPROPERTY(Transient) TObjectPtr<URomanSettingsWidget> SettingsWidget;
+	bool bOwnsSettingsPause=false;
 
 	UFUNCTION()
 	void HandleGameplayInitialized();
+	UFUNCTION()
+	void HandleTacticalBattleChanged(FTacticalBattleResult Result);
 
 	UFUNCTION()
 	void HandleGameplayModeChanged(EGameplayMode OldMode, EGameplayMode NewMode);

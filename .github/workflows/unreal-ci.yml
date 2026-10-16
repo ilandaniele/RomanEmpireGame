@@ -1,0 +1,104 @@
+name: Unreal offline gates
+
+# Never run an untrusted fork on an Unreal self-hosted machine.
+# Configure the trusted runner AND protected environment before setting READY.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roman-unreal-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require explicit trusted-runner configuration
+        env:
+          CI_RUNNER_READY: ${{ vars.ROMAN_CI_TRUSTED_RUNNER_READY }}
+          CI_ENGINE_ROOT: ${{ vars.ROMAN_CI_ENGINE_ROOT }}
+        run: |
+          if [ "$CI_RUNNER_READY" != "true" ] || [ -z "$CI_ENGINE_ROOT" ]; then
+            echo 'Unreal CI is not activated: configure the isolated Windows runner, environment approval and engine root.'
+            exit 1
+          fi
+
+  offline:
+    needs: authorization
+    runs-on: [self-hosted, Windows, X64, roman-ue-5.8.2]
+    environment: unreal-trusted
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: powershell
+    env:
+      ROMANEMPIREGAME_ENGINE_ROOT: ${{ vars.ROMAN_CI_ENGINE_ROOT }}
+    steps:
+      - name: Checkout exact revision and LFS content
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2, reviewed SHA
+        with:
+          lfs: true
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Capture build identity
+        run: |
+          .\Tools\write_build_metadata.ps1 -EngineRoot $env:ROMANEMPIREGAME_ENGINE_ROOT
+          $metadata = Get-Content -LiteralPath Artifacts/CI/build-metadata-CI.json -Raw | ConvertFrom-Json
+          if ($metadata.engineVersion -ne '5.8.2' -or $metadata.dirty) { throw 'CI requires UE5.8.2 and a clean source checkout' }
+
+      - name: Verify source policies and negative report gate
+        run: |
+          .\Tools\validate_repository.ps1
+          git lfs fsck
+          if ($LASTEXITCODE -ne 0) { throw 'LFS verification failed' }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Whitespace verification failed' }
+          python -m unittest discover -s Tools/tests -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python source/recipe tests failed' }
+          .\Tools\tests\test_automation_report.ps1
+          .\Tools\tests\test_unit_load_summary.ps1
+          python .\Tools\security_gate.py > Artifacts/CI/SecurityGate.json
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate secret/dependency gate failed; inspect redacted receipt' }
+
+      - name: Generate and compile Editor
+        run: |
+          .\BuildProject.ps1 -Action Generate *> Artifacts/CI/Generate.log
+          .\BuildProject.ps1 -Action Editor *> Artifacts/CI/Editor.log
+
+      - name: Native gameplay, content and actual PIE gates
+        run: .\BuildProject.ps1 -Action Test -DisableFab *> Artifacts/CI/NativeTests.log
+
+      - name: Strict standalone include compilation
+        run: .\BuildProject.ps1 -Action IWYU *> Artifacts/CI/IWYU.log
+
+      - name: Development QA package
+        run: |
+          .\BuildProject.ps1 -Action Package -Configuration Development -DisableFab -ArchiveDirectory "$PWD/Artifacts/CI/Packages/Development" *> Artifacts/CI/PackageDevelopment.log
+          .\Tools\write_build_metadata.ps1 -EngineRoot $env:ROMANEMPIREGAME_ENGINE_ROOT -Configuration Development
+
+      - name: Shipping package
+        run: |
+          .\BuildProject.ps1 -Action Package -Configuration Shipping -DisableFab -ArchiveDirectory "$PWD/Artifacts/CI/Packages/Shipping" *> Artifacts/CI/PackageShipping.log
+          .\Tools\write_build_metadata.ps1 -EngineRoot $env:ROMANEMPIREGAME_ENGINE_ROOT -Configuration Shipping
+
+      # Intentionally no unsigned launch/security bypass or fake smoke success.
+      # Trusted-player/render/performance gates remain required before release.
+      - name: Publish private QA evidence and packages
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2, reviewed SHA
+        with:
+          name: roman-offline-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            Artifacts/CI/
+            Artifacts/Automation/
+            Saved/Logs/
+          if-no-files-found: error
+          retention-days: 7

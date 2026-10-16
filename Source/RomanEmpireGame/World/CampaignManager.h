@@ -3,8 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Campaign/CampaignArmyState.h"
+#include "Campaign/CampaignAIPlanning.h"
+#include "Campaign/CampaignEncounterState.h"
 #include "Campaign/CampaignObjectiveState.h"
 #include "Campaign/CampaignTurn.h"
+#include "Campaign/CampaignTransfer.h"
 #include "GameFramework/Actor.h"
 #include "Faction/FactionData.h"
 #include "Math/RandomStream.h"
@@ -12,6 +16,9 @@
 
 class AFactionManager;
 class AWorldMapManager;
+class ABarracks;
+class AUnitBase;
+struct FTrainingReservation;
 
 /**
  * Manages the campaign/strategic layer of the game
@@ -63,6 +70,42 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetLastAutosaveRequestedTurn() const { return LastAutosaveRequestedTurn; }
+
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies")
+	TArray<FCampaignArmy> GetCampaignArmies() const;
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies")
+	bool TryGetCampaignArmy(FGuid ArmyID, FCampaignArmy& OutArmy) const;
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignArmiesChanged);
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Armies")
+	FOnCampaignArmiesChanged OnCampaignArmiesChanged;
+
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Armies")
+	FCampaignArmyMutationResult MoveCampaignArmy(FGuid ArmyID, FName TargetTerritoryID);
+	/** Strategic quantities only. Requires a ready Strategic session; no actor is spawned. */
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Armies")
+	FCampaignArmyMutationResult AssignCampaignArmyUnits(FGuid SourceArmyID, FGuid DestinationArmyID, FName UnitID, int32 Count);
+	UFUNCTION(BlueprintPure, Category = "Campaign|Armies")
+	FCampaignRecruitmentQuote GetCampaignRecruitmentQuote(FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID) const;
+	/** Invalid destination requests a fresh army at the selected owned settlement. */
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Armies")
+	FCampaignArmyMutationResult RecruitCampaignUnits(FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID);
+	/** Read-only proposal for the slice AI. Execution belongs to the canonical turn pipeline. */
+	UFUNCTION(BlueprintPure, Category = "Campaign|AI")
+	FCampaignAIProposal GetCampaignAIProposal() const;
+	UFUNCTION(BlueprintPure, Category = "Campaign|AI")
+	bool IsAwaitingAITacticalTravel() const { return bAwaitingAITacticalTravel; }
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Encounter")
+	ECampaignEncounterFailure BeginCampaignEncounter(FGuid AttackingArmyID, FName TargetTerritoryID);
+	/** Reads the canonical subsystem result; callers cannot submit invented casualties. */
+	UFUNCTION(BlueprintCallable, Category = "Campaign|Encounter")
+	ECampaignEncounterFailure ApplyCurrentEncounterResult();
+	UFUNCTION(BlueprintPure, Category = "Campaign|Encounter")
+	FCampaignEncounterPlan GetCampaignEncounterPlan() const;
+	UFUNCTION(BlueprintPure, Category = "Campaign|Encounter")
+	bool HasAppliedCampaignEncounter(FGuid EncounterID) const;
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignEncounterChanged);
+	UPROPERTY(BlueprintAssignable, Category = "Campaign|Encounter")
+	FOnCampaignEncounterChanged OnCampaignEncounterChanged;
 
 	// Save/Load (placeholder)
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
@@ -139,6 +182,38 @@ protected:
 	TObjectPtr<AWorldMapManager> WorldMapManager;
 
 private:
+	friend class UCampaignSessionSubsystem;
+	friend class UCampaignSaveSubsystem;
+	ECampaignTransferFailure CaptureForSave(FCampaignTransferSnapshot& Out, bool bAutosaveBoundary = false) const;
+	ECampaignTransferFailure ValidateSavedCampaign(const FCampaignTransferSnapshot& Snapshot) const;
+	ECampaignEncounterFailure PrepareEncounterForTravel(FGuid ArmyID, FName Target, FCampaignEncounterState& Out, bool bAIStage = false) const;
+	ECampaignTransferFailure CaptureForTravel(ECampaignTransferPhase Phase, const FSoftObjectPath& Destination,
+		const FSoftObjectPath& ReturnMap, const FCampaignEncounterState& PreparedEncounter, FCampaignTransferSnapshot& Out);
+	ECampaignTransferFailure RestoreFromTravel(const FCampaignTransferSnapshot& Snapshot);
+	void CancelTravelFreeze();
+	void FreezeForTravel();
+	bool bCampaignTransferPending = false;
+	friend class ABarracks;
+	bool PrepareTrainingReservation(FTrainingReservation& Reservation) const;
+	bool EnrollTrainedUnit(ABarracks* Producer, AUnitBase* Unit, const FTrainingReservation& Reservation);
+	UPROPERTY()
+	FCampaignArmyState ArmyState;
+	UPROPERTY()
+	FCampaignEncounterState EncounterState;
+	bool bEncounterMutationActive = false;
+	ECampaignEncounterFailure ValidateCampaignAuthority(bool bAllowResolvedCampaign = false, bool bAIStage = false, bool bAutosaveStage = false) const;
+	FCampaignRecruitmentQuote QuoteRecruitmentForFaction(EFactionID Faction, FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID) const;
+	FCampaignArmyMutationResult RecruitUnitsForFaction(EFactionID Faction, FName TerritoryID, FName UnitID, int32 Count, FGuid DestinationArmyID);
+	ECampaignTurnFailure ApplyCampaignAIProposal();
+	ECampaignTurnFailure DispatchQueuedAIEncounter();
+	void CancelQueuedAIOnTerminalOutcome();
+	bool ValidateQueuedAIEncounter(FCampaignEncounterState& Out) const;
+	UPROPERTY()
+	bool bAwaitingAITacticalTravel = false;
+	ECampaignTurnStep ExecutingTurnStep = ECampaignTurnStep::ValidateRequest;
+	ECampaignArmyFailure ValidateStrategicArmyAction(bool bReadOnly = false) const;
+	bool ValidateDeploymentContent(const FCampaignEncounterPlan& Plan) const;
+	bool BuildStartingArmies(FCampaignArmyState& OutState) const;
 	static constexpr int32 PrototypeTurnRandomSeed = 1337;
 	FRandomStream TurnRandomStream;
 	bool bIsProcessingTurn = false;

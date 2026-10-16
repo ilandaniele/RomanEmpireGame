@@ -19,7 +19,7 @@ void ARomanUnitAIController::OnUnPossess()
 
 void ARomanUnitAIController::SynchronizeOrder(AUnitBase* Unit)
 {
-	if (!IsValid(Unit) || GetPawn() != Unit || !Unit->CanAcceptCommands() ||
+	if (!IsValid(Unit) || GetPawn() != Unit || !Unit->CanParticipateInWorld() || Unit->IsTacticalBattleResolved() ||
 		Unit->IsPossessedByPlayer() || !Unit->Orders.HasMoveCommand())
 	{
 		CancelOrderNavigation();
@@ -28,7 +28,7 @@ void ARomanUnitAIController::SynchronizeOrder(AUnitBase* Unit)
 	const uint64 Revision = Unit->Orders.GetRevision();
 	if (ActiveRequest.IsValid() && ActiveUnit == Unit && ActiveRevision == Revision) return;
 	CancelOrderNavigation();
-	if (!IsValid(Unit) || GetPawn() != Unit || !Unit->CanAcceptCommands() || Unit->IsPossessedByPlayer() ||
+	if (!IsValid(Unit) || GetPawn() != Unit || !Unit->CanParticipateInWorld() || Unit->IsTacticalBattleResolved() || Unit->IsPossessedByPlayer() ||
 		Unit->Orders.GetRevision() != Revision || !Unit->Orders.HasMoveCommand()) return;
 
 	FAIMoveRequest Request;
@@ -45,7 +45,7 @@ void ARomanUnitAIController::SynchronizeOrder(AUnitBase* Unit)
 	const FPathFollowingRequestResult Result = MoveTo(Request);
 	// MoveTo may finish/abort immediately and external engine observers can replace intent.
 	if (!IsValid(Unit) || GetPawn() != Unit || Unit->Orders.GetRevision() != Revision ||
-		!Unit->CanAcceptCommands() || Unit->IsPossessedByPlayer())
+		!Unit->CanParticipateInWorld() || Unit->IsTacticalBattleResolved() || Unit->IsPossessedByPlayer())
 	{
 		// Cancel only this stale submission, never a newer observer-owned request.
 		if (Result.Code == EPathFollowingRequestResult::RequestSuccessful && GetPathFollowingComponent())

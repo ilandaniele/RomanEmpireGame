@@ -17,12 +17,16 @@ class ROMANEMPIREGAME_API FTacticalBattleState
 {
 public:
 	bool BeginEncounter(FName InObjectiveID, EFactionID InPlayerFaction,
-		EFactionID InEnemyFaction, const TArray<FTacticalSquadSeed>& StartingSquads);
+		EFactionID InEnemyFaction, const TArray<FTacticalSquadSeed>& StartingSquads,
+		FGuid InEncounterID = FGuid(), EFactionID InAttackingFaction = EFactionID::None);
+	EFactionID GetAttackingFaction() const { return AttackingFaction; }
+	EFactionID GetDefendingFaction() const { return AttackingFaction == PlayerFaction ? EnemyFaction : PlayerFaction; }
 	bool RegisterReinforcement(const FTacticalSquadSeed& Squad);
 	bool RecordCasualty(FGuid SquadID, int32 Count = 1);
 	bool CaptureObjective(EFactionID CapturingFaction);
 	FTacticalBattleResult GetResult() const;
 	bool HasEncounter() const { return bHasEncounter; }
+	bool IsResolved() const { return bHasEncounter && Outcome != ETacticalBattleOutcome::InProgress; }
 	void Reset();
 
 private:
@@ -31,10 +35,12 @@ private:
 	void EvaluateCasualties();
 
 	bool bHasEncounter = false;
+	FGuid EncounterID;
 	FName ObjectiveID = NAME_None;
 	FName CapturedObjectiveID = NAME_None;
 	EFactionID PlayerFaction = EFactionID::None;
 	EFactionID EnemyFaction = EFactionID::None;
+	EFactionID AttackingFaction = EFactionID::None;
 	ETacticalBattleOutcome Outcome = ETacticalBattleOutcome::InProgress;
 	TArray<FTacticalBattleSquadResult> Squads;
 	TMap<FGuid, int32> SquadIndices;

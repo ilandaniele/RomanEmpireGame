@@ -22,6 +22,11 @@ public:
 
 	/** Immediate snapshot; consumers must revalidate actors after any callback. No stable ordering. */
 	TArray<AUnitBase*> GetUnitsForFaction(EFactionID Faction) const;
+	/** Validated weak-index snapshot; never a world actor scan. */
+	TArray<AUnitBase*> GetRegisteredUnits() const;
+	DECLARE_MULTICAST_DELEGATE(FOnUnitRegistryChanged);
+	/** Invalidation after committed registration/ownership/removal; re-query actors. */
+	FOnUnitRegistryChanged OnUnitRegistryChanged;
 	bool ContainsUnit(const AActor* Actor) const;
 	int32 GetRegisteredUnitCount() const { return RegisteredUnits.Num(); }
 

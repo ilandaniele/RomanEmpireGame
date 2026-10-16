@@ -1,8 +1,14 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "UnitBase.h"
+#include "Audio/RomanFeedbackSubsystem.h"
+#include "Battle/TacticalBattleSubsystem.h"
 #include "Units/RomanUnitRegistry.h"
 #include "Units/RomanUnitAIController.h"
+#include "Units/RomanCharacterPresentation.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Engine/SkeletalMesh.h"
 #include "Content/RomanContentRegistry.h"
 #include "RomanEmpireGame.h"
 #include "CollisionQueryParams.h"
@@ -19,6 +25,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 AUnitBase::AUnitBase()
 {
@@ -26,6 +33,18 @@ AUnitBase::AUnitBase()
 	AIControllerClass = ARomanUnitAIController::StaticClass();
 	// Initialize content/lifecycle before creating the tactical controller in BeginPlay.
 	AutoPossessAI = EAutoPossessAI::Disabled;
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Surface(TEXT("/Game/Materials/RomanVisual/MI_Surface"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Rome(TEXT("/Game/Materials/RomanVisual/MI_FactionRome"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Carthage(TEXT("/Game/Materials/RomanVisual/MI_FactionCarthage"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Gaul(TEXT("/Game/Materials/RomanVisual/MI_FactionGaul"));
+	SurfaceMaterial = Surface.Object;
+	FactionMaterials.Add(EFactionID::Rome, Rome.Object);
+	FactionMaterials.Add(EFactionID::Carthage, Carthage.Object);
+	FactionMaterials.Add(EFactionID::Gaul, Gaul.Object);
+	// Small mandatory bootstrap bundle, retained by reflected CDO/instances.
+	// No loads/scans on orders, damage, animation updates or ownership changes.
+	static ConstructorHelpers::FObjectFinder<URomanCharacterPresentation> Characters(TEXT("/Game/Characters/RomanSoldier/DA_RomanCharacterPresentation"));
+	CharacterPresentation = Characters.Object;
 
 	// Configure capsule (collision only, not visible in-game)
 	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
@@ -34,9 +53,15 @@ AUnitBase::AUnitBase()
 	GetCapsuleComponent()->SetCastShadow(false);
 	GetCapsuleComponent()->SetCanEverAffectNavigation(false);
 
-	// Hide default skeletal mesh (we use custom static meshes instead)
+	// Capsule remains sole collision/nav authority. Verified imported forward+Y;
+	// reflect transverse X then yaw-90 to preserve +X-forward/+Y-right anatomy.
 	if (GetMesh())
 	{
+		GetMesh()->SetRelativeLocation(FVector(0, 0, -96));
+		GetMesh()->SetRelativeRotation(FRotator(0, -90, 0));
+		GetMesh()->SetRelativeScale3D(FVector(-1, 1, 1));
+		GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		GetMesh()->SetCanEverAffectNavigation(false);
 		GetMesh()->SetVisibility(false);
 		GetMesh()->SetHiddenInGame(true);
 		GetMesh()->SetCastShadow(false);
@@ -80,6 +105,8 @@ AUnitBase::AUnitBase()
 		SelectionRingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SelectionRingMesh->SetVisibility(false); // Hidden until selected
 		SelectionRingMesh->SetHiddenInGame(true); // Truly hidden
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> Selection(TEXT("/Game/Materials/RomanVisual/MI_Selection"));
+		SelectionRingMesh->SetMaterial(0, Selection.Object);
 
 		static ConstructorHelpers::FObjectFinder<UStaticMesh> RingMesh(TEXT("/Engine/BasicShapes/Cylinder"));
 		if (RingMesh.Succeeded())
@@ -279,7 +306,6 @@ AUnitBase::AUnitBase()
 	// Initialize state
 	OwnerFaction = EFactionID::None;
 	bIsPossessedByPlayer = false;
-	WalkAnimTime = 0.0f;
 }
 
 void AUnitBase::BeginPlay()
@@ -320,11 +346,12 @@ void AUnitBase::BeginPlay()
 		Registry->SynchronizeUnit(this);
 	}
 	RestoreTacticalController();
+	if (IsRouted()) BeginRout(nullptr);
 }
 
 void AUnitBase::RestoreTacticalController()
 {
-	if (!CanAcceptCommands() || bIsPossessedByPlayer || GetController()) return;
+	if (!CanParticipateInWorld() || bIsPossessedByPlayer || GetController()) return;
 	if (IsValid(TacticalController) && !TacticalController->GetPawn())
 	{
 		TacticalController->Possess(this);
@@ -336,6 +363,30 @@ void AUnitBase::RestoreTacticalController()
 	}
 }
 
+void AUnitBase::RefreshPossessionHeadVisibility()
+{
+	if (!GetMesh() || !GetMesh()->GetSkeletalMeshAsset() || IsActorBeingDestroyed()) return;
+	// Offline local possession only. Hide the rigged head/helmet, not arms,
+	// weapon or collision. Restore on AI/RTS/death/ownership teardown.
+	// This affects this local world's mesh, not a per-view multiplayer solution.
+	const bool Hide = bIsPossessedByPlayer && IsPlayerControlled() && IsLocallyControlled();
+	if (Hide) GetMesh()->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
+	else GetMesh()->UnHideBoneByName(TEXT("head"));
+}
+
+void AUnitBase::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	// SetPossessedByPlayer(true) commits before the actual controller transfer.
+	RefreshPossessionHeadVisibility();
+}
+
+void AUnitBase::UnPossessed()
+{
+	Super::UnPossessed();
+	RefreshPossessionHeadVisibility();
+}
+
 void AUnitBase::StopNavigation()
 {
 	if (IsValid(TacticalController)) TacticalController->CancelOrderNavigation();
@@ -343,7 +394,7 @@ void AUnitBase::StopNavigation()
 
 void AUnitBase::CompleteNavigation(uint64 Revision, bool bSuccess)
 {
-	if (!CanAcceptCommands() || bIsPossessedByPlayer || Orders.GetRevision() != Revision) return;
+	if (!CanParticipateInWorld() || bIsPossessedByPlayer || Orders.GetRevision() != Revision) return;
 	if (bSuccess)
 	{
 		Orders.StopMovement();
@@ -387,6 +438,23 @@ bool AUnitBase::InitializeUnit(FName DefinitionID, EFactionID NewOwner)
 
 bool AUnitBase::CanAcceptCommands() const
 {
+	return CanParticipateInWorld() && !IsRouted() && !IsTacticalBattleResolved();
+}
+
+bool AUnitBase::IsTacticalBattleResolved() const
+{
+	const UTacticalBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UTacticalBattleSubsystem>() : nullptr;
+	return Battle && Battle->IsResolved();
+}
+
+void AUnitBase::StopForBattleResolution()
+{
+	StopAllActions();
+	SetActorTickEnabled(false);
+}
+
+bool AUnitBase::CanParticipateInWorld() const
+{
 	return HasActorBegunPlay() && IsAlive() && !IsActorBeingDestroyed();
 }
 
@@ -394,6 +462,7 @@ EUnitActivity AUnitBase::GetActivity() const
 {
 	if (GetLifeState() == EUnitLifeState::Ended) return EUnitActivity::Ended;
 	if (GetLifeState() == EUnitLifeState::Dead) return EUnitActivity::Dead;
+	if (CanParticipateInWorld() && IsRouted()) return EUnitActivity::Routed;
 	if (!CanAcceptCommands()) return EUnitActivity::Unavailable;
 	if (Combat.IsAttackInProgress()) return EUnitActivity::Attacking;
 	return Orders.GetOrderType() == EUnitOrderType::None ? EUnitActivity::Idle : EUnitActivity::Commanded;
@@ -426,6 +495,16 @@ void AUnitBase::Tick(float DeltaSeconds)
 		SetActorLocation(Loc, false);
 		return; // Dead units skip all other logic
 	}
+	if (IsTacticalBattleResolved())
+	{
+		StopForBattleResolution();
+		return;
+	}
+	if (CanParticipateInWorld() && IsRouted())
+	{
+		if (ARomanUnitAIController* AI = Cast<ARomanUnitAIController>(GetController())) AI->SynchronizeOrder(this);
+		return; // Withdrawal has no attack, acquisition, stamina action or rally loop.
+	}
 	if (!CanAcceptCommands()) return;
 
 	// The only temporal combat update, before either AI or direct-control actions.
@@ -440,7 +519,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 		if (Orders.GetOrderType() == EUnitOrderType::Attack)
 		{
 			AUnitBase* Target = Cast<AUnitBase>(Orders.GetTarget());
-			if (Target && Target->CanAcceptCommands() && Target->GetOwnerFaction() != OwnerFaction)
+			if (Target && Target->CanParticipateInWorld() && Target->GetOwnerFaction() != OwnerFaction)
 			{
 				float Dist2D = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
 				if (Dist2D <= UnitData.AttackRange)
@@ -459,8 +538,7 @@ void AUnitBase::Tick(float DeltaSeconds)
 						PendingMeleeTarget = Target;
 						PendingMeleeOrderRevision = Revision;
 
-						// Arm swing
-						if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator(-60.0f, 0.0f, 0.0f));
+						PlayAttackPresentation(WindupDuration);
 					}
 					// Face target while fighting
 					FVector FaceDir = Target->GetActorLocation() - GetActorLocation();
@@ -488,35 +566,6 @@ void AUnitBase::Tick(float DeltaSeconds)
 		if (ARomanUnitAIController* AI = Cast<ARomanUnitAIController>(GetController())) AI->SynchronizeOrder(this);
 	} // END if (!bIsPossessedByPlayer)
 
-	// Procedural walking animation (limb swinging)
-	bool bIsMoving = (GetVelocity().SizeSquared2D() > 100.0f);
-	if (bIsMoving)
-	{
-		WalkAnimTime += DeltaSeconds * 8.0f; // Walk cycle speed
-		float Swing = FMath::Sin(WalkAnimTime) * 15.0f; // degrees
-
-		// Arms swing opposite to legs
-		if (RightArmMesh)
-			RightArmMesh->SetRelativeRotation(FRotator(Swing, 0.0f, 0.0f));
-		if (LeftArmMesh)
-			LeftArmMesh->SetRelativeRotation(FRotator(-Swing, 0.0f, 0.0f));
-
-		// Legs alternate
-		if (RightLegMesh)
-			RightLegMesh->SetRelativeRotation(FRotator(-Swing, 0.0f, 0.0f));
-		if (LeftLegMesh)
-			LeftLegMesh->SetRelativeRotation(FRotator(Swing, 0.0f, 0.0f));
-	}
-	else
-	{
-		// Reset limbs to default when idle
-		WalkAnimTime = 0.0f;
-		if (RightArmMesh) RightArmMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		if (LeftArmMesh) LeftArmMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		if (RightLegMesh) RightLegMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		if (LeftLegMesh) LeftLegMesh->SetRelativeRotation(FRotator::ZeroRotator);
-	}
-
 	UpdateStamina(DeltaSeconds);
 }
 
@@ -539,9 +588,45 @@ void AUnitBase::SetOwnerFaction(EFactionID NewOwner)
 	OnOwnerFactionChanged.Broadcast(this);
 }
 
+void AUnitBase::ConfigureCharacterPresentation()
+{
+	USkeletalMeshComponent* CharacterMesh = GetMesh();
+	if (!CharacterMesh || !CharacterPresentation || !IsInitialized()) return;
+	USkeletalMesh* Profile = OwnerFaction == EFactionID::Carthage ? CharacterPresentation->CarthageMesh
+		: OwnerFaction == EFactionID::Gaul ? CharacterPresentation->GaulMesh : CharacterPresentation->RomeMesh;
+	if (!Profile || !CharacterPresentation->AnimationClass || !CharacterPresentation->AttackMontage) return;
+	if (CharacterMesh->GetSkeletalMeshAsset() != Profile)
+	{
+		SkeletalVisualMaterials.Empty(); CharacterMesh->EmptyOverrideMaterials();
+		CharacterMesh->SetSkeletalMeshAsset(Profile);
+	}
+	if (!CharacterMesh->GetAnimInstance() || CharacterMesh->GetAnimInstance()->GetClass() != CharacterPresentation->AnimationClass)
+		CharacterMesh->SetAnimInstanceClass(CharacterPresentation->AnimationClass);
+	CharacterMesh->SetVisibility(true); CharacterMesh->SetHiddenInGame(false); CharacterMesh->SetCastShadow(true);
+	RefreshPossessionHeadVisibility();
+	// Keep legacy subobject identities for existing BP serialization/diagnostic
+	// compatibility, but never display both figures or animate procedural limbs.
+	for (UStaticMeshComponent* Part : {VisualMesh.Get(), HeadMesh.Get(), WeaponMesh.Get(), ShieldMesh.Get(),
+		RightArmMesh.Get(), LeftArmMesh.Get(), RightLegMesh.Get(), LeftLegMesh.Get(),
+		RightHandMesh.Get(), LeftHandMesh.Get(), RightFootMesh.Get(), LeftFootMesh.Get()})
+		if (Part) { Part->SetVisibility(false); Part->SetHiddenInGame(true); }
+}
+
+void AUnitBase::PlayAttackPresentation(float WindupSeconds)
+{
+	UAnimInstance* Animation = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!Animation || !CharacterPresentation || !CharacterPresentation->AttackMontage || !CanAcceptCommands() || !IsAttacking()
+		|| !FMath::IsFinite(WindupSeconds) || WindupSeconds <= 0.f) return;
+	// Original clip apex is halfway through. Match the existing canonical windup,
+	// without animation callbacks, root motion, notifies or damage ownership.
+	const float Rate = CharacterPresentation->AttackMontage->GetPlayLength() / (2.f * WindupSeconds);
+	if (FMath::IsFinite(Rate) && Rate > 0.f) Animation->Montage_Play(CharacterPresentation->AttackMontage, Rate);
+}
+
 void AUnitBase::ApplyFactionColor()
 {
 	if (!VisualMesh) return;
+	ConfigureCharacterPresentation();
 
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
 	const URomanFactionDefinition* Faction = Registry ? Registry->FindFaction(OwnerFaction) : nullptr;
@@ -549,72 +634,56 @@ void AUnitBase::ApplyFactionColor()
 		? Faction->Definition.FactionColor
 		: FLinearColor(0.5f, 0.5f, 0.5f);
 
-	UMaterial* BaseMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
-	if (BaseMat)
+	const auto Apply = [this](UStaticMeshComponent* Part, UMaterialInterface* Parent, FLinearColor Color, float Metallic = 0.f)
 	{
-		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(BaseMat, this);
-		if (MID)
+		if (!Part || !Parent) return;
+		UMaterialInstanceDynamic* MID = VisualMaterials.FindRef(Part);
+		if (!MID || MID->Parent != Parent)
 		{
-			MID->SetVectorParameterValue(TEXT("Color"), FactionColor);
-			VisualMesh->SetMaterial(0, MID);
+			MID = UMaterialInstanceDynamic::Create(Parent, this);
+			if (!MID) return;
+			VisualMaterials.Add(Part, MID);
+			Part->SetMaterial(0, MID);
 		}
-
-		// Color head with a lighter skin tone variant
-		if (HeadMesh)
+		MID->SetVectorParameterValue(TEXT("Color"), Color);
+		MID->SetScalarParameterValue(TEXT("Metallic"), Metallic);
+	};
+	UMaterialInterface* FactionParent = FactionMaterials.FindRef(OwnerFaction);
+	if (!FactionParent) FactionParent = SurfaceMaterial;
+	if (GetMesh() && GetMesh()->GetSkeletalMeshAsset() && FactionParent)
+	{
+		for (const int32 Index : {0, 4, 5})
 		{
-			UMaterialInstanceDynamic* HeadMID = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (HeadMID)
+			UMaterialInstanceDynamic* MID = SkeletalVisualMaterials.FindRef(Index);
+			if (!MID || MID->Parent != FactionParent)
 			{
-				FLinearColor HeadColor = FLinearColor(0.85f, 0.72f, 0.55f); // Skin tone
-				HeadMID->SetVectorParameterValue(TEXT("Color"), HeadColor);
-				HeadMesh->SetMaterial(0, HeadMID);
+				MID = UMaterialInstanceDynamic::Create(FactionParent, this);
+				if (!MID) continue;
+				SkeletalVisualMaterials.Add(Index, MID); GetMesh()->SetMaterial(Index, MID);
 			}
+			FLinearColor Color = Index == 4 ? FactionColor * .6f : FactionColor; Color.A = 1.f;
+			MID->SetVectorParameterValue(TEXT("Color"), Color);
 		}
+	}
+	Apply(VisualMesh, FactionParent, FactionColor);
+	FLinearColor ShieldColor = FactionColor * 0.6f; ShieldColor.A = 1.f;
+	Apply(ShieldMesh, FactionParent, ShieldColor);
+	Apply(HeadMesh, SurfaceMaterial, FLinearColor(0.85f, 0.72f, 0.55f));
+	Apply(WeaponMesh, SurfaceMaterial, FLinearColor(0.75f, 0.75f, 0.8f), 0.8f);
+	for (UStaticMeshComponent* Part : {RightArmMesh.Get(), LeftArmMesh.Get(), RightLegMesh.Get(), LeftLegMesh.Get(),
+		RightHandMesh.Get(), LeftHandMesh.Get(), RightFootMesh.Get(), LeftFootMesh.Get()})
+		Apply(Part, SurfaceMaterial, FLinearColor(0.85f, 0.72f, 0.55f));
+	RefreshDamageVisuals();
+}
 
-		// Color sword blade (silver metallic)
-		if (WeaponMesh)
-		{
-			UMaterialInstanceDynamic* SwordMID = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (SwordMID)
-			{
-				SwordMID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.75f, 0.75f, 0.8f));
-				WeaponMesh->SetMaterial(0, SwordMID);
-			}
-		}
-
-		// Color shield (darker faction color)
-		if (ShieldMesh)
-		{
-			UMaterialInstanceDynamic* ShieldMID = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (ShieldMID)
-			{
-				FLinearColor ShieldColor = FactionColor * 0.6f; // Darker faction
-				ShieldColor.A = 1.0f;
-				ShieldMID->SetVectorParameterValue(TEXT("Color"), ShieldColor);
-				ShieldMesh->SetMaterial(0, ShieldMID);
-			}
-		}
-
-		// Color limbs with skin tone
-		FLinearColor SkinColor = FLinearColor(0.85f, 0.72f, 0.55f);
-		TArray<UStaticMeshComponent*> SkinMeshes = {
-			RightArmMesh, LeftArmMesh,
-			RightLegMesh, LeftLegMesh,
-			RightHandMesh, LeftHandMesh,
-			RightFootMesh, LeftFootMesh
-		};
-		for (UStaticMeshComponent* LimbMesh : SkinMeshes)
-		{
-			if (LimbMesh)
-			{
-				UMaterialInstanceDynamic* LimbMID = UMaterialInstanceDynamic::Create(BaseMat, this);
-				if (LimbMID)
-				{
-					LimbMID->SetVectorParameterValue(TEXT("Color"), SkinColor);
-					LimbMesh->SetMaterial(0, LimbMID);
-				}
-			}
-		}
+void AUnitBase::RefreshDamageVisuals()
+{
+	for (const auto& Entry : SkeletalVisualMaterials)
+		if (Entry.Value) Entry.Value->SetScalarParameterValue(TEXT("Damage"), 1.f - GetHealthPercent());
+	for (UStaticMeshComponent* Part : {VisualMesh.Get(), ShieldMesh.Get()})
+	{
+		if (UMaterialInstanceDynamic* MID = VisualMaterials.FindRef(Part))
+			MID->SetScalarParameterValue(TEXT("Damage"), 1.f - GetHealthPercent());
 	}
 }
 
@@ -639,7 +708,7 @@ void AUnitBase::CommandAttack(AActor* Target)
 {
 	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld()) return;
 	const AUnitBase* TargetUnit = Cast<AUnitBase>(Target);
-	if (!TargetUnit || !TargetUnit->CanAcceptCommands() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
+	if (!TargetUnit || !TargetUnit->CanParticipateInWorld() || TargetUnit->GetOwnerFaction() == OwnerFaction) return;
 	if (Orders.IssueAttack(Target, Target->GetActorLocation()))
 	{
 		CancelPendingMelee();
@@ -721,12 +790,15 @@ void AUnitBase::PerformAttack()
 	PendingMeleeKind = EPendingMeleeKind::Direct;
 	PendingMeleeTarget.Reset();
 	PendingMeleeOrderRevision = 0;
+	PlayAttackPresentation(WindupDuration);
 	OnUnitVitalsChanged.Broadcast(this);
 	if (!CanAcceptCommands()) return;
 }
 
 void AUnitBase::CancelPendingMelee()
 {
+	if (CharacterPresentation && CharacterPresentation->AttackMontage && GetMesh() && GetMesh()->GetAnimInstance())
+		GetMesh()->GetAnimInstance()->Montage_Stop(.05f, CharacterPresentation->AttackMontage);
 	Combat.CancelPendingImpact();
 	PendingMeleeKind = EPendingMeleeKind::None;
 	PendingMeleeTarget.Reset();
@@ -736,7 +808,7 @@ void AUnitBase::CancelPendingMelee()
 bool AUnitBase::TryApplyMeleeHit(AUnitBase* Target)
 {
 	if (!CanAcceptCommands() || !IsValid(Target) || Target == this || Target->GetWorld() != GetWorld() ||
-		!Target->CanAcceptCommands() || Target->GetOwnerFaction() == OwnerFaction ||
+		!Target->CanParticipateInWorld() || Target->GetOwnerFaction() == OwnerFaction ||
 		FVector::Dist2D(GetActorLocation(), Target->GetActorLocation()) > UnitData.AttackRange ||
 		FMath::Abs(GetActorLocation().Z - Target->GetActorLocation().Z) > 200.0) return false;
 	Target->TakeCombatDamage(float(UnitData.BaseStats.MeleeAttack), this, false);
@@ -757,7 +829,7 @@ void AUnitBase::ResolveMeleeImpact()
 		if (bIsPossessedByPlayer || Orders.GetRevision() != Revision || Orders.GetTarget() != Target) return;
 		TryApplyMeleeHit(Target);
 		if (CanAcceptCommands() && Orders.GetRevision() == Revision &&
-			(!IsValid(Target) || !Target->CanAcceptCommands())) Orders.Clear();
+			(!IsValid(Target) || !Target->CanParticipateInWorld())) Orders.Clear();
 	}
 	else if (Kind == EPendingMeleeKind::Direct && bIsPossessedByPlayer)
 	{
@@ -824,7 +896,7 @@ void AUnitBase::PerformDodge(const FVector2D& Direction)
 
 void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRanged)
 {
-	if (!CanAcceptCommands() || !FMath::IsFinite(Damage) || Damage <= 0.0f)
+	if (!CanParticipateInWorld() || IsTacticalBattleResolved() || !FMath::IsFinite(Damage) || Damage <= 0.0f)
 	{
 		return;
 	}
@@ -838,8 +910,13 @@ void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRan
 	// Clamp in double precision before rounding/conversion to avoid int32 overflow.
 	const int32 HealthDamage = FMath::RoundToInt(FMath::Min(double(ActualDamage), double(GetCurrentHealth())));
 	const int32 MoraleDamage = FMath::RoundToInt(FMath::Min(double(ActualDamage) * 0.1, double(GetCurrentMorale())));
+	const bool bWasRouted = IsRouted();
 	if (!Vitals.ApplyDamage(HealthDamage, MoraleDamage)) return;
+	RefreshDamageVisuals();
+	if (HealthDamage > 0)
+		if (auto* Audio = GetWorld()->GetSubsystem<URomanFeedbackSubsystem>()) Audio->PlayCue(ERomanFeedbackCue::Impact, GetActorLocation());
 	if (!IsAlive()) OnDeath();
+	else if (!bWasRouted && IsRouted()) BeginRout(DamageSource);
 	if (IsActorBeingDestroyed() || GetLifeState() == EUnitLifeState::Ended) return;
 	OnUnitDamaged.Broadcast(this, ActualDamage);
 	if (!IsActorBeingDestroyed() && GetLifeState() != EUnitLifeState::Ended) OnUnitVitalsChanged.Broadcast(this);
@@ -847,10 +924,11 @@ void AUnitBase::TakeCombatDamage(float Damage, AActor* DamageSource, bool bIsRan
 
 void AUnitBase::SetCurrentHealth(int32 NewHealth)
 {
-	if (!CanAcceptCommands()) return;
+	if (!CanParticipateInWorld() || IsTacticalBattleResolved()) return;
 	const int32 PreviousHealth = GetCurrentHealth();
 	if (Vitals.SetHealth(FMath::Max(0, NewHealth)) && GetCurrentHealth() != PreviousHealth)
 	{
+		RefreshDamageVisuals();
 		if (!IsAlive()) OnDeath();
 		if (!IsActorBeingDestroyed() && GetLifeState() != EUnitLifeState::Ended) OnUnitVitalsChanged.Broadcast(this);
 	}
@@ -909,6 +987,7 @@ void AUnitBase::SetPossessedByPlayer(bool bPossessed)
 	}
 	// SetActive broadcasts synchronously. Finish all effects before observers can
 	// exit possession or destroy this actor; never apply stale effects afterward.
+	RefreshPossessionHeadVisibility();
 	if (FPSCamera) FPSCamera->SetActive(bPossessed);
 }
 
@@ -964,6 +1043,22 @@ void AUnitBase::OnDeath()
 bool AUnitBase::TrySpendUnitStamina(float Amount)
 {
 	return CanAcceptCommands() && Vitals.TrySpendStamina(Amount);
+}
+
+void AUnitBase::BeginRout(AActor* DamageSource)
+{
+	// Morale is already committed. Synchronous observers must see command rejection before cleanup.
+	StopAllActions();
+	if (!CanParticipateInWorld() || !IsRouted()) return;
+	RestoreTacticalController();
+	FVector Away = IsValid(DamageSource) && DamageSource->GetWorld() == GetWorld()
+		? GetActorLocation() - DamageSource->GetActorLocation() : -GetActorForwardVector();
+	Away.Z = 0.0;
+	Away = Away.GetSafeNormal();
+	if (Away.IsNearlyZero()) Away = FVector(-1.0, 0.0, 0.0);
+	// One bounded slice withdrawal, not perpetual flight or an implicit recovery policy.
+	Orders.IssueMove(GetActorLocation() + Away * 1000.0);
+	NavigationResult = EUnitNavigationResult::None;
 }
 
 void AUnitBase::StopAllActions()

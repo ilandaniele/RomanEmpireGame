@@ -44,6 +44,10 @@ struct ROMANEMPIREGAME_API FTacticalBattleResult
 {
 	GENERATED_BODY()
 
+	/** Distinct from squad/army IDs; prevents applying a different encounter's result. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FGuid EncounterID;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	ETacticalBattleOutcome Outcome = ETacticalBattleOutcome::InProgress;
 

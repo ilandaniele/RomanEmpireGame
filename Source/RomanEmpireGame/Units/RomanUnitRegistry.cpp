@@ -15,6 +15,7 @@ void URomanUnitRegistrySubsystem::Deinitialize()
 	Squads.Empty();
 	RegisteredUnits.Empty();
 	UnitsByFaction.Empty();
+	OnUnitRegistryChanged.Clear();
 	Super::Deinitialize();
 }
 
@@ -36,10 +37,18 @@ void URomanUnitRegistrySubsystem::SynchronizeUnit(AUnitBase* Unit)
 	if (const EFactionID* IndexedFaction = RegisteredUnits.Find(Key))
 	{
 		if (*IndexedFaction == Faction) return;
-		RemoveUnit(Unit);
+		// Reindex atomically before notifying. No intermediate "removed" event
+		// may re-enter SynchronizeUnit and leave the two buckets inconsistent.
+		RemoveSquadMembership(Key);
+		if (auto* Bucket = UnitsByFaction.Find(*IndexedFaction))
+		{
+			Bucket->Remove(Key);
+			if (Bucket->IsEmpty()) UnitsByFaction.Remove(*IndexedFaction);
+		}
 	}
 	RegisteredUnits.Add(Key, Faction);
 	UnitsByFaction.FindOrAdd(Faction).Add(Key);
+	OnUnitRegistryChanged.Broadcast();
 }
 
 void URomanUnitRegistrySubsystem::RemoveUnit(AUnitBase* Unit)
@@ -54,6 +63,18 @@ void URomanUnitRegistrySubsystem::RemoveUnit(AUnitBase* Unit)
 		Bucket->Remove(Key);
 		if (Bucket->IsEmpty()) UnitsByFaction.Remove(Faction);
 	}
+	OnUnitRegistryChanged.Broadcast();
+}
+
+TArray<AUnitBase*> URomanUnitRegistrySubsystem::GetRegisteredUnits() const
+{
+	TArray<AUnitBase*> Result;
+	for (const auto& Pair : RegisteredUnits)
+	{
+		AUnitBase* Unit = Pair.Key.Get();
+		if (IsLiveUnit(Unit) && Unit->GetOwnerFaction() == Pair.Value) Result.Add(Unit);
+	}
+	return Result;
 }
 
 FGuid URomanUnitRegistrySubsystem::CreateSquad(const TArray<AUnitBase*>& Members)
@@ -207,7 +228,7 @@ AUnitBase* URomanUnitRegistrySubsystem::FindNearestEnemy(const FVector& Origin, 
 		for (const TWeakObjectPtr<AUnitBase>& Key : Pair.Value)
 		{
 			AUnitBase* Unit = Key.Get();
-			if (!IsLiveUnit(Unit) || Unit->GetOwnerFaction() != Pair.Key || !Unit->CanAcceptCommands()) continue;
+			if (!IsLiveUnit(Unit) || Unit->GetOwnerFaction() != Pair.Key || !Unit->CanParticipateInWorld()) continue;
 			const double DistanceSquared = FVector::DistSquared2D(Origin, Unit->GetActorLocation());
 			if (DistanceSquared < BestDistanceSquared || (Nearest && DistanceSquared == BestDistanceSquared &&
 				Unit->GetFName().LexicalLess(Nearest->GetFName())))

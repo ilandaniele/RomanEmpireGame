@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "RomanEmpireMainWidget.h"
+#include "Campaign/CampaignSessionSubsystem.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Building/Barracks.h"
@@ -15,13 +16,28 @@
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Components/UniformGridPanel.h"
 #include "Content/RomanContentRegistry.h"
 #include "Core/RomanEmpireGameState.h"
 #include "Engine/World.h"
 #include "Core/RomanEmpirePlayerController.h"
+#include "Input/RomanInputConfig.h"
+#include "Input/RomanInputRemapping.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 #include "RomanEmpireGame.h"
 #include "UI/BuildingMenuWidget.h"
+#include "UI/MinimapWidget.h"
+#include "Components/SizeBox.h"
+#include "UI/RomanTerritoryButton.h"
+#include "Components/ScrollBox.h"
+#include "UObject/Class.h"
+#include "UObject/UObjectGlobals.h"
 #include "Units/UnitBase.h"
+#include "Engine/GameInstance.h"
+#include "UI/RomanPlayerSettingsSubsystem.h"
 
 namespace
 {
@@ -79,6 +95,8 @@ void URomanEmpireMainWidget::NativeConstruct()
 	Super::NativeConstruct();
 	BuildNativeWidgetTree();
 	BindCanonicalEvents();
+	BindSessionEvents();
+	BindPreferences();
 	RefreshFromCanonicalState();
 	UE_LOG(LogRomanEmpire, Log, TEXT("Production UMG root constructed; gameplay event bindings %s"),
 		bCanonicalEventsBound ? TEXT("ready") : TEXT("awaiting initialization"));
@@ -86,9 +104,19 @@ void URomanEmpireMainWidget::NativeConstruct()
 
 void URomanEmpireMainWidget::NativeDestruct()
 {
+	if (TacticalMinimap) TacticalMinimap->SetPresentationActive(false);
+	if (StrategicMinimap) StrategicMinimap->SetPresentationActive(false);
 	ClearInteractionFeedback();
 	HideBuildingMenu();
 	UnbindCanonicalEvents();
+	UnbindSessionEvents();
+	UnbindPreferences();
+	SelectedTerritoryID = NAME_None;
+	SelectedArmyID.Invalidate();
+	if (CancelTrainingButton) CancelTrainingButton->SetIsEnabled(false);
+	if (RestartEncounterButton) RestartEncounterButton->SetIsEnabled(false);
+	if (StrategicPanel) StrategicPanel->SetVisibility(ESlateVisibility::Collapsed);
+	for (URomanTerritoryButton* Button : TerritoryButtons) Button->SetIsEnabled(false);
 	Super::NativeDestruct();
 }
 
@@ -96,6 +124,30 @@ TSharedRef<SWidget> URomanEmpireMainWidget::RebuildWidget()
 {
 	BuildNativeWidgetTree();
 	return Super::RebuildWidget();
+}
+
+void URomanEmpireMainWidget::BindPreferences()
+{
+	UnbindPreferences();
+	PreferencesSource=GetGameInstance()?GetGameInstance()->GetSubsystem<URomanPlayerSettingsSubsystem>():nullptr;
+	if (PreferencesSource.IsValid()) PreferencesChangedHandle=PreferencesSource->OnPreferencesChanged().AddUObject(this,&URomanEmpireMainWidget::RefreshTextScale);
+	const auto* Subsystem=CachedController?ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(CachedController->GetLocalPlayer()):nullptr;
+	BindingSettingsSource=Subsystem?Subsystem->GetUserSettings():nullptr;
+	if(BindingSettingsSource.IsValid()) BindingSettingsSource->OnSettingsChanged.AddUniqueDynamic(this,&ThisClass::HandleBindingsChanged);
+	RefreshTextScale();
+}
+
+void URomanEmpireMainWidget::UnbindPreferences()
+{
+	if (PreferencesSource.IsValid()) PreferencesSource->OnPreferencesChanged().Remove(PreferencesChangedHandle);
+	if(BindingSettingsSource.IsValid()) BindingSettingsSource->OnSettingsChanged.RemoveDynamic(this,&ThisClass::HandleBindingsChanged);
+	BindingSettingsSource.Reset();
+	PreferencesChangedHandle.Reset(); PreferencesSource.Reset();
+}
+
+void URomanEmpireMainWidget::RefreshTextScale()
+{
+	if (PreferencesSource.IsValid()) TextScaleProjection.Apply(WidgetTree,PreferencesSource->GetPreferences().TextScale);
 }
 
 void URomanEmpireMainWidget::BuildNativeWidgetTree()
@@ -121,8 +173,8 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	UOverlay* TopOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("TopOverlay"));
 	ResourceText = CreateTextBlock(WidgetTree, TEXT("ResourceText"), 17, FLinearColor(0.95f, 0.86f, 0.55f));
 	PhaseText = CreateTextBlock(WidgetTree, TEXT("PhaseText"), 17, FLinearColor(0.75f, 0.85f, 1.0f));
-	// These labels share a fixed-height header. Auto-wrap can retain the previous
-	// mode's narrower layout width and spill a longer mode/turn onto a second line.
+	// Initial construction is reparented into the flex header below; phase stays
+	// single-line in its own column, resources wrap within their allocated column.
 	ResourceText->SetAutoWrapText(false);
 	PhaseText->SetAutoWrapText(false);
 	UOverlaySlot* ResourceSlot = TopOverlay->AddChildToOverlay(ResourceText);
@@ -190,6 +242,13 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	TrainButton->AddChild(TrainButtonText);
 	TrainButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleTrainClicked);
 	TrainButton->SetVisibility(ESlateVisibility::Collapsed);
+	CancelTrainingButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("CancelTrainingButton"));
+	UTextBlock* CancelLabel = CreateTextBlock(WidgetTree, TEXT("CancelTrainingLabel"), 15, FLinearColor(1.0f, 0.85f, 0.35f));
+	CancelLabel->SetText(NSLOCTEXT("RomanProduction", "CancelTraining", "CANCEL + REFUND"));
+	CancelTrainingButton->SetContent(CancelLabel);
+	CancelTrainingButton->SetToolTipText(NSLOCTEXT("RomanProduction", "CancelRefundTooltip", "Cancel the active training order and refund its full paid cost. The next prepaid order starts automatically."));
+	CancelTrainingButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleCancelTrainingClicked);
+	CancelTrainingButton->SetVisibility(ESlateVisibility::Collapsed);
 	UHorizontalBox* UnitCommandRow = WidgetTree->ConstructWidget<UHorizontalBox>(
 		UHorizontalBox::StaticClass(), TEXT("UnitCommandRow"));
 	StopButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("StopButton"));
@@ -209,7 +268,10 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	SelectionBox->AddChildToVerticalBox(SelectionText);
 	SelectionBox->AddChildToVerticalBox(UnitCommandRow);
 	SelectionBox->AddChildToVerticalBox(ProductionText);
-	SelectionBox->AddChildToVerticalBox(TrainButton);
+	UHorizontalBox* TrainingCommands = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("TrainingCommands"));
+	TrainingCommands->AddChildToHorizontalBox(TrainButton)->SetPadding(FMargin(0, 0, 10, 0));
+	TrainingCommands->AddChildToHorizontalBox(CancelTrainingButton);
+	SelectionBox->AddChildToVerticalBox(TrainingCommands);
 	SelectionPanel->SetContent(SelectionBox);
 	PlaceFixed(RootCanvas, SelectionPanel, FAnchors(0.5f, 1.0f), FVector2D(0.5f, 1.0f),
 		FVector2D(0.0f, -12.0f), FVector2D(650.0f, 140.0f));
@@ -248,18 +310,55 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 		UVerticalBox::StaticClass(), TEXT("CommandsBox"));
 	BuildMenuButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("BuildMenuButton"));
 	UTextBlock* BuildLabel = CreateTextBlock(WidgetTree, TEXT("BuildMenuButtonText"), 18, FLinearColor::White);
-	BuildLabel->SetText(FText::FromString(TEXT("BUILD MENU [B]")));
+	BuildLabel->SetText(FText::FromString(TEXT("BUILD MENU")));
 	BuildMenuButton->AddChild(BuildLabel);
 	BuildMenuButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleBuildMenuClicked);
 	EndTurnButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("EndTurnButton"));
 	UTextBlock* EndTurnLabel = CreateTextBlock(WidgetTree, TEXT("EndTurnButtonText"), 18, FLinearColor::White);
-	EndTurnLabel->SetText(FText::FromString(TEXT("END TURN [T]")));
+	EndTurnLabel->SetAutoWrapText(true);
+	EndTurnLabel->SetText(FText::FromString(TEXT("END TURN")));
 	EndTurnButton->AddChild(EndTurnLabel);
 	EndTurnButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleEndTurnClicked);
 	CommandsBox->AddChildToVerticalBox(BuildMenuButton);
 	CommandsBox->AddChildToVerticalBox(EndTurnButton);
 	PlaceFixed(RootCanvas, CommandsBox, FAnchors(1.0f, 1.0f), FVector2D(1.0f, 1.0f),
-		FVector2D(-10.0f, -12.0f), FVector2D(270.0f, 86.0f));
+		FVector2D(-10.0f, -12.0f), FVector2D(270.0f, 120.0f));
+
+	StrategicPanel = CreatePanel(WidgetTree, TEXT("StrategicPanel"), FLinearColor(0.025f, 0.03f, 0.055f, 0.97f));
+	StrategicPanel->SetVisibility(ESlateVisibility::Collapsed);
+	UHorizontalBox* StrategicBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("StrategicBox"));
+	UVerticalBox* RegionsBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("RegionsBox"));
+	UTextBlock* RegionsTitle = CreateTextBlock(WidgetTree, TEXT("RegionsTitle"), 18, FLinearColor(0.95f, 0.86f, 0.55f));
+	RegionsTitle->SetText(NSLOCTEXT("RomanTerritories", "Title", "CAMPAIGN REGIONS"));
+	RegionsBox->AddChildToVerticalBox(RegionsTitle);
+	TerritoryGrid = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(), TEXT("TerritoryGrid"));
+	TerritoryGrid->SetSlotPadding(FMargin(3.0f));
+	TerritoryGrid->SetMinDesiredSlotWidth(170.0f);
+	TerritoryGrid->SetMinDesiredSlotHeight(100.0f);
+	RegionsBox->AddChildToVerticalBox(TerritoryGrid);
+	StrategicMinimap = CreateWidget<UMinimapWidget>(GetOwningPlayer(), UMinimapWidget::StaticClass(), TEXT("StrategicMinimap"));
+	StrategicMinimap->SetPresentationRoot(this);
+	USizeBox* RegionMapSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("RegionMapSize"));
+	RegionMapSize->SetHeightOverride(260.f);
+	RegionMapSize->SetContent(StrategicMinimap);
+	RegionsBox->AddChildToVerticalBox(RegionMapSize);
+	TacticalMinimap = CreateWidget<UMinimapWidget>(GetOwningPlayer(), UMinimapWidget::StaticClass(), TEXT("TacticalMinimap"));
+	TacticalMinimap->SetPresentationRoot(this);
+	PlaceFixed(RootCanvas, TacticalMinimap, FAnchors(1,0), FVector2D(1,0), FVector2D(-10,52), FVector2D(240,240));
+	UHorizontalBoxSlot* RegionsSlot = StrategicBox->AddChildToHorizontalBox(RegionsBox);
+	FSlateChildSize RegionsSize(ESlateSizeRule::Fill);
+	RegionsSize.Value = 1.4f;
+	RegionsSlot->SetSize(RegionsSize);
+	RegionsSlot->SetPadding(FMargin(0, 0, 14, 0));
+	TerritoryDetailText = CreateTextBlock(WidgetTree, TEXT("TerritoryDetailText"), 14, FLinearColor::White);
+	UScrollBox* DetailScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("TerritoryDetailScroll"));
+	DetailScroll->AddChild(TerritoryDetailText);
+	UVerticalBox* StrategicDetails = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("StrategicDetails"));
+	StrategicDetails->AddChildToVerticalBox(DetailScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	StrategicBox->AddChildToHorizontalBox(StrategicDetails)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	StrategicPanel->SetContent(StrategicBox);
+	PlaceFixed(RootCanvas, StrategicPanel, FAnchors(0.5f, 0.5f), FVector2D(0.5f, 0.5f),
+		FVector2D::ZeroVector, FVector2D(1100.0f, 660.0f));
 
 	OutcomePanel = CreatePanel(
 		WidgetTree,
@@ -268,10 +367,28 @@ void URomanEmpireMainWidget::BuildNativeWidgetTree()
 	OutcomePanel->SetVisibility(ESlateVisibility::Collapsed);
 	OutcomeText = CreateTextBlock(WidgetTree, TEXT("OutcomeText"), 40, FLinearColor(1.0f, 0.85f, 0.15f));
 	OutcomeText->SetJustification(ETextJustify::Center);
-	OutcomePanel->SetContent(OutcomeText);
+	OutcomeText->SetAutoWrapText(false);
+	OutcomeText->SetWrapTextAt(640.0f);
+	UCanvasPanel* OutcomeCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("OutcomeCanvas"));
+	UVerticalBox* OutcomeBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("OutcomeBox"));
+	OutcomeBox->AddChildToVerticalBox(OutcomeText);
+	RestartEncounterButton = WidgetTree->ConstructWidget<URomanHUDButton>(URomanHUDButton::StaticClass(), TEXT("RestartEncounterButton"));
+	UTextBlock* RestartLabel = CreateTextBlock(WidgetTree, TEXT("RestartEncounterLabel"), 22, FLinearColor::White);
+	RestartLabel->SetAutoWrapText(false);
+	RestartLabel->SetText(NSLOCTEXT("RomanBattle", "RestartEncounter", "RESTART ENCOUNTER"));
+	RestartEncounterButton->SetContent(RestartLabel);
+	RestartEncounterButton->SetToolTipText(NSLOCTEXT("RomanBattle", "RestartSandbox", "Reload this sandbox encounter. This does not apply results to a persistent campaign."));
+	RestartEncounterButton->OnClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleRestartEncounterClicked);
+	OutcomeBox->AddChildToVerticalBox(RestartEncounterButton);
+	BuildCampaignControls(CommandsBox, OutcomeBox, StrategicDetails);
+	BuildCampaignSaveControls();
+	PlaceFixed(OutcomeCanvas, OutcomeBox, FAnchors(0.5f, 0.5f), FVector2D(0.5f, 0.5f),
+		FVector2D::ZeroVector, FVector2D(640.0f, 220.0f));
+	OutcomePanel->SetContent(OutcomeCanvas);
 	UCanvasPanelSlot* OutcomeSlot = RootCanvas->AddChildToCanvas(OutcomePanel);
 	OutcomeSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
 	OutcomeSlot->SetOffsets(FMargin(0.0f));
+	BuildResponsiveShell();
 }
 
 void URomanEmpireMainWidget::BindCanonicalEvents()
@@ -313,6 +430,13 @@ void URomanEmpireMainWidget::BindCanonicalEvents()
 		this, &URomanEmpireMainWidget::HandleObjectivesChanged);
 	CachedGameState->OnTacticalBattleChanged.AddUniqueDynamic(
 		this, &URomanEmpireMainWidget::HandleTacticalBattleChanged);
+	CachedGameState->OnTerritoryOwnerChanged.AddUniqueDynamic(
+		this, &URomanEmpireMainWidget::HandleTerritoryOwnerChanged);
+	CachedGameState->OnTerritorySettlementChanged.AddUniqueDynamic(
+		this, &URomanEmpireMainWidget::HandleTerritorySettlementChanged);
+	CachedGameState->OnCampaignArmiesChanged.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleCampaignArmiesChanged);
+	CachedGameState->OnCampaignEncounterChanged.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleCampaignArmiesChanged);
+	CachedGameState->OnDiplomacyChanged.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleDiplomacyChanged);
 	CachedGameState->OnVictory.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleVictory);
 	CachedGameState->OnDefeat.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	bCanonicalEventsBound = true;
@@ -351,6 +475,13 @@ void URomanEmpireMainWidget::UnbindCanonicalEvents()
 			this, &URomanEmpireMainWidget::HandleObjectivesChanged);
 		CachedGameState->OnTacticalBattleChanged.RemoveDynamic(
 			this, &URomanEmpireMainWidget::HandleTacticalBattleChanged);
+		CachedGameState->OnTerritoryOwnerChanged.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandleTerritoryOwnerChanged);
+		CachedGameState->OnTerritorySettlementChanged.RemoveDynamic(
+			this, &URomanEmpireMainWidget::HandleTerritorySettlementChanged);
+		CachedGameState->OnCampaignArmiesChanged.RemoveDynamic(this, &URomanEmpireMainWidget::HandleCampaignArmiesChanged);
+		CachedGameState->OnCampaignEncounterChanged.RemoveDynamic(this, &URomanEmpireMainWidget::HandleCampaignArmiesChanged);
+		CachedGameState->OnDiplomacyChanged.RemoveDynamic(this, &URomanEmpireMainWidget::HandleDiplomacyChanged);
 		CachedGameState->OnVictory.RemoveDynamic(this, &URomanEmpireMainWidget::HandleVictory);
 		CachedGameState->OnDefeat.RemoveDynamic(this, &URomanEmpireMainWidget::HandleDefeat);
 	}
@@ -426,6 +557,9 @@ void URomanEmpireMainWidget::RefreshFromCanonicalState()
 	RefreshSelection();
 	RefreshDiagnostic();
 	RefreshCommands();
+	RefreshStrategicTerritories();
+	RefreshCampaignControls();
+	RefreshTextScale();
 }
 
 void URomanEmpireMainWidget::UpdateResourceDisplay(const FFactionResourceAmounts& Resources)
@@ -473,6 +607,8 @@ void URomanEmpireMainWidget::RefreshCommands()
 	if (EndTurnButton)
 	{
 		EndTurnButton->SetIsEnabled(CachedController && CachedController->CanEndTurn());
+		const bool bRetry = CachedController && CachedController->IsAwaitingAITacticalTravel();
+		EndTurnButton->SetToolTipText(FText::FromString(bRetry ? TEXT("Retry the accepted AI attack without advancing another turn") : TEXT("Advance one campaign turn")));
 		EndTurnButton->SetVisibility(Mode == EGameplayMode::Possessed
 			? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
@@ -480,19 +616,194 @@ void URomanEmpireMainWidget::RefreshCommands()
 	{
 		HideBuildingMenu();
 	}
-	if (ControlsText)
+	RefreshInputLabels();
+}
+
+void URomanEmpireMainWidget::HandleBindingsChanged(UEnhancedInputUserSettings* Settings)
+{
+	RefreshInputLabels(); // Labels only: do not latch paused command enablement into the resumed HUD.
+}
+void URomanEmpireMainWidget::RefreshInputLabels()
+{
+	const auto* Config=CachedController?CachedController->GetInputConfiguration():nullptr;
+	if(!Config) return;
+	const EGameplayMode Mode=CachedGameState?CachedGameState->GetCurrentGameplayMode():EGameplayMode::Tactical;
+	const UInputMappingContext* Context=Config->GetContextForMode(Mode);
+	const auto Key=[&](const UInputAction* Action){return RomanInputRemapping::DescribeKeys(Context,Action,BindingSettingsSource.Get());};
+	const FString Build=RomanInputRemapping::DescribeKeys(Config->TacticalContext,Config->BuildMenu,BindingSettingsSource.Get());
+	if(BuildMenuButton) if(auto* Label=Cast<UTextBlock>(BuildMenuButton->GetContent())) Label->SetText(FText::FromString(FString::Printf(TEXT("BUILD MENU [%s]"),*Build)));
+	if(EndTurnButton) if(auto* Label=Cast<UTextBlock>(EndTurnButton->GetContent())) Label->SetText(FText::FromString(FString::Printf(TEXT("%s [%s]"),CachedController && CachedController->IsAwaitingAITacticalTravel()?TEXT("RETRY"):TEXT("END TURN"),*Key(Config->EndTurn))));
+	if(ControlsText)
 	{
-		const TCHAR* Help = TEXT("TACTICAL CONTROLS\nWASD / screen edge: move camera\nWheel: zoom | Click / drag: select\nShift + click: toggle | + drag: add\nRight click: order | F: possess unit\nSelected units: STOP / HOLD buttons\nB: menu | 1-6: build (menu open)\nT: end turn | Esc: cancel / clear");
-		if (Mode == EGameplayMode::Possessed)
+		FString Help;
+		if(Mode==EGameplayMode::Possessed) Help=FString::Printf(TEXT("SOLDIER CONTROLS\n%s: move | Mouse: look\n%s: attack | Hold %s: block\n%s / Esc: return to camera\nF10: settings"),*Key(Config->SoldierMove),*Key(Config->Attack),*Key(Config->Block),*Key(Config->ExitPossession));
+		else if(Mode==EGameplayMode::Strategic) Help=FString::Printf(TEXT("STRATEGIC CONTROLS\nClick a region: inspect\n%s / screen edge: move camera\nMouse wheel: zoom into tactical view\n%s: end turn | F10: settings"),*Key(Config->CameraPan),*Key(Config->EndTurn));
+		else
 		{
-			Help = TEXT("SOLDIER CONTROLS\nWASD: move | Mouse: look\nLeft click: attack | Hold right click: block\nF / Esc: return to camera");
-		}
-		else if (Mode == EGameplayMode::Strategic)
-		{
-			Help = TEXT("STRATEGIC CONTROLS\nWASD / screen edge: move camera\nMouse wheel: zoom into tactical view\nT: end turn | Esc: clear selection");
+			TArray<FString> Slots; for(const auto& SlotAction:Config->BuildingSlots) Slots.Add(Key(SlotAction));
+			Help=FString::Printf(TEXT("TACTICAL CONTROLS\n%s / screen edge: move camera\nWheel: zoom | %s / drag: select\nHold %s + select: toggle / add\n%s: order | %s: possess unit\nSelected units: STOP / HOLD buttons\n%s: menu | %s: build (menu open)\n%s: end turn | Esc: cancel / clear\nF10: settings"),*Key(Config->CameraPan),*Key(Config->Select),*Key(Config->SelectionModifier),*Key(Config->Command),*Key(Config->EnterPossession),*Build,*FString::Join(Slots,TEXT(" / ")),*Key(Config->EndTurn));
 		}
 		ControlsText->SetText(FText::FromString(Help));
 	}
+	if(BuildingMenu) BuildingMenu->RefreshShortcutLabels();
+}
+
+bool URomanEmpireMainWidget::SelectTerritory(FName TerritoryID)
+{
+	if (!bCanonicalEventsBound || !IsInViewport()) return false;
+	if (!IsValid(CachedGameState) || !CachedGameState->IsGameplayInitialized() ||
+		CachedGameState->GetCurrentGameplayMode() != EGameplayMode::Strategic)
+	{
+		RefreshStrategicTerritories();
+		return false;
+	}
+	FTerritoryPresentationSnapshot Snapshot;
+	const bool bFound = CachedGameState->TryGetTerritorySnapshot(TerritoryID, Snapshot);
+	SelectedTerritoryID = bFound ? TerritoryID : NAME_None;
+	RefreshStrategicTerritories();
+	return bFound;
+}
+
+void URomanEmpireMainWidget::HandleTerritoryClicked(FName TerritoryID)
+{
+	SelectTerritory(TerritoryID);
+}
+
+void URomanEmpireMainWidget::HandleTerritoryOwnerChanged(
+	FName TerritoryID, EFactionID PreviousOwner, EFactionID NewOwner)
+{
+	(void)TerritoryID;
+	(void)PreviousOwner;
+	(void)NewOwner;
+	// Notifications may be overtaken by another synchronous observer.
+	RefreshStrategicTerritories();
+}
+
+void URomanEmpireMainWidget::RefreshStrategicTerritories()
+{
+	RefreshCampaignArmies();
+	if (!StrategicPanel || !TerritoryGrid || !TerritoryDetailText) return;
+	const bool bShow = bCanonicalEventsBound && IsValid(CachedGameState) &&
+		CachedGameState->IsGameplayInitialized() && CachedGameState->GetCurrentGameplayMode() == EGameplayMode::Strategic;
+	if (StrategicMinimap) StrategicMinimap->SetPresentationActive(bShow && IsInViewport());
+	if (TacticalMinimap) TacticalMinimap->SetPresentationActive(!bShow && IsInViewport() &&
+		bCanonicalEventsBound && CachedGameState && CachedGameState->IsGameplayInitialized());
+	if (TacticalMinimapFrame) TacticalMinimapFrame->SetVisibility(TacticalMinimap && TacticalMinimap->IsPresentationActive()
+		? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	StrategicPanel->SetVisibility(bShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	if (!bShow)
+	{
+		SelectedTerritoryID = NAME_None;
+		for (URomanTerritoryButton* Button : TerritoryButtons) Button->SetIsEnabled(false);
+		return;
+	}
+	const TArray<FTerritoryPresentationSnapshot> Rows = CachedGameState->GetTerritorySnapshots();
+	bool bSameIDs = Rows.Num() == TerritoryButtons.Num();
+	for (int32 Index = 0; bSameIDs && Index < Rows.Num(); ++Index)
+	{
+		bSameIDs = TerritoryButtons[Index]->GetTerritoryID() == Rows[Index].TerritoryID;
+	}
+	if (!bSameIDs)
+	{
+		for (URomanTerritoryButton* Button : TerritoryButtons)
+		{
+			Button->OnTerritoryClicked.RemoveDynamic(this, &URomanEmpireMainWidget::HandleTerritoryClicked);
+		}
+		TerritoryGrid->ClearChildren();
+		TerritoryButtons.Reset();
+		for (int32 Index = 0; Index < Rows.Num(); ++Index)
+		{
+			const FName ID = Rows[Index].TerritoryID;
+			const FName ButtonName = MakeUniqueObjectName(WidgetTree, URomanTerritoryButton::StaticClass(),
+				FName(*FString::Printf(TEXT("TerritoryButton_%s"), *ID.ToString())));
+			URomanTerritoryButton* Button = WidgetTree->ConstructWidget<URomanTerritoryButton>(URomanTerritoryButton::StaticClass(), ButtonName);
+			Button->InitializeTerritoryButton(ID);
+			Button->OnTerritoryClicked.AddUniqueDynamic(this, &URomanEmpireMainWidget::HandleTerritoryClicked);
+			const FName LabelName = MakeUniqueObjectName(WidgetTree, UTextBlock::StaticClass(),
+				FName(*FString::Printf(TEXT("TerritoryLabel_%s"), *ID.ToString())));
+			UTextBlock* Label = CreateTextBlock(WidgetTree, LabelName, 14, FLinearColor::White);
+			Label->SetAutoWrapText(true);
+			Label->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+			Button->SetContent(Label);
+			TerritoryGrid->AddChildToUniformGrid(Button, Index / 3, Index % 3);
+			TerritoryButtons.Add(Button);
+		}
+		RefreshTextScale(); // Newly authored labels use the current preference without a tick scan.
+	}
+	const FTerritoryPresentationSnapshot* Selected = Rows.FindByPredicate([this](const FTerritoryPresentationSnapshot& Row)
+	{
+		return Row.TerritoryID == SelectedTerritoryID;
+	});
+	if (!Selected) SelectedTerritoryID = NAME_None;
+	auto OwnerLabel = [](const FTerritoryPresentationSnapshot& Row)
+	{
+		if (Row.OwnerFaction == EFactionID::None) return NSLOCTEXT("RomanTerritories", "Unowned", "Unowned");
+		return !Row.OwnerDisplayName.IsEmpty() ? Row.OwnerDisplayName :
+			StaticEnum<EFactionID>()->GetDisplayNameTextByValue(static_cast<int64>(Row.OwnerFaction));
+	};
+	auto ActivityLabel = [](const FTerritoryPresentationSnapshot& Row)
+	{
+		return Row.bOwnerActive ? NSLOCTEXT("RomanTerritories", "Active", "Active participant") :
+			(Row.OwnerFaction == EFactionID::None ? NSLOCTEXT("RomanTerritories", "NoParticipant", "No participant") :
+			NSLOCTEXT("RomanTerritories", "Dormant", "Dormant faction"));
+	};
+	for (int32 Index = 0; Index < Rows.Num(); ++Index)
+	{
+		const FTerritoryPresentationSnapshot& Row = Rows[Index];
+		URomanTerritoryButton* Button = TerritoryButtons[Index];
+		Button->SetIsEnabled(true); // Dormant/unowned regions can still be inspected.
+		Button->SetBackgroundColor(FMath::Lerp(FLinearColor::White, Row.OwnerColor, 0.25f));
+		Button->SetToolTipText(FText::Format(NSLOCTEXT("RomanTerritories", "CardTooltip", "{0}\n{1} | {2}"),
+			Row.DisplayName, OwnerLabel(Row), ActivityLabel(Row)));
+		const FText CardActivity = Row.bOwnerActive ? NSLOCTEXT("RomanTerritories", "CardActive", "Active") :
+			(Row.OwnerFaction == EFactionID::None ? NSLOCTEXT("RomanTerritories", "CardNoOwner", "No owner") :
+			NSLOCTEXT("RomanTerritories", "CardDormant", "Dormant"));
+		CastChecked<UTextBlock>(Button->GetContent())->SetText(FText::Format(
+			NSLOCTEXT("RomanTerritories", "Card", "{0}{1}\n{2}\n{3}"),
+			Row.TerritoryID == SelectedTerritoryID ? FText::FromString(TEXT("* ")) : FText::GetEmpty(),
+			Row.DisplayName, OwnerLabel(Row), CardActivity));
+	}
+	if (!Selected)
+	{
+		TerritoryDetailText->SetText(Rows.IsEmpty() ? NSLOCTEXT("RomanTerritories", "Unavailable", "Territory data unavailable.") :
+			NSLOCTEXT("RomanTerritories", "ChooseArmyTarget", "Select a region to inspect.\n\nBase and effective production are shown separately. Dormant/unowned regions do not credit a wallet.\nSelect an army, then a target region to move or start battle."));
+		return;
+	}
+	TArray<FString> NeighborIDs;
+	for (FName ID : Selected->AdjacentTerritoryIDs) NeighborIDs.Add(ID.ToString());
+	const FFactionResourceDelta& Production = Selected->BaseResourceProduction;
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Name"), Selected->DisplayName);
+	Args.Add(TEXT("ID"), FText::FromName(Selected->TerritoryID));
+	Args.Add(TEXT("Description"), Selected->Description);
+	Args.Add(TEXT("Owner"), OwnerLabel(*Selected));
+	Args.Add(TEXT("Activity"), ActivityLabel(*Selected));
+	Args.Add(TEXT("Terrain"), StaticEnum<ETerrainType>()->GetDisplayNameTextByValue(static_cast<int64>(Selected->TerrainType)));
+	Args.Add(TEXT("Neighbors"), NeighborIDs.IsEmpty() ? NSLOCTEXT("RomanTerritories", "NoNeighbors", "None") : FText::FromString(FString::Join(NeighborIDs, TEXT(", "))));
+	Args.Add(TEXT("Gold"), FText::AsNumber(Production.Gold));
+	Args.Add(TEXT("Food"), FText::AsNumber(Production.Food));
+	Args.Add(TEXT("Iron"), FText::AsNumber(Production.Iron));
+	Args.Add(TEXT("Wood"), FText::AsNumber(Production.Wood));
+	Args.Add(TEXT("Stone"), FText::AsNumber(Production.Stone));
+	Args.Add(TEXT("Population"), FText::AsNumber(Production.Population));
+	Args.Add(TEXT("Settlement"), Selected->Settlement.bHasSettlement ? Selected->Settlement.SettlementName :
+		NSLOCTEXT("RomanTerritories", "NoSettlement", "None"));
+	Args.Add(TEXT("Residents"), FText::AsNumber(Selected->Settlement.Population));
+	const FFactionResourceDelta& Effective = Selected->EffectiveResourceProduction;
+	Args.Add(TEXT("EffectiveGold"), FText::AsNumber(Effective.Gold));
+	Args.Add(TEXT("EffectiveFood"), FText::AsNumber(Effective.Food));
+	Args.Add(TEXT("EffectiveIron"), FText::AsNumber(Effective.Iron));
+	Args.Add(TEXT("EffectiveWood"), FText::AsNumber(Effective.Wood));
+	Args.Add(TEXT("EffectiveStone"), FText::AsNumber(Effective.Stone));
+	Args.Add(TEXT("EffectivePopulation"), FText::AsNumber(Effective.Population));
+	TerritoryDetailText->SetText(FText::Format(NSLOCTEXT("RomanTerritories", "DetailLive",
+		"{Name} [{ID}]\n{Owner} | {Activity}\nTerrain: {Terrain}\nNeighbor IDs: {Neighbors}\nSettlement: {Settlement} | Residents: {Residents}\n\nBase production (not effective yield):\nGold {Gold} | Food {Food} | Iron {Iron}\nWood {Wood} | Stone {Stone} | Population {Population}\n\nEffective production per turn:\nGold {EffectiveGold} | Food {EffectiveFood} | Iron {EffectiveIron}\nWood {EffectiveWood} | Stone {EffectiveStone} | Population {EffectivePopulation}\nDormant/unowned: no wallet credit.\n\n{Description}"), Args));
+}
+
+void URomanEmpireMainWidget::HandleTerritorySettlementChanged(FName TerritoryID)
+{
+	(void)TerritoryID;
+	RefreshStrategicTerritories();
 }
 
 void URomanEmpireMainWidget::RefreshObjectives(const FCampaignObjectiveState& State)
@@ -534,8 +845,11 @@ void URomanEmpireMainWidget::RefreshBattle(const FTacticalBattleResult& Result)
 			FoeTotal += Squad.InitialUnits;
 		}
 	}
+	const auto Plan = CachedGameState ? CachedGameState->GetCampaignEncounterPlan() : FCampaignEncounterPlan();
+	const bool bDefending = Plan.EncounterID.IsValid() && Plan.PlayerFaction == Plan.Defender;
 	const TCHAR* Status = Result.Outcome == ETacticalBattleOutcome::PlayerVictory ? TEXT("Victory") :
-		Result.Outcome == ETacticalBattleOutcome::PlayerDefeat ? TEXT("Defeat") : TEXT("Capture camp");
+		Result.Outcome == ETacticalBattleOutcome::PlayerDefeat ? TEXT("Defeat") : Result.Outcome == ETacticalBattleOutcome::Draw ? TEXT("Draw") :
+		bDefending ? TEXT("Defend camp") : TEXT("Capture camp");
 	BattleText->SetText(FText::FromString(FString::Printf(
 		TEXT("BATTLE  Allies %d/%d | Foes %d/%d | %s"),
 		OwnAlive, OwnTotal, FoeAlive, FoeTotal, Status)));
@@ -544,6 +858,11 @@ void URomanEmpireMainWidget::RefreshBattle(const FTacticalBattleResult& Result)
 void URomanEmpireMainWidget::RefreshSelection()
 {
 	if (TrainButton) TrainButton->SetIsEnabled(false);
+	if (CancelTrainingButton)
+	{
+		CancelTrainingButton->SetVisibility(ESlateVisibility::Collapsed);
+		CancelTrainingButton->SetIsEnabled(false);
+	}
 	if (StopButton) StopButton->SetVisibility(ESlateVisibility::Collapsed);
 	if (HoldButton) HoldButton->SetVisibility(ESlateVisibility::Collapsed);
 	if (!SelectionPanel || !SelectionText || !ProductionText || !TrainButton)
@@ -552,6 +871,8 @@ void URomanEmpireMainWidget::RefreshSelection()
 	}
 	const bool bPossessed = CachedGameState &&
 		CachedGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed;
+	if (PossessionPanel)
+		PossessionPanel->SetVisibility(bPossessed ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	if (CrosshairText)
 	{
 		CrosshairText->SetVisibility(bPossessed ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
@@ -640,7 +961,13 @@ void URomanEmpireMainWidget::RefreshSelection()
 
 	ProductionText->SetVisibility(ESlateVisibility::HitTestInvisible);
 	const FName ActiveUnitID = Barracks->GetCurrentlyTrainingID();
-	if (Barracks->IsTraining())
+	if (Barracks->IsAwaitingTrainingRefund())
+	{
+		ProductionText->SetText(FText::Format(
+			NSLOCTEXT("RomanProduction", "AwaitingRefund", "Production failed: refund pending | {0} pending"),
+			FText::AsNumber(Barracks->GetPendingOrderCount())));
+	}
+	else if (Barracks->IsTraining())
 	{
 		const URomanUnitDefinition* ActiveUnit = Registry ? Registry->FindUnit(ActiveUnitID) : nullptr;
 		ProductionText->SetText(FText::FromString(FString::Printf(
@@ -658,6 +985,12 @@ void URomanEmpireMainWidget::RefreshSelection()
 		CachedController->IsPlayerBuildingEligible(Building) &&
 		!Data.TrainableUnits.IsEmpty();
 	TrainButton->SetVisibility(bCanTrain ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	const bool bCanCancel = CachedController && CachedController->CanCancelSelectedTraining();
+	if (CancelTrainingButton)
+	{
+		CancelTrainingButton->SetVisibility(bCanCancel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		CancelTrainingButton->SetIsEnabled(bCanCancel);
+	}
 	if (bCanTrain && TrainButtonText)
 	{
 		const URomanUnitDefinition* Unit = Registry ? Registry->FindUnit(Data.TrainableUnits[0]) : nullptr;
@@ -680,6 +1013,10 @@ void URomanEmpireMainWidget::RefreshDiagnostic()
 	{
 		return;
 	}
+	// Keep canonical diagnostic values current without covering the native FPS
+	// aim point at accessible text/DPI sizes. This is presentation, not state.
+	if (DiagnosticPanel) DiagnosticPanel->SetVisibility(CachedGameState && CachedGameState->GetCurrentGameplayMode() == EGameplayMode::Possessed
+		? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
 	const EFactionID PlayerFaction = CachedGameState
@@ -709,17 +1046,43 @@ void URomanEmpireMainWidget::RefreshDiagnostic()
 
 void URomanEmpireMainWidget::RefreshOutcome(ECampaignOutcome Outcome)
 {
+	RefreshCampaignControls();
 	if (!OutcomePanel || !OutcomeText)
 	{
 		return;
 	}
+	if (RestartEncounterButton)
+	{
+		RestartEncounterButton->SetVisibility(ESlateVisibility::Collapsed);
+		RestartEncounterButton->SetIsEnabled(false);
+	}
 	if (Outcome == ECampaignOutcome::InProgress)
 	{
+		const FTacticalBattleResult Battle = CachedGameState ? CachedGameState->GetTacticalBattleResult() : FTacticalBattleResult();
+		if (Battle.IsResolved())
+		{
+			OutcomePanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			const TCHAR* Title = Battle.Outcome == ETacticalBattleOutcome::PlayerVictory ? TEXT("TACTICAL VICTORY") :
+				Battle.Outcome == ETacticalBattleOutcome::PlayerDefeat ? TEXT("TACTICAL DEFEAT") : TEXT("TACTICAL DRAW");
+			const FString Detail = Battle.CapturedObjectiveID.IsNone() ? TEXT("Encounter resolved") :
+				Battle.Outcome == ETacticalBattleOutcome::PlayerDefeat ? TEXT("Your camp was captured") :
+				FString::Printf(TEXT("Captured: %s"), *Battle.CapturedObjectiveID.ToString());
+			OutcomeText->SetText(FText::FromString(FString::Printf(TEXT("%s\n%s"), Title, *Detail)));
+			OutcomeText->SetColorAndOpacity(FSlateColor(Battle.Outcome == ETacticalBattleOutcome::PlayerVictory
+				? FLinearColor(1.0f, 0.85f, 0.2f) : FLinearColor(1.0f, 0.4f, 0.35f)));
+			if (RestartEncounterButton)
+			{
+				RestartEncounterButton->SetVisibility(CachedSession && CachedSession->HasSession() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+				RestartEncounterButton->SetIsEnabled(IsInViewport() && bCanonicalEventsBound && CachedController && CachedController->CanRestartEncounter());
+			}
+			return;
+		}
 		OutcomePanel->SetVisibility(ESlateVisibility::Collapsed);
 		return;
 	}
 
-	OutcomePanel->SetVisibility(ESlateVisibility::HitTestInvisible);
+	OutcomePanel->SetVisibility(ContinueCampaignButton && ContinueCampaignButton->GetVisibility() == ESlateVisibility::Visible
+		? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::HitTestInvisible);
 	if (Outcome == ECampaignOutcome::Victory)
 	{
 		OutcomeText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.85f, 0.1f)));
@@ -835,6 +1198,7 @@ void URomanEmpireMainWidget::HandleResourcesChanged(
 	if (CachedGameState && FactionID == CachedGameState->GetPlayerFaction())
 	{
 		UpdateResourceDisplay(CachedGameState->GetFactionResources(FactionID));
+		RefreshCampaignArmyActions();
 		RefreshSelection();
 		RefreshDiagnostic();
 	}
@@ -873,6 +1237,8 @@ void URomanEmpireMainWidget::HandleGameplayModeChanged(EGameplayMode OldMode, EG
 	RefreshSelection();
 	RefreshDiagnostic();
 	RefreshCommands();
+	RefreshStrategicTerritories();
+	ScheduleSaveRefresh(); // Existing coalesced read runs after transition guards release.
 }
 
 void URomanEmpireMainWidget::HandleTurnStepStarted(int32 TurnNumber, ECampaignTurnStep Step)
@@ -891,6 +1257,7 @@ void URomanEmpireMainWidget::HandleTurnStepStarted(int32 TurnNumber, ECampaignTu
 
 void URomanEmpireMainWidget::HandleTurnProcessed(int32 TurnNumber)
 {
+	ScheduleSaveRefresh();
 	(void)TurnNumber;
 	RefreshModeAndTurn();
 	RefreshDiagnostic();
@@ -938,7 +1305,11 @@ void URomanEmpireMainWidget::HandleObjectivesChanged(FCampaignObjectiveState Sta
 void URomanEmpireMainWidget::HandleTacticalBattleChanged(FTacticalBattleResult Result)
 {
 	(void)Result;
-	if (CachedGameState) RefreshBattle(CachedGameState->GetTacticalBattleResult());
+	if (!CachedGameState) return;
+	RefreshBattle(CachedGameState->GetTacticalBattleResult());
+	RefreshOutcome(CachedGameState->GetObjectiveState().Outcome);
+	RefreshSelection();
+	RefreshCommands();
 }
 
 void URomanEmpireMainWidget::HandleVictory(EFactionID WinningFaction, EVictoryCondition Condition)
@@ -993,6 +1364,25 @@ void URomanEmpireMainWidget::HandleTrainClicked()
 void URomanEmpireMainWidget::HandleStopClicked()
 {
 	if (CachedController) CachedController->CommandSelectedUnitsStop();
+}
+
+void URomanEmpireMainWidget::HandleCancelTrainingClicked()
+{
+	if (!IsInViewport() || !bCanonicalEventsBound || !IsValid(CachedGameState) ||
+		!CachedGameState->IsGameplayInitialized() || !CachedController ||
+		!CachedController->CanCancelSelectedTraining()) return;
+	if (!CachedController->CancelSelectedTraining() && ProductionText)
+	{
+		ProductionText->SetText(NSLOCTEXT("RomanProduction", "RefundFailed", "Cannot cancel: refund unavailable; training order retained."));
+	}
+}
+
+void URomanEmpireMainWidget::HandleRestartEncounterClicked()
+{
+	if (!IsInViewport() || !bCanonicalEventsBound || !IsValid(CachedGameState) ||
+		!CachedGameState->IsGameplayInitialized() || !CachedController || !CachedController->CanRestartEncounter()) return;
+	CachedController->RestartEncounter();
+	RefreshOutcome(CachedGameState->GetObjectiveState().Outcome);
 }
 
 void URomanEmpireMainWidget::HandleHoldClicked()

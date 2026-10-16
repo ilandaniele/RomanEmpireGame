@@ -15,6 +15,7 @@ bool FUnitVitalStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Default is explicitly uninitialized"), State.GetLifeState(), EUnitLifeState::Uninitialized);
 	TestEqual(TEXT("No authored health before initialization"), State.GetHealthPercent(), 0.0f);
 	TestFalse(TEXT("No damage before initialization"), State.ApplyDamage(1, 1));
+	TestFalse(TEXT("Uninitialized zero morale is not a routed soldier"), State.IsRouted());
 	TestFalse(TEXT("No healing before initialization"), State.SetHealth(100));
 	TestFalse(TEXT("Reject zero health definition"), State.Initialize(0, 100.0f, 50));
 	TestFalse(TEXT("Reject zero stamina definition"), State.Initialize(100, 0.0f, 50));
@@ -27,6 +28,7 @@ bool FUnitVitalStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Initial health preserved"), State.GetHealth(), 100);
 	TestEqual(TEXT("Initial stamina preserved"), State.GetStamina(), 80.0f);
 	TestEqual(TEXT("Initial morale preserved"), State.GetMorale(), 50);
+	TestFalse(TEXT("Positive morale is not routed"), State.IsRouted());
 	TestFalse(TEXT("Negative health rejected"), State.SetHealth(-1));
 	TestFalse(TEXT("Negative damage rejected"), State.ApplyDamage(-1, 0));
 	TestFalse(TEXT("Negative morale damage rejects whole transaction"), State.ApplyDamage(10, -1));
@@ -51,6 +53,7 @@ bool FUnitVitalStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Death state"), State.GetLifeState(), EUnitLifeState::Dead);
 	TestEqual(TEXT("Zero health"), State.GetHealth(), 0);
 	TestEqual(TEXT("Zero morale"), State.GetMorale(), 0);
+	TestFalse(TEXT("Lethal zero morale is death, not routing"), State.IsRouted());
 	TestFalse(TEXT("Dead cannot heal"), State.SetHealth(100));
 	TestFalse(TEXT("Dead cannot initialize"), State.Initialize(100, 100.0f, 100));
 	TestFalse(TEXT("Dead cannot take damage twice"), State.ApplyDamage(1, 1));
@@ -79,6 +82,22 @@ bool FUnitVitalStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Double-rounding boundary cannot overflow stamina"), Maximum.GetStamina(), MAX_flt);
 	TestTrue(TEXT("Zero-health setter commits death"), Maximum.SetHealth(0));
 	TestFalse(TEXT("Setter death cannot resurrect"), Maximum.SetHealth(1));
+	FUnitVitalState Routed;
+	TestTrue(TEXT("Routing fixture initializes"), Routed.Initialize(100, 80.0f, 1));
+	TestTrue(TEXT("Nonlethal morale damage commits"), Routed.ApplyDamage(10, 1));
+	TestTrue(TEXT("Morale zero derives routing without a second state owner"), Routed.IsRouted());
+	TestTrue(TEXT("Routed soldier remains alive"), Routed.IsAlive());
+	TestTrue(TEXT("Routed soldier remains vulnerable to further damage"), Routed.ApplyDamage(10, 0));
+	TestEqual(TEXT("Routed damage changes health"), Routed.GetHealth(), 80);
+	TestTrue(TEXT("Health healing does not invent rally"), Routed.SetHealth(100));
+	TestTrue(TEXT("Healing health preserves routing"), Routed.IsRouted());
+	TestTrue(TEXT("Real lethal damage ends routing"), Routed.ApplyDamage(100, 0));
+	TestFalse(TEXT("Dead routed soldier is no longer routed"), Routed.IsRouted());
+	FUnitVitalState InitiallyRouted;
+	TestTrue(TEXT("Zero initial morale is valid content"), InitiallyRouted.Initialize(100, 80.0f, 0));
+	TestTrue(TEXT("Zero initial morale immediately derives routed state"), InitiallyRouted.IsRouted());
+	InitiallyRouted.EndLife();
+	TestFalse(TEXT("Ended soldier is not routed"), InitiallyRouted.IsRouted());
 	return true;
 }
 #endif
