@@ -833,7 +833,7 @@ Current C018A (2026-10-07), local foundation VERIFIED: [automation foundation re
   [Evidence](M5_CAMPAIGN_SAVE_ARCHIVE_REVIEW.md). No codec defect found or runtime
   change needed; reuse SaveDisk10 and existing Shipping/cook/render evidence.
   Clean-candidate local-commit authority granted by owner (2026-10-16); C018H
-  candidate/independent local checkout now in progress, without push. Still needs an isolated
+  candidate/independent local checkout VERIFIED below, without push. Still needs an isolated
   licensed CI runner; no automatic staging/commit/push/remote policy changes.
   Deferred VM/player, dependency-security, attribution and owner budgets remain OPEN.
   Historical post-C018J permission block is superseded by that explicit approval;
@@ -857,6 +857,21 @@ C018B provisional capture (2026-10-07) COMPLETE: [current load review](M7_CURREN
 - Completed during M1 recovery: the broken Remote Control `run_e2e.py` harness and its helper/tests were retired in favor of native automation, future Functional Tests, and UAT/package smoke coverage. See `scripts/README.md`.
 
 #### M7.3 CI pipeline
+
+C018H LOCAL CLEAN-CANDIDATE PREFLIGHT VERIFIED (2026-10-16): owner authorized
+local commits without push/remote configuration. f79f0b8 commits503 reviewed paths,
+assets and87 LFS visual baselines. First genuinely clean Unity build caught helper
+overload/redefinition collisions hidden by dirty adaptive builds; scoped rename/
+test namespaces fixed in91c54c2. Same independent clone clean/LFS176; Editor7,
+Rules27 clean/all16 impacted anchors, full139Success/138clean/1intentional missing-file
+warning/all21 anchors, strictIWYU112, Generate and BOTH Development/Shipping
+packages PASS. Each cook594+7platform/601total/0errors/0warnings. Native target
+receipts exclude test module; actual final Shipping registry601rows retains59
+presentation/input assets+configured launch map and excludes test paths/module.
+Root Editor11 also passes. [Full evidence/manifests](M7_CLEAN_CHECKOUT_REVIEW.md).
+No player launch/security mitigation/remote-CI certificate. Fresh readonly remote
+check19:36:56UTC: main89d8d66e/protected=false/runners0/workflows0; no push/settings
+changed. Remote runner/governance/player/security/rights/budgets and M7 remain OPEN.
 
 C018H goal BLOCKED, not complete (2026-10-09 20:26:58UTC): independent local QA packages under M7.5 were verified after the historical13:59 block, resetting that audit count. Three NEW consecutive post-package goal turns at20:24:37/20:25:49/20:26:58 then confirmed the same external environment/authority boundary: actual mainSHA89d8d66e/unprotected/runners0/workflows0, HEAD0726de2/empty index/no UE jobs, packaged Development+Shipping NotSigned/no owner response. Goal tool returned blocked; objective intact. Artifacts/C018H-PostPackageBlockedAudit{1,2,3}.json and HANDOFF.md preserve evidence. No safe substitute for isolated CI/trusted-player/clean candidate/owner decisions; no configuration/push/security changes authorized. Explicit user resumption starts a fresh blocked audit count, not these historical3.
 

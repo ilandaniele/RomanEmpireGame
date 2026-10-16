@@ -1,5 +1,19 @@
 # C018H — QA local del player: preparado, NO ejecutado
 
+## Candidato vigente — 2026-10-16
+
+Fuente LOCAL comprometida91c54c2 (sin push), checkout separado limpio; ambos
+paquetes nuevos listos en `Artifacts/C018H_CleanCandidate1/Checkout/Artifacts/Packages/{Development,Shipping}/Windows`.
+Identidad/config/engine/dirty=false en `Checkout/Artifacts/CI/build-metadata-{Development,Shipping}.json`.
+Manifiestos exactos48/30 archivos y hashes en [revisión del candidato](M7_CLEAN_CHECKOUT_REVIEW.md),
+`Artifacts/C018H_CleanCandidate1/Package-{Development,Shipping}1.json`.
+Reemplazan al candidato dirty antiguo SOLO para próximo QA; conservar sus recibos.
+139 pruebas Editor aprobadas y build/cook/package no prueban QA-01–10: TODOS PENDING.
+No player nuevo ejecutado en host ni VM. VM DIFERIDA por petición del usuario;
+no restablecerla/reiniciarla ni reintentar ejecutables bloqueados automáticamente.
+
+## Historial VM — no estado actual ni siguiente tarea
+
 VigenteOct15 21:48 local: licencia POSTBOOT verificada offline, captura
 VM_3DOff_LicenseResult2.png/sentinels completos: EnterpriseEval,LicenseStatus1,
 128112min. Transporte COM lento probado; consulta única terminada/worker0,

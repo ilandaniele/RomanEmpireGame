@@ -3,7 +3,17 @@
 No release is approved by this file. Keep evidence linked to the exact candidate
 revision; a dirty worktree or an Editor/cook success is not a distributable release.
 
-## Current local QA environment — not release approval
+## Current local candidate — not release approval
+
+2026-10-16: committed source91c54c2 builds from a separate clean local checkout.
+Full139 native tests, Unity Editor, strictIWYU and both Dev/Ship packages pass;
+actual Shipping registry/target-receipt checks and48/30-file manifests are recorded
+in [clean-checkout review](M7_CLEAN_CHECKOUT_REVIEW.md). Reviewed87PNG baselines
+are now committed through LFS. No remote CI, player execution, signing, rights or
+dependency-security approval. All current QA-01–10 remain pending; VM deferred.
+Later evidence-only Markdown commits do not change that package source revision.
+
+## Historical QA environment — VM deferred, not current verification
 
 UpdateOct15 21:48 local: offline POSTBOOT CIM license verified with complete
 sentinels/output: Windows EnterpriseEval/LicenseStatus1/128112minutes. No key,

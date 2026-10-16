@@ -6,6 +6,15 @@ created by this implementation. It does not commit/push or upload anything local
 
 ## Owner activation
 
+Local preflight verified2026-10-16: [source91c54c2 clean checkout](M7_CLEAN_CHECKOUT_REVIEW.md),
+139 native successes, Unity/IWYU and both Dev/Ship packages. This closes the local
+commit/reproducibility preparation, NOT the remote runner gate. Readonly remote
+check19:36:56UTC: main89d8d66e/protected=false/repository runners0/workflows0.
+No push or remote setting changed; current approval is local-commit-only.
+Continue the activation steps below only with a genuinely isolated licensed runner
+and authority for the specific remote changes. Do not attach this normal desktop
+or revive the deferred VM merely to produce a green status.
+
 1. Provide an isolated, preferably disposable Windows x64 runner with a licensed
    UE5.8.2 installation, VS2022 C++ Build Tools/Windows SDK, Git LFS, Python3 and
    Windows PowerShell5.1. Use a dedicated account and runner group limited to this
