@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Description": "Disposable source-art verification only; no gameplay module.",
+  "DisableEnginePluginsByDefault": true,
+  "Plugins": [
+    {"Name": "PythonScriptPlugin", "Enabled": true},
+    {"Name": "EditorScriptingUtilities", "Enabled": true},
+    {"Name": "InterchangeEditor", "Enabled": true},
+    {"Name": "ACLPlugin", "Enabled": true},
+    {"Name": "Fab", "Enabled": false},
+    {"Name": "ModelContextProtocol", "Enabled": false}
+  ]
+}

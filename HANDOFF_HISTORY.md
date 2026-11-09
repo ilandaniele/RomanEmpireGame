@@ -1,6 +1,6 @@
 # Historical GPT / Claude checkpoints — not current execution state
 
-Latest archived checkpoint set: [2026-10-12](HANDOFF_HISTORY_2026-10-12.md).
+Latest archived checkpoint set: [2026-10-19](HANDOFF_HISTORY_2026-10-19.md), exact copy of the previous oversized handoff; previous set [2026-10-12](HANDOFF_HISTORY_2026-10-12.md).
 HANDOFF.md is the ONLY current state; old CURRENT/NEXT/process markers in both
 archives are historical and must not be executed without current verification.
 
@@ -510,3 +510,73 @@ C018G read-only stdlib secret/plugin/module/action gate incluido en CI existente
 Todos procesos propios TERMINAL. NEXT C018H owner runner/trust/clean candidate/targetFPS/license/version/distribution; M3.7/M7/goal OPEN, no repetir local gates ni declarar release. HANDOFF.md vigente; este bloque histórico.
 
 HANDOFF_READY | FROM=GPT | TO=CLAUDE | NEXT=C-018H | STATE=ready
+
+## 2026-10-19 — semireal runtime continuation
+
+HANDOFF_HISTORY_2026-10-19_RUNTIME1.md conserva BYTE-EXACT el checkpoint intermedio
+de17232bytes antes de compactar el relevo vigente. Sus procesos/NEXT son históricos.
+M6_SEMIREAL_RUNTIME_REVIEW.md guarda omisión de montageV1/fallos reales, nueva
+IntegrationV2/Runtime03, política PBR opt-in legacyfalse y pruebas141/IWYU/Shipping/
+main Editor. HANDOFF.md es la única autoridad CURRENT/NEXT; no releer la historia
+completa ni relanzar procesos cerrados. Nada se eliminó de la evidencia anterior.
+
+## 2026-10-19 — cameras / same-body local-player pose
+
+HANDOFF_HISTORY_2026-10-19_CAMERA1.md conserva el checkpoint intermedio byte-exact
+antes de compactar. Errores históricos/handles allí NO son tareas vigentes.
+M6_SEMIREAL_CAMERA_REVIEW.md guarda GPU realRTS02/FPS04, clipping1765→872corregido
+sinFOVhack, latónsinTinte, Runtime05/IntegrationV3 y regresión141/builds. CURRENT y
+NEXT únicos en HANDOFF.md; fuente y arte anterior preservados, sin adopción main.
+
+## 2026-10-20 — LOD import / motion / GPU
+
+HANDOFF_HISTORY_2026-10-20_LOD1.md conserva16087B byte-exact del checkpoint
+anterior al cierre. Fallos/handles allí históricos, NO repetir operaciones.
+M6_SEMIREAL_LOD_REVIEW.md registra LOD01, conteos source→native, deformación
+regional real y mutation negativa, GPU03 renderLOD y nueve PNG inspeccionados.
+CURRENT/NEXT únicos en HANDOFF.md: PrivateGPUPerformance50target/100stretch.
+
+## 2026-10-20 — primer par de rendimiento real semireal
+
+HANDOFF_HISTORY_2026-10-20_PERF1.md guarda checkpoint previo byte-exact. Sus
+marcas EN CURSO son históricas: comprobar HANDOFF.md, todos esos procesos cerrados.
+M6_SEMIREAL_PERFORMANCE_REVIEW.md: Perf50_02/Perf100_01 válidos, fallos deCDO y
+parser documentados; inferencia de limitadorEditor/resolución interna pendientes.
+
+## 2026-10-20 — observación runtime y diagnóstico repetido50/100
+
+HANDOFF_HISTORY_2026-10-20_PERF2.md conserva18057B byte-exact del checkpoint
+anterior. Sus ENCURSO son históricos: todas las capturas allí registradas
+terminaron; CURRENT/NEXT únicamente en HANDOFF.md. M6_SEMIREAL_PERFORMANCE_REVIEW.md
+guarda default-cap confirmado, inferencia de escala100%, fallo de startupqueue,
+4corridas diagnósticas válidas y manifest native-diagnostic-cohort01.json.
+50Editor budget cumple2veces;100stretch variable; player/owner/M7/M8OPEN.
+Siguiente fuente independiente GPT: G-VQ02_CampSource1, muestra acotada VQ-02.
+
+## 2026-10-20 — fuente e integración privada del campamento
+
+HANDOFF_HISTORY_2026-10-20_CAMP1.md guarda14489B byte-exact del checkpoint previo;
+sus procesos ENCURSO son HISTÓRICOS, consultar CURRENT/NEXT solo en HANDOFF.md.
+M6_SEMIREAL_CAMP_SOURCE_REVIEW.md conserva fuente/imagenprompt/derechos;
+M6_SEMIREAL_CAMP_PREVIEW_REVIEW.md conserva Camp01import/readback/cámaras,
+falso positivo GPU01 invalidado y mutationfallingpose detectada.7PNGs finales
+inspeccionados,169assets hash-identical. NEXT privatecook; no owner/player/mainmap.
+
+## 2026-10-21 — cook privado del campamento
+
+HANDOFF_HISTORY_2026-10-21_COOK1.md guarda15294B byte-exact del checkpoint previo;
+EN CURSO allí es histórico. Cook01Zen/SM5/nativeexit0 conservado pese aexpectativa
+looseincorrecta. Cook02loose/SM5+SM6,12assets/35hardgameidentifiers/0missing y6SM6
+materiales verificados con registries nativos/PBRbytes;12guardsPASS,169Content/
+14sources/config/descriptorintactos. Autoridad M6_SEMIREAL_CAMP_COOK_REVIEW.md.
+CURRENT/NEXT soloHANDOFF.md: FontNoticeMap independiente mientras ownervisual
+responde. No rehacer cooks,VM,upstreamlookupni afirmarQAplayer/M7/M8completos.
+
+## Revisión privada de arquitectura y materiales — fuentev2
+
+HANDOFF_HISTORY_CAMP_REVISION2.md conserva19022B byte-exact del relevo anterior.
+Sus bloqueos/preguntas/EN_CURSO/PIDs son HISTÓRICOS: owner eligió ambas áreas;
+Author03/Readback02 y negativeguard terminaron. No relanzar procesos de ese archivo.
+Autoridad M6_SEMIREAL_CAMP_REVISION_REVIEW.md: fuentev2/4GLBs/32986tri/2Katlas,
+cobertura UV reparada y reimports/render fuente reales; no Unreal/adopción/player.
+CURRENT/NEXT únicamente HANDOFF.md: nuevo Camp02 privado conservando169assets.

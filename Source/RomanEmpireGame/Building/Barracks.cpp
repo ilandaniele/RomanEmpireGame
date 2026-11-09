@@ -10,6 +10,11 @@
 #include "Units/RomanUnitRegistry.h"
 #include "World/CampaignManager.h"
 #include "Engine/World.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
+#include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Templates/UnrealTemplate.h"
 #include "Misc/ScopeExit.h"
@@ -179,6 +184,49 @@ bool ABarracks::TryRefundReservation(const FTrainingReservation& Reservation)
 	return Result.WasSuccessful();
 }
 
+bool ABarracks::FindTrainingSpawnTransform(UClass* UnitClass, FTransform& OutTransform) const
+{
+	UWorld* World = GetWorld();
+	const AUnitBase* Defaults = UnitClass ? UnitClass->GetDefaultObject<AUnitBase>() : nullptr;
+	const UCapsuleComponent* Capsule = Defaults ? Defaults->GetCapsuleComponent() : nullptr;
+	UNavigationSystemV1* Navigation = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+	if (!Capsule || !Navigation || !FMath::IsFinite(Capsule->GetScaledCapsuleRadius()) ||
+		!FMath::IsFinite(Capsule->GetScaledCapsuleHalfHeight())) return false;
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	if (Radius <= 0 || HalfHeight < Radius) return false;
+	const FVector HalfExtent = GetPlacementHalfExtent();
+	if (HalfExtent.ContainsNaN() || HalfExtent.X <= 0 || HalfExtent.Y <= 0 || SpawnOffset.ContainsNaN()) return false;
+	FVector LocalExit = SpawnOffset;
+	// Preserve the authored exit side; enlarge its distance for the actual footprint/capsule.
+	constexpr float ExitMargin = 50.0f;
+	if (FMath::Abs(LocalExit.X) >= FMath::Abs(LocalExit.Y))
+		LocalExit.X = (LocalExit.X < 0 ? -1 : 1) * FMath::Max(FMath::Abs(LocalExit.X), HalfExtent.X + Radius + ExitMargin);
+	else
+		LocalExit.Y = (LocalExit.Y < 0 ? -1 : 1) * FMath::Max(FMath::Abs(LocalExit.Y), HalfExtent.Y + Radius + ExitMargin);
+	FVector Desired = GetActorLocation() + GetActorRotation().RotateVector(LocalExit);
+	// Query near the supporting ground, not near the box centre or a neighbouring roof.
+	Desired.Z = GetActorLocation().Z - HalfExtent.Z + LocalExit.Z;
+	const UCharacterMovementComponent* Movement = Defaults->GetCharacterMovement();
+	if (!Movement || !FMath::IsFinite(Movement->MaxStepHeight) || Movement->MaxStepHeight < 0 || Desired.ContainsNaN()) return false;
+	const float VerticalTolerance = FMath::Max(10.0f, Movement->MaxStepHeight + 10.0f);
+	FNavLocation Ground;
+	if (!Navigation->ProjectPointToNavigation(Desired, Ground, FVector(50,50,VerticalTolerance), &Defaults->GetNavAgentPropertiesRef()) ||
+		FMath::Abs(Ground.Location.Z - Desired.Z) > VerticalTolerance) return false;
+	// Projection is not permission to move the recruit back inside the building.
+	const FVector ProjectedLocal = GetActorRotation().UnrotateVector(Ground.Location - GetActorLocation());
+	const double DX = FMath::Max(FMath::Abs(ProjectedLocal.X) - HalfExtent.X, 0.0);
+	const double DY = FMath::Max(FMath::Abs(ProjectedLocal.Y) - HalfExtent.Y, 0.0);
+	if (DX*DX + DY*DY < FMath::Square(static_cast<double>(Radius + 10))) return false;
+	const FVector Center = Ground.Location + FVector(0,0,HalfHeight + 2);
+	const FQuat Rotation = GetActorQuat();
+	const FCollisionQueryParams Query(SCENE_QUERY_STAT(BarracksTrainingSpawn), false);
+	if (World->OverlapBlockingTestByProfile(Center, Rotation, Capsule->GetCollisionProfileName(),
+		FCollisionShape::MakeCapsule(Radius,HalfHeight), Query)) return false;
+	OutTransform = FTransform(Rotation, Center);
+	return true;
+}
+
 bool ABarracks::SpawnTrainedUnit()
 {
 	UWorld* World = GetWorld();
@@ -200,13 +248,16 @@ bool ABarracks::SpawnTrainedUnit()
 	if (OwnerFaction != ActiveTrainingOrder.PayingFaction) return false;
 	const FVector SpawnLocation = GetActorLocation() + GetActorRotation().RotateVector(SpawnOffset);
 	const FRotator SpawnRotation = GetActorRotation();
-	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+	FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+	const bool bAuthored = UsesAuthoredPresentation();
+	if (bAuthored && !FindTrainingSpawnTransform(UnitClass, SpawnTransform)) return false;
 	AUnitBase* NewUnit = World->SpawnActorDeferred<AUnitBase>(
 		UnitClass,
 		SpawnTransform,
 		this,
 		nullptr,
-		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+		bAuthored ? ESpawnActorCollisionHandlingMethod::DontSpawnIfColliding :
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	bool bCommitted = false;
 	ON_SCOPE_EXIT { if (!bCommitted && IsValid(NewUnit)) NewUnit->Destroy(); };
 	

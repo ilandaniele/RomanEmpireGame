@@ -1,0 +1,214 @@
+{
+  "schema": 2,
+  "scope": "Owner-requested source revision, NOT Unreal/player/adoption approval",
+  "owner_request": "Cambiar ambas cosas: architecture AND materials",
+  "seed": 2202,
+  "blender": "5.2.2 LTS",
+  "meshes": [
+    {
+      "name": "SM_CampGround",
+      "vertices": 625,
+      "triangles": 1152,
+      "dimensions_m": [
+        12.0,
+        10.0,
+        0.02176443673670292
+      ],
+      "material_slots": 6
+    },
+    {
+      "name": "SM_CampWall",
+      "vertices": 2048,
+      "triangles": 3704,
+      "dimensions_m": [
+        9.25,
+        0.377500057220459,
+        2.599696159362793
+      ],
+      "material_slots": 6
+    },
+    {
+      "name": "SM_CampBarracks",
+      "vertices": 17674,
+      "triangles": 28130,
+      "dimensions_m": [
+        6.685999870300293,
+        5.729999542236328,
+        3.815000057220459
+      ],
+      "material_slots": 6
+    }
+  ],
+  "atlas_size": 2048,
+  "units": "meters",
+  "triangle_limit": 65000,
+  "reference_legionary": {
+    "path": "SourceArt\\Characters\\RomanSoldier\\semireal_v2\\SK_Roman_Rome_Semireal01.glb",
+    "sha256": "3157ac079a631d6fa2a317d550b0b3aeb9a56be9d752d423c478f7d50e0211f6",
+    "scope": "Preview-only existing legionary; excluded from all camp GLB exports"
+  },
+  "uv_island_margin": 0.0005,
+  "bake_margin_pixels": 2,
+  "owner_approved": false,
+  "imported_to_unreal": false,
+  "historical_period_validated": false,
+  "changes": [
+    "6.2x3.6m long barrack; actual facade openings/covered porch",
+    "long-axis tile roof and porch roof; physical pans/covers",
+    "native procedural macro-earth/wear tracks, plaster dirt and surface variation"
+  ],
+  "geometry_source": "Original GPT Blender construction; no downloaded environment geometry",
+  "texture_source": "Unchanged v1 GPT soil input + new native procedural shaders/PBR bake",
+  "protected_source_files": [
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/BaseColor.png",
+      "bytes": 3285598,
+      "sha256": "19c1303fb8cc6db504b4d183213e7f78a43383527b9a494be7d17f177bd5aedd"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Camp-HumanScale.png",
+      "bytes": 2098453,
+      "sha256": "556e23d7daa2b1c8ed6ec1c79366906e69a0fe107f4c2adbea558f928fbe49c9"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Camp-Overview.png",
+      "bytes": 2201772,
+      "sha256": "2bb49f03e825b132a24db302d8c620d88b4cf2028e0b5ac6a063b5767f2b420f"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Metallic.png",
+      "bytes": 68954,
+      "sha256": "c8d3033b77fdec1e459c662ff08253927f35f4e9722e69f2bd305e44b98fab9f"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Normal.png",
+      "bytes": 1853279,
+      "sha256": "c65b042c12d840e33d636090577ab04396cba73d596d670b99d76f0b2ffc81a1"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/README.md",
+      "bytes": 3591,
+      "sha256": "a10516a0b2a3cafeaf0e6dd3c62089ed313e6af93f0efd4885c3814388398c47"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/RomanCamp-Proposal01.blend",
+      "bytes": 17258407,
+      "sha256": "8b3e39fe7b288abd80e7243504611f0603104bfd1ce3ec8e2d10e95132130d63"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/RomanCamp-Proposal01.glb",
+      "bytes": 9397508,
+      "sha256": "c7a3f2b54a1add870c3cb2a063ca2bc15ae06d3d75c6314364b03a9a17217cb8"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Roughness.png",
+      "bytes": 491026,
+      "sha256": "e5f96a7df0be7ff206d8b30e2fab1055c9a613ddd013da3cad99fbf85d4f9b05"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/SM_CampBarracks.glb",
+      "bytes": 9076896,
+      "sha256": "c7fba2d46225ecb9437da992ab027ef9132ad3a885a6e9e409932e3434004ce5"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/SM_CampGround.glb",
+      "bytes": 5672560,
+      "sha256": "ce2868c9ce4db9168b307d88ca72b8e88b14b41bf427d265a97c6cae67870ad3"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/SM_CampWall.glb",
+      "bytes": 5830248,
+      "sha256": "9ffb96de2a19414fb35e5c43bf02984f4bde26c267a32656bcf47cd344052edc"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/Soil-Input01.png",
+      "bytes": 4445380,
+      "sha256": "28ab6df00b0a75c85f65116a400ff662349caa58548381d0dfb94463fb4124af"
+    },
+    {
+      "path": "SourceArt/Environment/RomanCamp/semireal_v1/source-manifest.json",
+      "bytes": 3634,
+      "sha256": "0669bef5066f8204730935da2276bcf4cac08e5cc78e5d7f4d6158bdfa905912"
+    }
+  ],
+  "protected_sources_unchanged": true,
+  "tools": [
+    {
+      "path": "Tools/create_semireal_camp_v2.py",
+      "bytes": 15376,
+      "sha256": "3b5ab5d3a6b7adcb968bd31eef76abb9593075794b45b12a591c74d80f42b243"
+    },
+    {
+      "path": "Tools/semireal_camp_revision_recipe.py",
+      "bytes": 2194,
+      "sha256": "f5fc1e5e0e82578ee90d63c8e86c8ff10437ab7ae4bc545e6e85c3896dbc56f2"
+    },
+    {
+      "path": "Tools/create_semireal_camp.py",
+      "bytes": 19386,
+      "sha256": "419b471c1de7d982ede331bff2b0693fad0a224b10233b4a213c59d64e356f1f"
+    }
+  ],
+  "files": [
+    {
+      "path": "BaseColor.png",
+      "bytes": 5061833,
+      "sha256": "435cc187f8328f0f2b323be9cfbb0d00850038f09ff1d4937dc5795b6d9a1b33"
+    },
+    {
+      "path": "Camp-HumanScale.png",
+      "bytes": 2018378,
+      "sha256": "cf30c74d3cd7f63e56bdba906598dc039bf44b7447bb204548a36a63057de46c"
+    },
+    {
+      "path": "Camp-Overview.png",
+      "bytes": 2060574,
+      "sha256": "6410f2a5cc13ea5fdc428d9a3c3bdaab8b5a7e1e68a11b920468435c90b1e561"
+    },
+    {
+      "path": "Metallic.png",
+      "bytes": 67019,
+      "sha256": "8daa90b8990bc17eba4b43c60795a5c9cfb878158f6b32f35cffe07cd1f6191e"
+    },
+    {
+      "path": "Normal.png",
+      "bytes": 2810255,
+      "sha256": "a69bc6f3ba397b46c667cd0d1cc14c2fb8d4b1111e8371827d45948d7ceb83a0"
+    },
+    {
+      "path": "RomanCamp-Proposal02.blend",
+      "bytes": 19618892,
+      "sha256": "caa2234cf1cd979d679c57bc38a2272f2a5a3799090363a00fd4f5578ffa2175"
+    },
+    {
+      "path": "RomanCamp-Proposal02.glb",
+      "bytes": 10564396,
+      "sha256": "6d830f0160bbd6b81120f1a713b820ed29fe7eb043cb7fdda6d2dd8bfe514d44"
+    },
+    {
+      "path": "Roughness.png",
+      "bytes": 431393,
+      "sha256": "9ead70f5df3ead22babf86909571a759a5aea78d91a76e6ee65944ab20efcb5d"
+    },
+    {
+      "path": "SM_CampBarracks.glb",
+      "bytes": 10243744,
+      "sha256": "e3474791a3b3f5c1f3298d63458202bca7cf56de38e4e53796f93773e3291954"
+    },
+    {
+      "path": "SM_CampGround.glb",
+      "bytes": 8351124,
+      "sha256": "e91fe47e4b73ebf67cb5c5edc21c83558d0de49fe67df22d13a2021e513eccfb"
+    },
+    {
+      "path": "SM_CampWall.glb",
+      "bytes": 8508812,
+      "sha256": "636aa3899ab61d38473ac49581b24452a5ceac95c05d2fce669a6ab198b0dd69"
+    },
+    {
+      "path": "Soil-Input01.png",
+      "bytes": 4445380,
+      "sha256": "28ab6df00b0a75c85f65116a400ff662349caa58548381d0dfb94463fb4124af"
+    }
+  ]
+}

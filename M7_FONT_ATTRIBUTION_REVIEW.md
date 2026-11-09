@@ -232,3 +232,18 @@ Current package NOTICES.txt remains unchanged. Inventory != owner legal approval
 complete all-engine-asset audit, actual player behavior, clean release or CI.
 No new production asset/import/config/dependency, commit/install/trust change.
 Packaging skill informed separation of extraction/provenance/rights/player proof.
+
+## Per-identity notice map — 2026-10-21
+
+[M7_FONT_NOTICE_MAP.md](M7_FONT_NOTICE_MAP.md) now binds all14unique font hashes
+to exact copyright/nameID0/13/14/version observations, documentary tiers and
+specific review gaps. FontNoticeMap02.json reuses five pinned receipts, verifies
+Pak/extraction/manifest/TPS/license identities and45raw installed/extracted paths.
+No new extraction, font parsing, download or native run. Old/Tiles Bold is an
+alias outside the declared TPS directory, not another face or extended scope.
+Exact Mono proof is retained separately from historical Ascender metadata and
+is not applied to Fallback. Eight oldRoboto identities have no13/14 and do not
+inherit the2017 siblings' claims.12new directed mapping tests pass; this is not
+a rerun or supersession of the original parser suite/fullPython69 result above.
+ATR-13 refined, rights/notice review still pending_owner; no final notices copied
+or package/font/engine/license bytes rewritten. See map for current hashes/limits.

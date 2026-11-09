@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 
 #if WITH_EDITOR
+#include "Building/BuildingPresentation.h"
 #include "Misc/DataValidation.h"
 #endif
 
@@ -158,6 +159,11 @@ EDataValidationResult URomanBuildingDefinition::IsDataValid(FDataValidationConte
 	if (BuildingClass.IsNull())
 	{
 		AddError(Context, TEXT("Building definition requires a factory class."));
+		Result = EDataValidationResult::Invalid;
+	}
+	if (RomanEmpireBuildingPresentation::Validate(Definition) != RomanEmpireBuildingPresentation::EFailure::None)
+	{
+		AddError(Context, TEXT("Building presentation requires a valid positive transform, non-empty bounds within its footprint, and grounding on the placement-box base."));
 		Result = EDataValidationResult::Invalid;
 	}
 	return Result;

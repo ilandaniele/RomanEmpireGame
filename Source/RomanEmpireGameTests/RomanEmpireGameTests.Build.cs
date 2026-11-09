@@ -13,6 +13,7 @@ public class RomanEmpireGameTests : ModuleRules
 		{
 			"Core",
 			"CoreUObject",
+			"Json", // Native private art-integration receipts; Editor test module only.
 			"Engine",
 			"AIModule",
 			"NavigationSystem",

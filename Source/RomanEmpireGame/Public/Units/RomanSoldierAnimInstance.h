@@ -16,4 +16,11 @@ public:
 	bool bBlocking = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Soldier")
 	bool bDead = false;
+	/** Optional full-body graph input; legacy graphs do not consume these fields. */
+	UPROPERTY(BlueprintReadOnly, Category = "Soldier|FirstPerson")
+	bool bLocalFirstPerson = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Soldier|FirstPerson")
+	FVector FirstPersonHandTarget = FVector::ZeroVector;
+	UPROPERTY(BlueprintReadOnly, Category = "Soldier|FirstPerson")
+	FVector FirstPersonElbowTarget = FVector::ZeroVector;
 };

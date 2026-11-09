@@ -1,0 +1,125 @@
+{
+  "schema": "RomanSemiReal/1",
+  "blender": "5.2.2 LTS",
+  "recipe_sha256": {
+    "create_semireal_legionary.py": "640e321127faa52f56eab1453581217fea6541f73d8c4f56b28fa78233a2b78a",
+    "semireal_legionary_mesh.py": "0d7490f163d143b9aaa4edf7ebb49ebbe5e1d0cb584c733a8b5cf67fca3b0a52",
+    "semireal_gltf_cleanup.py": "2de079a258f8cb7e8a365e810b6321320b73d5fae7195638f45c184f1dfaf79f",
+    "roman_character_recipe.py": "a408ce02f8d8660cdd509f06bd7f45cf2206841b3cbe9a9b65982e2c601a115b",
+    "pose_semireal_grip.py": "380e6db54b1dfd62cc3042a4a3740469463a99b2c0a35d4d756d362c144d9e4a",
+    "semireal_character_motion.py": "4aef56eb1239abfc69ab06f743e445daac549952b37eb649acfc7b24dabe44c5"
+  },
+  "source_sha256": "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c",
+  "anatomy_profile": "roman_adult_v1",
+  "morph_sources": [
+    {
+      "file": "caucasian-male-young.target",
+      "sha256": "70e228ba7164737dae664454394536fc5935fa48d333c1a97d77e2dc6eacc5f5",
+      "weight": 0.75
+    },
+    {
+      "file": "caucasian-male-old.target",
+      "sha256": "b0d2b1d58cba0358af59833740e70229265f7da1c20a11240f4123b7192cfd6d",
+      "weight": 0.25
+    },
+    {
+      "file": "universal-male-young-maxmuscle-averageweight.target",
+      "sha256": "c171ff9cc95e96273beb3e3b1969a01988c2d4982ebc6fe04bf81cf72ee3b295",
+      "weight": 0.35
+    }
+  ],
+  "vertices": 26092,
+  "baked_weapon_grip": true,
+  "triangles": 49782,
+  "bones": [
+    "root",
+    "pelvis",
+    "spine",
+    "chest",
+    "head",
+    "upper_arm_l",
+    "forearm_l",
+    "hand_l",
+    "upper_arm_r",
+    "forearm_r",
+    "hand_r",
+    "thigh_l",
+    "calf_l",
+    "foot_l",
+    "thigh_r",
+    "calf_r",
+    "foot_r"
+  ],
+  "clips": {
+    "Idle": 2.0,
+    "Walk": 1.0,
+    "Attack": 0.6,
+    "Block": 0.8,
+    "Death": 1.0
+  },
+  "semantic_slots": [
+    "Body",
+    "Metal",
+    "Skin",
+    "Leather",
+    "Shield",
+    "Crest"
+  ],
+  "material_slots": [
+    "Body",
+    "Metal",
+    "Skin",
+    "Leather",
+    "Shield",
+    "Crest",
+    "MailLinks",
+    "EyeWhite"
+  ],
+  "glb_sha256": "3157ac079a631d6fa2a317d550b0b3aeb9a56be9d752d423c478f7d50e0211f6",
+  "textures": {
+    "BaseColor": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\BaseColor.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Roughness": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\Roughness.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Metallic": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\Metallic.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Normal": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\Normal.png",
+      "size": [
+        2048,
+        2048
+      ]
+    }
+  },
+  "lod_candidates": [
+    {
+      "level": 1,
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\SK_Roman_Rome_Semireal01_LOD1.glb",
+      "triangles": 12444,
+      "sha256": "99e5d203ba969c17704148dcce886c03ad781d194bcf6ddfe60ddd8e2e44d1c0"
+    },
+    {
+      "level": 2,
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt10\\SK_Roman_Rome_Semireal01_LOD2.glb",
+      "triangles": 4978,
+      "sha256": "6c61948ebe48db34494dfdb6f71a4994d15940b101166a33c422b5ddacad1110"
+    }
+  ],
+  "production_approved": false,
+  "unreal_imported": false
+}

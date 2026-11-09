@@ -781,6 +781,18 @@ Estimated effort: 2–4 focused weeks.
 
 ### M6 — Production UI, content, audio, and accessibility
 
+Pending art work package: [visual quality brief](M6_VISUAL_QUALITY_BRIEF.md), VQ-01 legionary and VQ-02 small camp sample. Owner selected Roman semi-realism on 2026-10-19: natural proportions, detailed materials, military appearance. A verified official workspace-portable Blender5.2.2 and explicitly CC0 anatomy data now support a REAL versioned [source candidate](SourceArt/Characters/RomanSoldier/semireal_v1/README.md): three GLBs/LOD candidates, rig17, five clips, baked PBR, packed editable BLENDs and reimported-pose renders. Actual isolated UE5.8.2 import/readback passes for the selected GLB (186cm/17bones/5clips/8slots/3shared textures); this does not change the live game. [Source review](M6_SEMIREAL_SOURCE_REVIEW.md) preserves attempts, tests and limits. Grip/raised-arm coverage/cloth/face quality, historical period, real RTS/FPS camera review, installed LOD performance and owner visual acceptance remain OPEN; not final art approval, a schema1 replacement, or M7 closure. VQ-02 camp sample remains pending.
+
+Selected continuation candidate: [semireal_v2](SourceArt/Characters/RomanSoldier/semireal_v2/README.md), attempt10. Adult anatomical proposal, actual baked closed grip, body-fitted clothing/torso weights, upright shield block and in-place foot compensation; exact six-file recipe snapshot retained. Three LOD GLBs (49782/12444/4978triangles), Blender reimport/gallery and actual UE5.8.2 import plus D3D12 visibility/Raw AND Compressed17bone motion across five phases per clip PASS. These are real source/engine checks, not accepted art, native game-camera/AnimBP integration, installed engine LODs, 100-unit performance, packaged QA or milestone closure. v1/schema1/baselines/gameplay stay intact. Next C-018H_SemirealGamePreview: controlled private game-context RTS/FPS preview, not a silent replacement in the owner's running Editor; preserve actual gameplay authorities and verify new textured materials/new clips rather than old flat overrides.
+
+GamePreview progress (2026-10-19): private game copy created/306file SHA256 snapshot and actual native-module/candidate readback PASS; already verified18candidate uassets reused without reimport. Private Editor build114actions PASS; new independent AnimBP with four new-rig graph clips, new Attack montage and reflected bundle authored in the candidate namespace. Missing-opt-in negative probe correctly failed without saves; authoring and fresh readonly native test each1/1,0errors/0warnings,exit0. Original306inputs and preexisting private Content unchanged. Tools/ASSET_AUTHORING.md documents create-only setup/guards and fixture; [review](M6_SEMIREAL_SOURCE_REVIEW.md) retains exact logs/hashes. This proves native authoring/readback, NOT runtime pose/camera or appearance acceptance. Next C-018H_SemirealRuntimeBindings within GamePreview: preserve PBR during canonical faction/damage updates, then actual actor transform/poses/selection/lifecycle/RTS/FPS. Main Source/Config/Content/baselines and clean91c checkout remain intact; M7/M8 gates remain open.
+
+Latest runtime progress (2026-10-19 21:32UTC, supersedes graph-only status above): C-018H_SemirealRuntimeBindings verified in the private game. Optional presentation policy keeps per-slot PBR parents/MIDs and canonical faction/health parameters, defaults false preserving schema1; main Source has the compatible extension and directed Editor test, no art adoption. Actual pose/timeline test exposed missing CompositeSection in V1 (playing without deformation); preserved failures and fixed NEW IntegrationV2+Runtime03 now pass real Idle/Walk/Block/Attack/Death checks without relaxed thresholds. Characters4/4 clean; private full141success/0failed/0pending, with documented audio/network/intentional-image warnings; strict IWYU, private Shipping78actions and main Editor11actions PASS. Runtime03 material graph authoring and fresh readonly10asset receipt PASS; NO GPU shader/camera/player proof. [Runtime review](M6_SEMIREAL_RUNTIME_REVIEW.md) records evidence/cohort/limits. Next C-018H_SemirealCameraPreview: real private D3D12/SM6 RTS/FPS/controller/head-hide/scale/facing/handedness and owner art review. Main Content/Config/baselines and clean91c checkout untouched; LOD/new-model100-unit performance and M7/M8 still OPEN.
+
+Latest camera progress (2026-10-19 22:58UTC, supersedes initial runtime status): C-018H_SemirealCameraPreview TECHNICAL gate verified privately in real D3D12/SM6 game viewport. Current Runtime05/IntegrationV3 preserves brass (slotCrest is fittings in this mesh) and adds optional same-body/local-player hand reach after a stricter real FPS test caught handX1765 outside1280. No viewmodel, stretch, camera/FOV/scale/collision/damage changes. Current hand872.727/546.182, own-mesh GPU witness41443pixels; RTS production zoom/handedness, possession/head hide and actual pawn/head/IK restoration PASS. RTS02/FPS04 inspected, each native1/1/0errors/1retained MotionVector warning/exit0; no shader/material compile failure signatures. Stronger Character checks4/4clean; final full141success(140clean/1intentional warning),0failed/pending; strict builds, private Shipping5actions/main Editor11actions and fresh Runtime05 readonly PASS. [Camera review](M6_SEMIREAL_CAMERA_REVIEW.md) preserves failures, source/PNG cohort and limits. No main Content/Config/baseline adoption or owner quality approval; source GLBs unchanged. Next C-018H_PrivateLODCheck: add verified LODs ONLY to a new private candidate, then measure actual new-model100-unit GPU performance on declared hardware; keep reference-hardware/acceptance gates distinct. VQ-02 camp sample remains independent GPT asset work; M7/M8 still OPEN.
+
+Owner visual review (2026-10-19): the user ran L_VerticalSlice in the Editor and rejects the model quality. The provided screenshot confirms gameplay/HUD rendering in the Editor, not the full manual journey or Development/Shipping player gates. M6.7's existing closure proves the minimum original skeletal/animation integration, NOT owner acceptance of final art. The current recipe-generated characters, prototype buildings/environment and test-floor presentation must not be described as production-quality visuals. Next: agree an art target and review one representative legionary plus a small environment sample before approving broader replacement. No new art direction, purchases, DCC installations, mesh replacement or gameplay redesign is authorized by this status note; final visual acceptance remains OPEN and does not waive M7. Real usable meshes/materials/rigs/animations are required; concept images alone do not fulfill this work.
+
 Goal: replace prototype/debug presentation with a coherent slice without changing authoritative gameplay state.
 
 C017A/M6.2 (2026-10-06) verified: native schematic minimap uses validated weak registered units, registered objective/current result and controlled Pawn; strategic public territory positions/owners/authored adjacency. Only visible shell placement subscribes; committed spawn/reindex/death/removal invalidation, tactical indexed movement5Hz, no strategic polling/UI Tick/world scans. Stable finite projection, color-safe shapes and current-world/parent readiness/lifecycle guards. Directed2/full97 clean; rendered2 successful (one known engine warning), both PNG inspected; strictIWYU93/Shipping17/repo0M1warnings/LFS/diff pass. [Minimap review](M6_MINIMAP_REVIEW.md) and [HANDOFF.md](HANDOFF.md) record exact evidence. No new assets/deps/config/input/authority, no cook/player/full-M6 claim. Next C017B/M6.1 responsive layout/legibility; tactical debug-panel overlap remains to address.
@@ -808,6 +820,10 @@ Evidence and exit gate:
 Estimated effort: 2–6 weeks depending primarily on art/audio availability; engineering can overlap M3–M5 after M2 interfaces stabilize.
 
 ### M7 — Automation, CI, security, and release gate
+
+Owner follow-up (2026-10-19): «atacan segui von todo me voy a dormir, sin frenarte» confirms enemies attack in the user's Editor test, following the training confirmation. Close both reported playtest availability issues without an AI/runtime patch; retain the navigation failure observation as an unconfirmed conditional risk, not a diagnosed regression. Continue authorized implementation autonomously, not repeated questions about these resolved reports. This is not full manual-journey, packaged-player or release-gate proof.
+
+Owner Editor playtest report (2026-10-19): initially reported inactive enemies and missing unit creation. Follow-up «bien si, esta entrenando y anda» confirms the user found training and has it running; close the missing-training-option report without a code change. This alone does not prove completed unit spawning, refunds, persistence or Development/Shipping player QA. Enemy inactivity remains OPEN pending clarification/reproduction; do not infer it is resolved from the training confirmation. Read-only diagnosis found a conditional AI failure path (failed navigation becomes Hold, while automatic acquisition only runs from None), but no live per-unit navigation state has yet confirmed that cause. Training UI is selection-dependent: completed owned Barracks, Tactical commands available, valid trainable content; Strategic zoom, possession or resolved battle suppress availability. Reproduce the exact actor/selection/mode before changing behavior or declaring an AI fix. Do not treat prior automated gates or art concepts as proof of owner acceptance or packaged QA.
 
 Goal: make regressions visible and produce repeatable release candidates.
 
@@ -1141,3 +1157,279 @@ When implementation is authorized, execute only this batch first:
 6. Prove clean Editor build, PIE launch, cook, package, and packaged smoke launch.
 
 The M1 human-review gate was accepted and its commit/clean-clone reproduction completed on 2026-09-05. Canonical-state refactoring may now proceed as the first M2 work package.
+
+## C-018H private LOD progress — 2026-10-19 23:22 UTC
+
+Import/static readback verified ONLY in existing GamePreview, new LOD01 derived
+from Runtime05/IntegrationV3. Three actual LODs:49758/12420/4954 native triangles,
+38756/12165/6000 vertices,8sections/2UV channels each, screen sizes1/.5/.25.
+Source counts differ by exactly24 coincident-corner brass faces per LOD; independent
+GLB analysis plus exact native per-material checks reconcile them. No source
+bytes, original Runtime05, main Content/Config/baselines or gameplay changed.
+Fresh readonly157Content files byte-unchanged, native1/1clean, strict private build,
+Python10+9checks/repo validation PASS. Preserved failures and complete evidence:
+[LOD review](M6_SEMIREAL_LOD_REVIEW.md). NEXT remains C-018H_PrivateLODCheck:
+animated deformation per LOD, real GPU forced/automatic transitions and actual
+new-model100-unit performance. Owner approval/reference hardware-budget/player
+QA/main art adoption and M7/M8 remain OPEN. Do not substitute static readback for
+those gates or repeat previous full141 tests without a relevant source change.
+
+2026-10-20 motion/GPU update: Animation02 verifies actual engine-skinned renderLOD
+vertices for Idle/Walk/Block/Attack/Death and held poses at eachLOD. Explicit
+process-only suppressed-attack mutation correctly fails three regional geometry
+checks; normal1/1clean. GPU03 verifies actual D3D12/SM6 render-threadLOD2/1/0 across
+legal RTS zoom.55/.6625/.70, actual FPSauto0, forced1/2/0 and exitauto2, nine PNGs
+inspected;1/1successWithWarnings (knownMotionVectorwarning),0errors/failed/pending.
+157privateContent files hash-unchanged; no source meshes, main art or runtime
+changes. [LOD review](M6_SEMIREAL_LOD_REVIEW.md) preserves failed fixture runs,
+native receipts, source/PNG lineage and scope limits. Next
+**C-018H_PrivateGPUPerformance**: D-05 is60FPS1080p/50 slice units plus separate
+100-unit stretch test; measure new-model simulation/rendering on declared
+hardware, not old original-art NullRHI or the one-body720p capture. No complete
+M6/M7/M8/owner-acceptance/continuous-video/trusted-player claim.
+
+2026-10-20 first measured semireal pair: PRIVATE observer reuses unchanged
+Encounter50/100 canonical gameplay, binding LOD01 per instance BEFORE init.
+Perf50_02/Perf100_01 each pass actual combat/training/FPS/physical victory with
+all-new-art population/ticks/realtime and inspected1080p output screenshots;
+157Content hashes unchanged. Full-population RTS means58.50/59.69FPS (1138/626
+frames), GPU3.421/3.567ms, observercost included. Schema2 parser retains complete
+4176/3776 native CSV frames using final union header. Failed old-art CDO attempt
+and185-frame parser mistake preserved, NOT valid evidence. Technical capture
+is not target acceptance: near60 median suggests Editor cap; actual runtime
+battery limiter/smoothing and internal resolution still need confirmation.
+[Performance review](M6_SEMIREAL_PERFORMANCE_REVIEW.md) gives exact artifacts,
+scope and next checks; keep C-018H_PrivateGPUPerformance/M7/M8/owner/player OPEN.
+
+2026-10-20 runtime observation supersedes the cap/resolution TODO above:
+Perf50_03 records battery1/DontLimit0/smoothingfalse/t.MaxFPS0, confirming the
+installed Editor60cap predicate, and primary resolution upper.728869–.846294
+(NOT fixed100%). New opt-in, process-only diagnostics set ScreenPercentage100
+and DontLimitOnBattery1 without persistent/Windows/security or other quality,
+camera, unit load, AI or animation changes. Default and diagnostic cohorts remain
+separate. Perf50_NativeDiag02 passes canonical gameplay at full50–51population:
+1597RTSframes,81.99FPSmean/12.197ms,p9514.072; upper=secondary=1/dynres0 supports
+source-grounded fixed full-scale inference, NOT a GPUbuffer size readback.
+Screenshot inspected, legacy camp art still unfinished. Launcher semicolon bug
+and failedDiag01 preserved; fixed comma queue8PS testsPASS, analyzer11PASS.
+100-unit diagnostic, repeat variability and player/owner gates remain OPEN;
+this provisional Editor sample does not approve release/M7/M8/main-art adoption.
+
+Repeat cohort now completed and preserved in `native-diagnostic-cohort01.json`:
+50units81.99/84.80FPS,p9514.072/13.549ms;100stretch51.68/65.53FPS,
+p9521.591/16.930ms. All4canonical native encounters pass (known engine warning
+only), same observer/DLL,157Content hashes unchanged,4PNGs inspected. No pooled
+FPS/cherry-picking:100variability remains unexplained and even its faster p95
+exceeds60FPS budget. Provisional50Editor budget met twice; packaged/owner gate
+NOT closed. Full details/hashes in performance review. No identical recaptures
+needed now without a source/asset change or concrete investigation hypothesis.
+Next independent work: G-VQ02_CampSource1 private terrain+wall+onebuilding source
+proposal at legionary scale; preserve canonical collision/nav and obtain owner
+visual acceptance before broad adoption. M7/M8/player/security/rights remain OPEN.
+
+2026-10-20 G-VQ02_CampSource1 source delivery verified: private original terrain,
+palisade and ONEbarrack under SourceArt/Environment/RomanCamp/semireal_v1,real
+editable BLEND/4GLBs/PBRatlas and previews,51458tri total. Soil generated with
+built-in image_gen (actual1254, baked atlas2048; no added source-detail claim).
+Independent4GLB imports validate actualtri/UV/embeddedPBR/dimensions/nocharacter;
+saved samplers identical,2final sourcePNG inspected,sourcecopySHA/LFSattrs checked.
+Exporter packing warning preserved/source-grounded, no main gameplay/assets edit.
+[Camp source review](M6_SEMIREAL_CAMP_SOURCE_REVIEW.md) documents prompt/provenance/
+failed initial assumption/units/sharedpivots/rights and technical limits. NEXT
+C-018H_PrivateCampPreview: fresh private integration and realRTS/possession cameras,
+original157assets hashguard, collision/nav/readback/owner review. Source rendering
+alone does NOT close VQ-02, production adoption, performance/player/M7/M8 gates.
+
+2026-10-20 C-018H_PrivateCampPreview technical proof complete: existing private
+Camp01=3SM/6materials/3shared2048textures, actualnative51458tri/UV/cm/PBR/simple
+collision0 verified, original157Content files preserved. Failed author verifier
+(missing Editor subsystem in commandlet) fixed via publicmeshAPI/readonlyprocess,
+not reimport/overwrite. ActualRTS/FPS/exit and3component visibility witnesses now
+pass with identical cameras/heldsourcepose;7GPU02PNGs inspected. EarlierGPU01
+success INVALIDATED after receipt showedfallingcamera; correctedguard detects
+samebinary mutationGPUFail1/error1 while nativeassetreadback passes.169Content
+hashes unchanged,cohortreceipt/strictbuilds/12Python guards saved. Full lineage:
+[camp preview review](M6_SEMIREAL_CAMP_PREVIEW_REVIEW.md). NEXT
+C-018H_PrivateCampCook: explicit private cook reachability/current registry and
+PBR evidence. No owner/mainmap adoption, realinput/navgameplay, environmental
+performance/player/security/rights/M7/M8 approval; full goal remains active.
+
+2026-10-21 C-018H_PrivateCampCook technical content gate verified. Cook01 native
+exit0 used defaultZen/SM5; wrapper's loose-file expectation failed, native registry
+then proved12assets, original attempt preserved. FreshCook02 selects supported
+loosewriter and process-onlyaddsSM6withoutremovingSM5 or editing config:537cooked+
+7platformskip=544,0errors/warnings.12uasset/12uexp/3texturebulk, actualGlobal/Game
+SM5+SM6shaderarchives,6materials inSM6assetinfo. Native runtime/development dumps
+validate classes/tags and35hard-game dependency identifiers(34content+NavigationSystem
+script),0missing;169Content/14source/config/descriptorunchanged. StrictUTF16/
+primary-ID aware verifier and12targeted guardsPASS. Full evidence/limits:
+[cook review](M6_SEMIREAL_CAMP_COOK_REVIEW.md). This is directed PRIVATEreachability,
+not normalShippingmap adoption/player/collision/nav/performance/rights approval.
+Ownerdirectionquestion pending; no silence-as-approval. NEXT independent
+C-018H_FontNoticeMap uses existing exactfontmetadata, no newextraction/build/cook.
+M7/M8/fullgoal remain OPEN.
+
+2026-10-21 C-018H_FontNoticeMap technical mapping verified:
+[per-identity notice map](M7_FONT_NOTICE_MAP.md), FontNoticeMap02.json.
+14exactraw hashes/15paths per historical QA configuration,45 installed/extracted
+fontpaths rehashed; pinned inventories/extraction/Pak/manifest/TPS/document links.
+Verbatim nameID0/13/14 records preserved, mixed2011/2017 Roboto separated,
+Old/Tiles Bold alias outside TPS directory explicit; exact Mono directory proof
+not inherited by Fallback.12directed Python testsPASS. ATR-13 scope refined,
+owner contractual/notice decisions and content/provider/platform coverage OPEN;
+no final bundle, font/license rewrite, extraction/build/cook/network/native change.
+Does not approve a clean release candidate, security, trusted player, M7 or M8.
+
+Owner response to private camp: «Prefiero ajustes visuales», NOT adoption approval.
+[Visual brief](M6_VISUAL_QUALITY_BRIEF.md) now distinguishes observed ground/roof/
+timber polish from a possible architecture change. Subsequent explicit response:
+«Cambiar ambas cosas». Source revision02 now delivered in
+SourceArt/Environment/RomanCamp/semireal_v2, not adopted to mainmap.
+[Revision proof](M6_SEMIREAL_CAMP_REVISION_REVIEW.md): actual4GLB/BLEND/PBR,
+32986tri/2048atlas, longer barrack/porch/openings and procedural material revision.
+NativeAuthor03/Readback02exit0,4actualGLBreimports/2inspectedrenders,14puretests;
+4410sampled clay-face atlas coverage repaired within2K, no exported vertex-color
+double tint. Python failure negative native73 is rejected (older0/stderr wasNOTpass).
+Existingv1/Camp01/evidence preserved. NEXT C-018H_CampRevision02Preview: new private
+Camp02 import with169existingassets hash-protected, realRTS/FPS/PBR/unit checks.
+Not historical/owner/player/performance/functionalNav/collision/M7/M8 approval.
+
+C-018H_CampRevision02Preview verified in the EXISTING privateGamePreview:
+Camp02 adds12assets (3SM/6mat/3tex), native source selector/pinned v1+v2 hashes;
+defaultv1 and Camp01 preserved. Native import/reopen0,169previous/181current
+ContentFILES protected (179Unrealassets+2designJSON). Strict private fixture build
+4actions/18.82s0; actual D3D12/SM6/1280x720 realRTS/possess/exit native2Success,
+1knownMotionVectorwarning/0errors.7PNGs inspected; same-source/DLL falling-pose
+mutation is ExpectedFail1/native255, unchanged181files. New8pure source-policy
+tests pass; [cohort and exact limits](M6_SEMIREAL_CAMP_REVISION_REVIEW.md).
+No mainmap/adoption/physicalinput/functionalNav/collision/perf/player/rights gate
+cleared by that preview. Subsequent C-018H_CampRevision02Cook also VERIFIED:
+fresh Camp02/v2 output, native0/0errors/0warnings,537cooked/7platform-skipped,
+12actual assets/35hard-Game identifiers/0missing,6SM6material mappings and actual
+SM5+SM6 archives.181Content/14source/Config/descriptor unchanged;15verifier plus
+8source-policy tests PASS. [Exact cook evidence/limits](M6_SEMIREAL_CAMP_COOK_REVIEW.md#camp02--semireal_v2--current-revised-private-cook).
+NEXT C-018H_CampRevision02AdoptionDecision: actual revised RTS/FPS owner review
+pending, not automatic main-map adoption. After approval evaluate shared-origin
+fit/offset against existing building/placement/nav authority before integration;
+otherwise implement the requested visual revision. No repeat source/import/GPU/
+cook gates solely on model switch. Trusted player/security/rights/CI/M7/M8 OPEN.
+
+C-018H_CampRevision02Fit measured read-only while owner review remains pending:
+actual saved Barracks4x4/PrototypeScale2.5,2.5,3; source mesh6.686x5.73x3.815m;
+spawn CDO+300cm/capsule CDO42cm. Natural mesh does NOT fit current footprint;
+7x6 is an unapproved enclosing-grid proposal, not a saved change. Naive swap
+would distort scale/height; construction/selection/material-slot0 and spawn need
+an explicit integration adapter, not just a mesh assignment. Native PID43828
+0errors/0warnings,181Content/14source/Config/descriptor unchanged;9pure tests PASS.
+[Exact read-only fit evidence and next contracts](M6_SEMIREAL_CAMP_FIT_REVIEW.md).
+Owner decision received2026-10-30: «Pedir más ajustes visuales». This supersedes
+the pending-adoption NEXT above: Camp02 is NOT approved for functional integration.
+NEXT G-VQ02_CampRevision03Brief / GPT: obtain concrete changes to the current
+sample or an annotated view/reference, retain agreed semi-realistic Roman style
+and architecture+materials scope, then define acceptance criteria for revision03.
+Do not generate speculative v3, adopt Camp02, or treat prior technical gates as
+proof for new assets. No mainmap/footprint/spawn change is approved by this answer.
+
+Subsequent owner instruction2026-10-30 «segui la tarea no importa» delegates the
+next private visual iteration. NEXT G-VQ02_CampRevision03Source: oxide bands/gable
+military identity, actual equipment rack/fasteners, less gravel/wood contrast;
+same envelope/layout/cameras and3meshes/6materials/2Katlas/65ktri budget.
+New source generation/readback needed; do not adopt rejected Camp02 or reinterpret
+this as footprint/spawn/mainmap/release approval. Existing v1/v2 remain untouched.
+
+G-VQ02_CampRevision03Source DELIVERED: real versioned semireal_v3,14files,
+oxide/gable military identity, physical equipment rack/fasteners and quieter
+soil/wood/clay.35,410tri/3meshes/6slots/2K/1UV, no new rig/LOD/nav/interactive
+mechanics. Author02/independent fourGLB Readback02 native0;4final PNGs inspected,
+28prior sources intact,20pure tests PASS. [Actual source evidence/limits](M6_SEMIREAL_CAMP_REVISION3_REVIEW.md).
+NEXT C-018H_CampRevision03Preview: explicit pinned v3/Camp03 profile, create-only
+import/read-only and real existing RTS/FPS fixture in current GamePreview,181files
+protected. No new clone, renderer/camera shortcut or automatic mainmap adoption.
+
+C-018H_CampRevision03Preview VERIFIED: explicit v3/Camp03 source/profile and10policy
+tests; native import/reopen0,181old/193current ContentFILES intact (191assets+2JSON).
+Strict private fixture build4actions/18.61s0; realD3D12/SM6/1280x720 RTS/possess/return
+2Success/0errors/1knownMotionVectorwarning;7PNGs inspected. Same-source/DLL posefall
+mutation expectedFail1/native255,193files unchanged. [Actual native evidence/limits](M6_SEMIREAL_CAMP_REVISION3_REVIEW.md#private-camp03-import-and-actual-engine-views--completed).
+NEXT C-018H_CampRevision03Cook: fresh selected v3 content cook+native registries/
+shader/dependency verification; preserve prior outputs, no default-map/engine/Zen
+change or standalone reachability/player claim. No mainmap/footprint/nav/perf/
+physicalinput/rights/M7/M8 gate cleared by preview. Delegated brief is not a blocker.
+
+C-018H_CampRevision03Cook VERIFIED: fresh directed Camp03/v3 output, native0/
+0errors/0warnings,537cooked+7platform-skipped; actual12assets/35hard-Game identifiers/
+0missing,6SM6material associations and both shader-format archives.193Content/
+14source/Config/descriptor unchanged;17verifier tests PASS. [Evidence/limits](M6_SEMIREAL_CAMP_COOK_REVIEW.md#camp03--semireal_v3--current-private-cook).
+NEXT C-018H_BuildingPresentationAdapter: implement opt-in final-mesh presentation
+using the existing building/content authorities, preserving prototype defaults,
+construction/selection/state visuals and PBR slots. First verify privately; no
+automatic mainmap/footprint/spawn changes or expanded adoption. Current v2 fit
+findings inform safe activation requirements, not approval to alter game rules.
+
+C-018H_BuildingPresentationAdapter CODE/LOGICAL GATES VERIFIED: runtime optional mesh/transform,
+actual-bounds/grounding guards in registry and actor, separate state/faction plate
+and preserved PBR slots implemented with null defaults. Root Editor Build04 PASS;
+Test02 native0/2Success/0test errors or warnings, original Content/Config/descriptor
+unchanged. Includes real canonical factory lifecycle and unsafe opt-in rejection.
+Strict IWYU native0/115actions; Shipping native0/10actions (player not executed);
+full regression native0/142 passed (141 clean + 1 missing-file-contract warning),
+0failed/not-run/in-process. Closure confirms protected files unchanged after full
+suite; validator0M1warnings/LFSfsck/diffcheck PASS, all jobs terminal. This does
+NOT close actual Camp03 runtime integration, rendered approval or player QA.
+NEXT C-018H_InitialPresentationCoverage: real starter-camp native coverage of the
+opt-in initial-completion branch, then actual-asset integration under a fit/activation
+decision. No assets/mainmap/footprint/spawn changes. [Contract/evidence/limits](M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md).
+
+C-018H_InitialPresentationCoverage VERIFIED: new real starter-camp InitialCampPIE
+checks exact transform/PBR slots/Complete/GC and canonical training receipt,
+six-resource debit and cancellation refund. Build05/Test03 PASS (3cleanSuccess).
+Controlled old zero-pivot mutation Build06/Test04 catches exactly the intended
+initial-transform failure; source restored byte-identically, Build07/Test05 PASS
+(3cleanSuccess). verified02 binds restored DLLs/unchanged6runtime files/protected
+ContentConfigdescriptor; no live jobs or new adoption. Previous full suite142 and
+IWYU/Shipping retained, not rerun for test-only work. [Evidence](M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md#c-018h_initialpresentationcoverage--verified).
+NEXT C-018H_CampFitDecision: decide 4x4 compact architecture vs7x6 plus spawn/nav
+verification, then integrate actual Camp03 (or compact successor), never equating
+these transient-mesh tests with final rendered adoption. M7/M8 gates remain open.
+
+C-018H_EditorPresentationValidation VERIFIED while fit choice pending: individual
+building IsDataValid now calls existing presentation policy (WITH_EDITOR only),
+closing disagreement with registry/actor. Test06 reproduced exactly8assertions;
+Build09/Test07 passed4presentation tests, Test08 passed3content tests (19canonical
+definitions); final Build10/Test09 passed direct editor validity cases plus all
+six saved building DataAssets individually. verified03 protects Content/Config/
+descriptor and unchanged six original runtime files; no new adoption or livejobs.
+Editor-only production change inRomanContentDefinitions.cpp; prior full142/
+IWYU/Shipping/cook/GPU not rerun or relabeled. NEXT remains C-018H_CampFitDecision;
+user choice still required before footprint/spawn changes. [Evidence](M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md#c-018h_editorpresentationvalidation--verified).
+
+2026-10-30 goal BLOCKED after three consecutive revalidated impasse turns; scope
+NOT complete or reduced. Next input:4x4compact vs7x6+spawn/navigation decision.
+All owned native jobs terminal; completed source/tests preserved. M7 still needs
+trusted actual playerQA, isolated licensedCI, verified corrected dependency
+integration and rights/attribution decisions; M8 remains downstream. No tests,
+security changes, VM restarts or art/adoption changes to bypass these gates.
+Current resume checkpoint: [HANDOFF.md](HANDOFF.md).
+
+2026-10-30 OWNER FIT DECISION RECEIVED: enlarge Barracks to7x6 and adjust exit with
+tests. This resolves the previous fit blocker; no compact replacement generation.
+C-018H_Camp03FunctionalIntegration IN PROGRESS: optional-art exit resolver uses
+actual footprint/capsule, nav projection and collision checks; legacy branch
+unchanged. Root builds and4presentation regressions PASS; actual enlarged-spawn
+proof still pending. Private source/DLL/PDA recovery snapshots preserved,193Content
+files untouched; runtime sync/private build in progress. No root art/DA/map adoption
+or release approval. [Current scope/gates](M6_CAMP03_FUNCTIONAL_INTEGRATION_REVIEW.md).
+
+C-018H_Camp03FunctionalIntegration INITIAL-ORIENTATION FLOW VERIFIED privately:
+Author01 adopts only backed-up privateBarracksPDA,7x6/realCamp03/5PBRslots/scale1;
+RootContentConfigdescriptor andother192privateContentfiles unchanged. Real trained
+recruit exits at442cm with42cm capsule, full navigation path and314.483cm actual
+canonical movement completed (35.517cm remaining, HasMoveCommandfalse). Producer06
+native0/1cleanSuccess, no teleport/dilation/heldpose. Corrected roof-level nav
+selection and generated decoration overlapping footprint, preserving nil legacy.
+RootBuild14/Test11 native0/fourcleanSuccess. verified01 binds source/runtime parity
+and protected inputs, alljobs terminal. This is NOT full integration/visual/player
+approval; fresh IWYU/Shipping/full regression still due for runtime changes.
+NEXT C-018H_Camp03ExitMatrix: four orientations, obstructed-exit refund/no ghost,
+canonical placement/selection, then real RTS/FPS functional views and eventual
+root adoption. No extra footprint decision needed. [Evidence/limits](M6_CAMP03_FUNCTIONAL_INTEGRATION_REVIEW.md).

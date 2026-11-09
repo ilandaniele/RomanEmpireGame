@@ -88,6 +88,8 @@ private:
 	bool bAwaitingFailureRefund = false;
 	bool TryRefundReservation(const FTrainingReservation& Reservation);
 	bool SpawnTrainedUnit();
+	/** Opt-in authored buildings require a free navigable exit, never a forced spawn. */
+	bool FindTrainingSpawnTransform(UClass* UnitClass, FTransform& OutTransform) const;
 	FName StartNextInQueue();
 	void FinishCurrentOrder(EProductionEventType Type);
 	void BroadcastProductionEvent(EProductionEventType Type, FName UnitID);

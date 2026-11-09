@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "scope": "Private editable source proposal, NOT Unreal integration/owner acceptance",
+  "seed": 1802,
+  "blender": "5.2.2 LTS",
+  "author_script_sha256": "c9443285fbad95b28cc54be0b0536163978efe70c63c966bb3d57860dbddfc58",
+  "meshes": [
+    {
+      "name": "SM_CampGround",
+      "vertices": 625,
+      "triangles": 1152,
+      "dimensions_m": [
+        12.0,
+        10.0,
+        0.011771234683692455
+      ],
+      "material_slots": 6
+    },
+    {
+      "name": "SM_CampWall",
+      "vertices": 2048,
+      "triangles": 3704,
+      "dimensions_m": [
+        9.25,
+        0.377500057220459,
+        2.5992038249969482
+      ],
+      "material_slots": 6
+    },
+    {
+      "name": "SM_CampBarracks",
+      "vertices": 25106,
+      "triangles": 46602,
+      "dimensions_m": [
+        4.930000305175781,
+        4.077000141143799,
+        3.7335000038146973
+      ],
+      "material_slots": 6
+    }
+  ],
+  "atlas_size": 2048,
+  "reference_legionary": {
+    "path": "SourceArt\\Characters\\RomanSoldier\\semireal_v2\\SK_Roman_Rome_Semireal01.glb",
+    "sha256": "3157ac079a631d6fa2a317d550b0b3aeb9a56be9d752d423c478f7d50e0211f6",
+    "scope": "Preview-only existing legionary; excluded from all camp GLB exports"
+  },
+  "geometry_source": "Original Blender primitives/mesh construction by GPT; no downloaded environment geometry",
+  "texture_source": "Built-in GPT image_gen soil input; original Blender procedural wood/plaster/clay/stone/iron; Cycles PBR atlas bake",
+  "units": "meters; Unreal import must verify100cm per meter",
+  "owner_approved": false,
+  "imported_to_unreal": false,
+  "historical_period_validated": false,
+  "files": [
+    {
+      "path": "BaseColor.png",
+      "bytes": 3285598,
+      "sha256": "19c1303fb8cc6db504b4d183213e7f78a43383527b9a494be7d17f177bd5aedd"
+    },
+    {
+      "path": "Camp-HumanScale.png",
+      "bytes": 2098453,
+      "sha256": "556e23d7daa2b1c8ed6ec1c79366906e69a0fe107f4c2adbea558f928fbe49c9"
+    },
+    {
+      "path": "Camp-Overview.png",
+      "bytes": 2201772,
+      "sha256": "2bb49f03e825b132a24db302d8c620d88b4cf2028e0b5ac6a063b5767f2b420f"
+    },
+    {
+      "path": "Metallic.png",
+      "bytes": 68954,
+      "sha256": "c8d3033b77fdec1e459c662ff08253927f35f4e9722e69f2bd305e44b98fab9f"
+    },
+    {
+      "path": "Normal.png",
+      "bytes": 1853279,
+      "sha256": "c65b042c12d840e33d636090577ab04396cba73d596d670b99d76f0b2ffc81a1"
+    },
+    {
+      "path": "RomanCamp-Proposal01.blend",
+      "bytes": 17258407,
+      "sha256": "8b3e39fe7b288abd80e7243504611f0603104bfd1ce3ec8e2d10e95132130d63"
+    },
+    {
+      "path": "RomanCamp-Proposal01.glb",
+      "bytes": 9397508,
+      "sha256": "c7a3f2b54a1add870c3cb2a063ca2bc15ae06d3d75c6314364b03a9a17217cb8"
+    },
+    {
+      "path": "Roughness.png",
+      "bytes": 491026,
+      "sha256": "e5f96a7df0be7ff206d8b30e2fab1055c9a613ddd013da3cad99fbf85d4f9b05"
+    },
+    {
+      "path": "SM_CampBarracks.glb",
+      "bytes": 9076896,
+      "sha256": "c7fba2d46225ecb9437da992ab027ef9132ad3a885a6e9e409932e3434004ce5"
+    },
+    {
+      "path": "SM_CampGround.glb",
+      "bytes": 5672560,
+      "sha256": "ce2868c9ce4db9168b307d88ca72b8e88b14b41bf427d265a97c6cae67870ad3"
+    },
+    {
+      "path": "SM_CampWall.glb",
+      "bytes": 5830248,
+      "sha256": "9ffb96de2a19414fb35e5c43bf02984f4bde26c267a32656bcf47cd344052edc"
+    },
+    {
+      "path": "Soil-Input01.png",
+      "bytes": 4445380,
+      "sha256": "28ab6df00b0a75c85f65116a400ff662349caa58548381d0dfb94463fb4124af"
+    }
+  ]
+}

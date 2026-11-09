@@ -7,6 +7,7 @@
 #include "BuildingTypes.generated.h"
 
 class UTexture2D;
+class UStaticMesh;
 
 /**
  * Building category for UI organization
@@ -117,6 +118,14 @@ struct FBuildingData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Prototype Visuals")
 	FLinearColor PrototypeColor = FLinearColor::White;
+
+	/** Optional always-resident art for this loaded definition. Null preserves the prototype. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Presentation")
+	TObjectPtr<UStaticMesh> PresentationMesh = nullptr;
+
+	/** Actor-local centimetres, including pivot/grounding; never multiplied by PrototypeScale. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Presentation")
+	FTransform PresentationTransform = FTransform::Identity;
 
 	// Production (for economic buildings)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building|Production")

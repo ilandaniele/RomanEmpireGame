@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "Content/RomanContentRegistry.h"
+#include "Building/BuildingPresentation.h"
 
 #include "Building/BuildingBase.h"
 #include "Engine/AssetManager.h"
@@ -211,10 +212,11 @@ FContentDefinitionValidationReport RomanEmpireContent::ValidateDefinitionSet(
 			Definition.FootprintSize.Y <= 0.0f || Definition.PrototypeScale.X <= 0.0f ||
 			Definition.PrototypeScale.Y <= 0.0f || Definition.PrototypeScale.Z <= 0.0f ||
 			Definition.ProductionRate < 0 ||
-			Asset->QuickSlot < 0 || Asset->QuickSlot > 9)
+			Asset->QuickSlot < 0 || Asset->QuickSlot > 9 ||
+			RomanEmpireBuildingPresentation::Validate(Definition) != RomanEmpireBuildingPresentation::EFailure::None)
 		{
 			Report.Add(EContentDefinitionFailure::InvalidDefinition, Asset, Definition.BuildingID, NAME_None,
-				TEXT("Building identity, display data, cost, duration, stats, footprint, production, or quick slot is invalid."));
+				TEXT("Building identity, display data, cost, duration, stats, footprint, production, quick slot, or optional presentation is invalid."));
 		}
 		if (Asset->BuildingClass.IsNull())
 		{

@@ -1,6 +1,7 @@
 // Copyright Roman Empire Game. All Rights Reserved.
 
 #include "BuildingBase.h"
+#include "Building/BuildingPresentation.h"
 #include "Audio/RomanFeedbackSubsystem.h"
 #include "Core/RomanEmpireGameState.h"
 #include "Battle/TacticalBattleSubsystem.h"
@@ -33,6 +34,7 @@ ABuildingBase::ABuildingBase()
 	if (CubeMesh.Succeeded())
 	{
 		BuildingMesh->SetStaticMesh(CubeMesh.Object);
+		PrototypeMesh = CubeMesh.Object;
 		BuildingMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f)); // 200x200x200cm building
 	}
 
@@ -130,6 +132,10 @@ bool ABuildingBase::InitializeBuilding(FName DefinitionID, EFactionID NewOwner)
 	{
 		return false;
 	}
+	if (RomanEmpireBuildingPresentation::Validate(Asset->Definition) != RomanEmpireBuildingPresentation::EFailure::None)
+	{
+		return false;
+	}
 
 	BuildingDefinitionID = DefinitionID;
 	BuildingData = Asset->Definition;
@@ -146,10 +152,35 @@ void ABuildingBase::ApplyDefinitionPresentation()
 		return;
 	}
 
-	BuildingMesh->SetRelativeScale3D(BuildingData.PrototypeScale);
-	const float HalfX = FMath::Max(BuildingData.FootprintSize.X * 50.0f, BuildingData.PrototypeScale.X * 50.0f) + 8.0f;
-	const float HalfY = FMath::Max(BuildingData.FootprintSize.Y * 50.0f, BuildingData.PrototypeScale.Y * 50.0f) + 8.0f;
-	const float BaseZ = -BuildingData.PrototypeScale.Z * 50.0f + 3.0f;
+	const bool bAuthored = UsesAuthoredPresentation();
+	if (bAuthored)
+	{
+		// BeginPlay-only factories must receive the same definition-owned box as deferred placement.
+		CollisionBox->SetBoxExtent(FVector(BuildingData.FootprintSize.X * 50.0f, BuildingData.FootprintSize.Y * 50.0f, RomanEmpireBuildingPresentation::PlacementHalfHeight));
+		if (!bAuthoredPresentationApplied)
+		{
+			BuildingMesh->SetStaticMesh(BuildingData.PresentationMesh);
+			BuildingMesh->EmptyOverrideMaterials();
+			BuildingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			BuildingMesh->SetCanEverAffectNavigation(false);
+			// Keep state/faction feedback separate from every authored PBR slot.
+			ConstructionScaffolding->SetStaticMesh(PrototypeMesh);
+			ConstructionScaffolding->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			ConstructionScaffolding->SetCanEverAffectNavigation(false);
+			ConstructionScaffolding->SetCastShadow(false);
+			bAuthoredPresentationApplied = true;
+		}
+		FTransform Transform = BuildingData.PresentationTransform;
+		if (CurrentState == EBuildingState::Constructing)
+			Transform.AddToTranslation(FVector(0, 0, FMath::Lerp(-200.0f, 0.0f, FMath::Clamp(ConstructionProgress, 0.0f, 1.0f))));
+		BuildingMesh->SetRelativeTransform(Transform);
+		ConstructionScaffolding->SetRelativeLocation(FVector(0, 0, -RomanEmpireBuildingPresentation::PlacementHalfHeight + 3));
+		ConstructionScaffolding->SetRelativeScale3D(FVector(BuildingData.FootprintSize.X, BuildingData.FootprintSize.Y, .035));
+	}
+	else BuildingMesh->SetRelativeScale3D(BuildingData.PrototypeScale);
+	const float HalfX = (bAuthored ? BuildingData.FootprintSize.X * 50.0f : FMath::Max(BuildingData.FootprintSize.X * 50.0f, BuildingData.PrototypeScale.X * 50.0f)) + 8.0f;
+	const float HalfY = (bAuthored ? BuildingData.FootprintSize.Y * 50.0f : FMath::Max(BuildingData.FootprintSize.Y * 50.0f, BuildingData.PrototypeScale.Y * 50.0f)) + 8.0f;
+	const float BaseZ = -(bAuthored ? RomanEmpireBuildingPresentation::PlacementHalfHeight : BuildingData.PrototypeScale.Z * 50.0f) + 3.0f;
 	for (int32 Index = 0; Index < SelectionOutline.Num(); ++Index)
 	{
 		const bool bHorizontal = Index < 2;
@@ -181,10 +212,11 @@ void ABuildingBase::OnConstruction(const FTransform& Transform)
 		FVector Extent(
 			BuildingData.FootprintSize.X * 50.0f,  // Convert to Unreal units
 			BuildingData.FootprintSize.Y * 50.0f,
-			200.0f  // Height
+			RomanEmpireBuildingPresentation::PlacementHalfHeight
 		);
 		CollisionBox->SetBoxExtent(Extent);
 	}
+	if (UsesAuthoredPresentation()) ApplyDefinitionPresentation();
 }
 
 void ABuildingBase::SetOwnerFaction(EFactionID NewOwner)
@@ -225,7 +257,7 @@ void ABuildingBase::CompleteInitialConstruction()
 	if (!bBuildingInitialized || !HasActorBegunPlay() || CurrentState != EBuildingState::Placing) return;
 	StartConstruction();
 	ConstructionProgress = 1.0f;
-	if (BuildingMesh) BuildingMesh->SetRelativeLocation(FVector::ZeroVector);
+	if (BuildingMesh) BuildingMesh->SetRelativeLocation(UsesAuthoredPresentation() ? BuildingData.PresentationTransform.GetTranslation() : FVector::ZeroVector);
 	OnConstructionFinished();
 }
 
@@ -244,9 +276,11 @@ void ABuildingBase::UpdateConstruction(float DeltaSeconds)
 	// Visual progress - raise building from ground
 	if (BuildingMesh)
 	{
-		FVector BaseLocation = RootScene->GetComponentLocation();
-		float TargetZ = FMath::Lerp(-200.0f, 0.0f, ConstructionProgress);
-		BuildingMesh->SetRelativeLocation(FVector(0.0f, 0.0f, TargetZ));
+		const bool bAuthored = UsesAuthoredPresentation();
+		const float Progress = bAuthored ? FMath::Clamp(ConstructionProgress, 0.0f, 1.0f) : ConstructionProgress;
+		const float TargetZ = FMath::Lerp(-200.0f, 0.0f, Progress);
+		const FVector Base = bAuthored ? BuildingData.PresentationTransform.GetTranslation() : FVector::ZeroVector;
+		BuildingMesh->SetRelativeLocation(Base + FVector(0.0f, 0.0f, TargetZ));
 	}
 
 	if (ConstructionProgress >= 1.0f)
@@ -444,7 +478,12 @@ void ABuildingBase::UpdateVisuals()
 			MID->SetVectorParameterValue(TEXT("Color"), Color);
 			MID->SetScalarParameterValue(TEXT("Damage"), 1.0f - GetHealthPercent());
 		}
-		BuildingMesh->SetMaterial(0, MID);
+		if (UsesAuthoredPresentation())
+		{
+			ConstructionScaffolding->SetMaterial(0, MID);
+			ConstructionScaffolding->SetVisibility(CurrentState != EBuildingState::Destroyed);
+		}
+		else BuildingMesh->SetMaterial(0, MID);
 	}
 }
 

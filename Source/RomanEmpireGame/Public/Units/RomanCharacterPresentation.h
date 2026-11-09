@@ -25,4 +25,11 @@ public:
 	TSubclassOf<URomanSoldierAnimInstance> AnimationClass;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
 	TObjectPtr<UAnimMontage> AttackMontage;
+
+	/** Opt-in for textured art. Legacy bundles retain their exact faction-parent policy. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation|Materials")
+	bool bUseMeshMaterialParents = false;
+	/** Semantic slots receiving Color/FactionTintStrength; all slots receive Damage. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation|Materials", meta = (EditCondition = "bUseMeshMaterialParents"))
+	TArray<FName> FactionTintSlots = {TEXT("Body"), TEXT("Shield"), TEXT("Crest")};
 };

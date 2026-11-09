@@ -650,7 +650,32 @@ void AUnitBase::ApplyFactionColor()
 	};
 	UMaterialInterface* FactionParent = FactionMaterials.FindRef(OwnerFaction);
 	if (!FactionParent) FactionParent = SurfaceMaterial;
-	if (GetMesh() && GetMesh()->GetSkeletalMeshAsset() && FactionParent)
+	if (GetMesh() && GetMesh()->GetSkeletalMeshAsset() && CharacterPresentation && CharacterPresentation->bUseMeshMaterialParents)
+	{
+		// Preserve each authored PBR parent; faction/health are actor-local parameters,
+		// never replacements by a flat faction material or changes to shared assets.
+		const TArray<FSkeletalMaterial>& Slots = GetMesh()->GetSkeletalMeshAsset()->GetMaterials();
+		for (int32 Index = 0; Index < Slots.Num(); ++Index)
+		{
+			UMaterialInterface* Parent = Slots[Index].MaterialInterface;
+			if (!Parent) continue;
+			UMaterialInstanceDynamic* MID = SkeletalVisualMaterials.FindRef(Index);
+			if (!MID || MID->Parent != Parent)
+			{
+				MID = UMaterialInstanceDynamic::Create(Parent, this);
+				if (!MID) continue;
+				SkeletalVisualMaterials.Add(Index, MID);
+			}
+			GetMesh()->SetMaterial(Index, MID);
+			const bool Tint = CharacterPresentation->FactionTintSlots.Contains(Slots[Index].MaterialSlotName);
+			FLinearColor Color = Tint ? FactionColor : FLinearColor::White;
+			if (Tint && Slots[Index].MaterialSlotName == TEXT("Shield")) Color *= .6f;
+			Color.A = 1.f;
+			MID->SetVectorParameterValue(TEXT("Color"), Color);
+			MID->SetScalarParameterValue(TEXT("FactionTintStrength"), Tint ? 1.f : 0.f);
+		}
+	}
+	else if (GetMesh() && GetMesh()->GetSkeletalMeshAsset() && FactionParent)
 	{
 		for (const int32 Index : {0, 4, 5})
 		{

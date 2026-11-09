@@ -1,0 +1,98 @@
+{
+  "schema": "RomanSemiReal/1",
+  "blender": "5.2.2 LTS",
+  "source_sha256": "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c",
+  "vertices": 25303,
+  "triangles": 48256,
+  "bones": [
+    "root",
+    "pelvis",
+    "spine",
+    "chest",
+    "head",
+    "upper_arm_l",
+    "forearm_l",
+    "hand_l",
+    "upper_arm_r",
+    "forearm_r",
+    "hand_r",
+    "thigh_l",
+    "calf_l",
+    "foot_l",
+    "thigh_r",
+    "calf_r",
+    "foot_r"
+  ],
+  "clips": {
+    "Idle": 2.0,
+    "Walk": 1.0,
+    "Attack": 0.6,
+    "Block": 0.8,
+    "Death": 1.0
+  },
+  "semantic_slots": [
+    "Body",
+    "Metal",
+    "Skin",
+    "Leather",
+    "Shield",
+    "Crest"
+  ],
+  "material_slots": [
+    "Body",
+    "Metal",
+    "Skin",
+    "Leather",
+    "Shield",
+    "Crest",
+    "MailLinks",
+    "EyeWhite"
+  ],
+  "glb_sha256": "fc8974cfc97e5ab21a2af333125b810520165612caa5b059c55666eac5b31dad",
+  "textures": {
+    "BaseColor": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\BaseColor.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Roughness": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\Roughness.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Metallic": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\Metallic.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    "Normal": {
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\Normal.png",
+      "size": [
+        2048,
+        2048
+      ]
+    }
+  },
+  "lod_candidates": [
+    {
+      "level": 1,
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\SK_Roman_Rome_Semireal01_LOD1.glb",
+      "triangles": 12063,
+      "sha256": "5d82f34791508d3c888c00e0756f27734248ac6e9ea6522d00de5e5c41271e7a"
+    },
+    {
+      "level": 2,
+      "path": "C:\\Users\\Ilan\\Desktop\\Proyectos\\RomanEmpireGame\\Artifacts\\VQ01_Semireal1\\attempt06\\SK_Roman_Rome_Semireal01_LOD2.glb",
+      "triangles": 4825,
+      "sha256": "3aa39b0fbda38cbe17c0437b682f7de5d4d382f0b03db438a8507b4a2436fb85"
+    }
+  ],
+  "production_approved": false,
+  "unreal_imported": false
+}

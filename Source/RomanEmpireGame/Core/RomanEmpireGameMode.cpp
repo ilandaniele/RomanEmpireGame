@@ -27,6 +27,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Math/Box2D.h"
 
 ARomanEmpireGameMode::ARomanEmpireGameMode()
 {
@@ -519,6 +520,8 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 	const URomanContentRegistrySubsystem* Registry = URomanContentRegistrySubsystem::Get(this);
 	const URomanBuildingDefinition* BarracksAsset = Registry ? Registry->FindBuilding(TEXT("Barracks")) : nullptr;
 	UClass* BarracksClass = BarracksAsset ? BarracksAsset->BuildingClass.Get() : nullptr;
+	FBox2D AuthoredBarracksFootprint(EForceInit::ForceInit);
+	bool bHasAuthoredBarracks = false;
 	if (BarracksClass && BarracksClass->IsChildOf(ABarracks::StaticClass()))
 	{
 		const FTransform Transform(FRotator::ZeroRotator, FVector(-600.0, -800.0, 200.0));
@@ -527,7 +530,17 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 		if (Barracks && Barracks->InitializeBuilding(TEXT("Barracks"), EFactionID::Rome))
 		{
 			UGameplayStatics::FinishSpawningActor(Barracks, Transform);
-			if (IsValid(Barracks)) Barracks->CompleteInitialConstruction();
+			if (IsValid(Barracks))
+			{
+				Barracks->CompleteInitialConstruction();
+				if (Barracks->UsesAuthoredPresentation())
+				{
+					const FVector Center = Barracks->GetActorLocation();
+					const FVector Half = Barracks->GetPlacementHalfExtent();
+					AuthoredBarracksFootprint = FBox2D(FVector2D(Center.X-Half.X,Center.Y-Half.Y), FVector2D(Center.X+Half.X,Center.Y+Half.Y));
+					bHasAuthoredBarracks = true;
+				}
+			}
 		}
 		else if (Barracks)
 		{
@@ -589,6 +602,10 @@ void ARomanEmpireGameMode::SpawnInitialBuildings()
 	{
 		float hx = -1200.0f + (h % 4) * 350.0f;
 		float hy = -1200.0f + (h / 4) * 500.0f;
+		// Generated decorative markers must not occupy a real authored building's footprint.
+		// Include their roof overhang, not only the smaller colliding wall cube.
+		if (bHasAuthoredBarracks && AuthoredBarracksFootprint.Intersect(
+			FBox2D(FVector2D(hx-125,hy-150),FVector2D(hx+125,hy+150)))) continue;
 		
 		// Wall
 		AStaticMeshActor* House = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector(hx, hy, 75), FRotator::ZeroRotator, SP);

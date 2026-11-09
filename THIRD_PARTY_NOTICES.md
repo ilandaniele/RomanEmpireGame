@@ -1,8 +1,8 @@
 # Third-Party Notices
 
-Last inventory reconciliation: 2026-10-12 (C018H local packaged dependency inventory); release rights remain an owner gate.
+Last art-source generation: 2026-10-22. Packaged dependency inventory: 2026-10-12 (C018H); release rights remain an owner gate.
 
-No third-party source code, binary library, Marketplace/Fab package, model, texture, animation, or audio source file is currently vendored in this repository's Git candidate. This is NOT a claim that packaged Unreal executables contain no third-party software. Ignored local QA archives contain engine-transitive binaries and declared static-library inputs, inventoried below.
+The last committed Git candidate contains no vendored third-party art source. The current uncommitted semi-realistic art work adds the explicitly CC0 anatomy data described below, not MakeHuman application code. This is NOT a claim that packaged Unreal executables contain no third-party software. Ignored local QA archives contain engine-transitive binaries and declared static-library inputs, inventoried below.
 
 Unreal Engine and its engine-provided plugins/content are external development prerequisites and are governed by Epic Games' terms; they are not relicensed by this project. Enhanced Input is enabled; Procedural Mesh Component is retired/explicitly disabled. The project does not vendor their source or binaries. ModelContextProtocol/EditorToolset/AutomationTestToolset are Editor-target-only integrations, not Shipping plugins.
 
@@ -13,6 +13,47 @@ Before adding any third-party material, record its source, exact version, licens
 C017D–I original material/audio/character recipes and assets introduce no third-party art source. Existing maps still reference engine/template content. Do not treat project authorship as approval to distribute Epic content; verify the actual candidate and applicable account/distribution rights before release.
 
 C018A GitHub Actions are external CI prerequisites, not vendored/shipped game content: checkout v4.2.2 (`11bd71901bbe5b1630ceea73d27597364c9af683`) and upload-artifact v4.6.2 (`ea165f8d65b6e75b540449e92b4886f43607fa02`). Exact reviewed upstream links and runner/security requirements are in `CI_RUNNER_SETUP.md`; re-review pins before updates. Locally available PyYAML6.0.3 was used only to parse the workflow during development, not installed or added as a production/CI test dependency.
+
+## Semi-realistic anatomy source — 2026-10-19
+
+`SourceArt/ThirdParty/MakeHuman/a8bc2d54/base.obj` is pinned to
+`makehumancommunity/makehuman` commit `a8bc2d54ff0ac92e78ff71431b1023eda42bf482`.
+Its own header explicitly releases this asset as CC0 (September 2020) and names
+Data Collection AB, Joel Palmius and Jonas Hauquier as copyright holders.
+Original `LICENSE.md` and `LICENSE.ASSETS.md` are retained beside it in full.
+The application is AGPL; no MakeHuman application code is copied or executed.
+This asset-specific statement does not license arbitrary community assets.
+
+The same pinned revision additionally supplies three numeric morph-data assets
+under `macrodetails/`: `caucasian-male-young.target`, `caucasian-male-old.target`,
+and `universal-male-young-maxmuscle-averageweight.target`. Each file has its own
+explicit September-2020 CC0 statement, original copyright2014 Manuel Bastioni
+and the stated2016 transfer /2020 holders above. The retained root license also
+explicitly includes targets/modifiers as bundled CC0 assets. These are numeric
+vertex deltas, not downloaded/executed program logic. Filenames retain upstream
+terminology; the draft blend is an artistic proposal, not an anthropological or
+historically validated model of a Roman population. Exact hashes are inventoried.
+
+The new candidate filters body/helper groups, normalizes scale and derives joints,
+then adds original clothing, equipment, materials, skinning and animation through
+`Tools/create_semireal_legionary.py`. Exact hashes and upstream URLs are recorded
+in `ASSET_INVENTORY.md`. Existing shipped Content has not been replaced. Final
+visual approval and any overall distribution review remain separate gates.
+
+Blender 5.2.2 LTS is an external, workspace-local portable development tool under
+ignored `Artifacts/Toolchains`, not a vendored or shipped runtime. Official ZIP
+checksum and Blender Foundation signature are recorded in its bootstrap receipt.
+
+The camp source architecture/material revision under
+`SourceArt/Environment/RomanCamp/semireal_v2` is original GPT Blender geometry
+and procedural shader/bake work. It reuses the v1 GPT-generated soil input
+byte-for-byte; no new image generation, third-party environment pack, purchase,
+external code or tool installation. The existing MakeHuman-derived legionary
+appears only as a BLEND/render scale reference, excluded from all four campGLBs;
+its exact provenance/retained notices above remain applicable. Generated-content
+and tool terms/owner rights review are not replaced by a blanketCC0 claim.
+[Revision review](M6_SEMIREAL_CAMP_REVISION_REVIEW.md) records source identities,
+verification and boundaries. No mainContent/QAarchive/package notice changed.
 
 ## Actual dirty local QA package dependencies — review OPEN
 
@@ -202,6 +243,16 @@ Roboto2011/2017 fonts and its2012 notice header are retained separately. Sixteen
 exact old-Roboto blob lookups returned404 in two selected primary repositories,
 not a global source-absence or licensing finding. No license text was copied,
 re-encoded or substituted; final notices and owner compliance remain OPEN.
+
+The [per-identity notice map](M7_FONT_NOTICE_MAP.md) (2026-10-21) now associates
+all14 raw hashes/15 historical QA paths per configuration with verbatim
+copyright/nameID0/13/14, versions, candidate-document identities and specific
+review gaps. FontNoticeMap02.json pins the existing receipts and rechecks45
+installed/extracted raw paths;12 directed mapping tests pass. Absent metadata
+is not a license determination, Mono proof does not extend to Fallback, and the
+Old/Tiles Bold alias does not extend a Fonts-directory declaration. ATR-13 and
+the final owner-reviewed bundle remain PENDING. No QA NOTICES/Pak/font/license
+bytes changed; this technical map is not the release notice bundle.
 
 HashTangentTiffSourceReview1/Diagnostics1 adds three source-notice candidates with
 unchanged library hashes/unique declaring modules in both exports. BLAKE3 1.3.1:

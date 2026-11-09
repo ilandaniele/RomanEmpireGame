@@ -1,194 +1,714 @@
 # Relevo vigente GPT / Claude
 
-Objetivo intacto: implementar IMPLEMENTATION_PLAN.md completo y verificar sus gates. C-018H_CleanCandidate LOCAL terminado: commits autorizados sin push, build Unity reparado, checkout independiente limpio, full139 pruebas y ambos paquetes aprobados. VM diferida; M7 OPEN por gates externos/reales, M8 requiere M7 completo. El usuario dirige switches.
+Bloqueo de fit RESUELTO por respuesta explícita del usuario:7x6+salida con pruebas.
+Trabajo autorizado reanudado; objetivo NO completo. Servicio goal aún devuelve
+blocked histórico (no existe herramienta resume; no crear otro goal ni falsearcomplete).
+Objetivo íntegro: implementar IMPLEMENTATION_PLAN.md desde C-006 y sus gates autorizados.
+Base anterior344c29b/main; anteriores91c54c2/f79f0b8. Publicación autorizada por el usuario
+el 2026-11-09: commit de todos los cambios versionables y push normal a origin/main.
+Consultar git log/status y comparar HEAD con origin/main para confirmar la entrega.
+NEXT=C-018H_Camp03ExitMatrix. STATE=ready. Primer flujo real privado verificado, todos los jobs terminales.
+VM RomanEmpireQA OFF/diferida. No .env de claimmix, auth/red/seguridadWindows.
 
-## Estado y siguiente tarea
+## Checkpoint actual — Camp03 real7x6, primer flujo privado verificado
 
-- TAREA/MODELO: GPT, C-018H_CleanCandidate LOCAL VERIFIED, cierre2026-10-16 16:36local. Aprobación explícita recibida dos veces para commits LOCALES sin push/configuración remota; permiso de commit ya NO es bloqueo. Commits f79f0b8 (503paths/87PNG baselines/assets LFS) y91c54c2 (fix limpio Unity: ArmyGuidLess y dos namespaces de tests). Revisión vigente `M7_CLEAN_CHECKOUT_REVIEW.md`; documentos finales se comprometen aparte sin cambiar source candidate91c.
-- TERMINADO/PRUEBAS: mismo clone `Artifacts/C018H_CleanCandidate1/Checkout`, detached91c54c2/CLEAN/LFS176materializados. Primer Unity f79 falló49.30s, conservado; fixUnity7/12.57s PASS; Rules27clean/all16anchors, full139Success/138clean/1warning missing.png intencional/all21anchors/exit0, estrictoIWYU112/72.72s, Generate, Dev+ShipPackage PASS; ambos cook594+7/601total/0errors/0warnings. Root Editor11/22.08s PASS. Python114=113pass/1capabilityskip; report25/negative1; repo/security353/0findings/LFS/diff PASS. Skills build/C++ mantuvieron Unity y reglas intactos; testing/packaging separan aserciones, cook y ejecución real.
-- ARTEFACTOS: `Artifacts/C018H_CleanCandidate1/`: CleanEditor-Fix1.log, CleanNativeFull1.log; clone report `Artifacts/Automation/20261016_161857_790` SHA c6d757820ab3b57b8946284b2fef80fe17eae3973731aa5949863a7c73206a36. CleanPackaging1.json COMPLETE/four stages0, todos procesos/handles38737,48328,63875,8561,4789,15415,34074 TERMINALES; NO wait ni wrapper replay. Paquetes clone `Artifacts/Packages/{Development,Shipping}/Windows`:48files/970900521bytes y30/617264123; manifiestos Package-Development1.json SHA0620eeb073b931d73b33b239deeb5d7c3f04432fd9bb1f51c9856e149d1f6c5b yPackage-Shipping1.json SHA15f582dee2a21b724db255bf96cf17dfc5fe6818a76930c4fcd88d730790d77c; metadataCI91c/dirtyfalse/UE5.8.2CL56702186. RegistryShipping601rows/all59presentation-input+GameDefaultMap presentes/no testpaths-moduleref; ambos target receipts Game/non-test/no testmodule. DLL21Dev/13Ship iguales a antiguos; NO mitigation/rights transfer automático ni nuevos players ejecutados.
-- DECISIONES/BLOQUEOS: original VM NO consultada ni operada. Source runtime solo comparador privado renombrado, assertions/registered names/build settings/assets intactos; ningún baseline sustituido. Primer check ad-hoc de registry asumió mal L_Testbed como launch map y paró: Config demuestra GameDefaultMap L_VerticalSlice, EditorStartupMap L_Testbed; se corrigió checker, no producto/cook. Remote readonly19:36:56.8546201UTC: main89d8d66e/protectedfalse/runners0/workflows0. No rulesets/environments queried ahora/no cambios remotos. Security QUIC+OpenSSL+curl HOLD/atribución-rights/performance budget y QA-01–10 siguen OPEN; objetivo NO completo.
-- NEXT/MODELO: C-018H_ExternalRunnerActivation / CLAUDE al switch del usuario, GPT si continúa aquí. Falta runner Windows AISLADO y licenciado real y autoridad para publicar/configurar CI/protección remotos; aprobación recibida excluye push/config remota. No activar runner en desktop normal, no fingir aislamiento, no retomar VM ni repetir consultas/gates sin nuevos datos. Usar candidate91c y paquetes/manifest nuevos, no dirtyQA1 antiguo para cerrar QA. Todos los procesos propios terminales; STATEready=contexto guardado, no M7 cerrado.
+### Bloque H-PUSH / GPT — 2026-11-09
 
-### Preparación del candidato — historial, no estado actual
+Solicitud explícita: «pushea todos los cambios». Se incluyen código, scripts,
+documentación y fuentes de assets presentes; se conserva la eliminación previa de
+SourceArt/Characters/RomanSoldier/schema1/SK_Roman_Rome.glb. No se agregan salidas
+ignoradas de Artifacts/Saved ni se promociona el PDA privado de Camp03 al proyecto raíz.
+Fetch confirma 37 commits locales pendientes y ningún commit remoto divergente.
+Validación del repositorio: PASS, 0 advertencias M1. Git diff --check: PASS.
+Revisión de los 131 archivos preparados: PASS excluyendo únicamente LICENSE.md
+original de MakeHuman: su título Markdown «=======» y espacios originales producen
+avisos de diff --check. Se preserva íntegro el texto de esa licencia de terceros.
+Se recuperaron 12 objetos ausentes del caché LFS desde el checkout de pruebas
+Artifacts/C018H_CleanCandidate1/Checkout/.git/lfs/objects, comprobando cada SHA256;
+no se modificó el worktree durante esa recuperación. Git LFS fsck: PASS.
+La publicación no cambia los gates abiertos ni acredita una build nueva. Siguiente
+tarea y modelo: C-018H_Camp03ExitMatrix / Claude; no hay jobs nuevos en marcha.
+Las menciones históricas «sin commit/stage/push» de abajo describen los bloques
+originales, anteriores a esta solicitud. Verificar el hash remoto tras el push.
 
-- AUTORIDAD ACTUAL: «seugi con todo tiene todo mi aprobacion», en respuesta a la confirmación de commit local sin push/configuración remota. Se toma esa autorización concreta; no equivale a derechos de distribución, evidencia de vendor, permiso para bajar seguridad Windows ni un runner aislado existente. Bloqueo por falta de permiso de commit SUPERADO. No reiniciar antiguos conteos de auditorías ni la VM.
-- TAREA/MODELO: GPT, C-018H_CleanCandidate ACTIVA. Revisión dirigida de cambios previamente verificados, stage por archivos explícitos (no git add -A), commit local y checkout separado bajo `Artifacts/C018H_CleanCandidate1/Checkout`. Si esa ruta existe, comprobarla antes de iniciar otro checkout. No push/remote writes.
-- PROGRESO CANDIDATO: commit LOCAL f79f0b8bef35dc408fdb113d3c35558b07986c9a creado,503 paths explícitos, worktree quedó limpio. Python114(113pass/1skip), report25/negative1, security353/0findings/0policy, repo/LFS/staged-diff PASS. Clone `--local --no-hardlinks` creado/checkout detached; LFS176 materializados/0pointer-only, fsck/clean/metadata dirty=false UE5.8.2/CL56702186 PASS. NO recrear clone ni publicar nada.
-- ERROR REAL/REPARACIÓN VERIFICADA: primer clean Editor build TERMINAL exit6/49.30s, `CleanEditor.log` preservado; Unity limpio expuso overload-set GuidLess en Sort, MakeArmy duplicado y FFixture duplicado. Fix commit LOCAL91c54c2ba6b697950ed96a8d7d6d74e9a192bf75: ArmyGuidLess y namespaces completos únicos en dos testfiles, sin reglas/aserciones/paths/build settings cambiadas. Mismo clone fetch LOCAL/checkout detached CLEAN, metadata dirty=false; metadata f79 preservada en `Artifacts/C018H_CleanCandidate1/Metadata-f79.json`. Build reparado7 acciones/12.57s/exit0 en `CleanEditor-Fix1.log`; dirigido Rules27/27 limpio/exit0 y16anchors afectados requeridos en `Checkout/Artifacts/Automation/C018H_CleanRules1`, log `CleanRules1.log`.
-- NATIVO COMPLETO: clone91c54c2 full139Success/138clean/1warning/0failed-pending/exit0, todos21anchors PASS; reporte clone `Artifacts/Automation/20261016_161857_790`, SHA256 c6d757820ab3b57b8946284b2fef80fe17eae3973731aa5949863a7c73206a36, outer `CleanNativeFull1.log`. Warning exacta revisada: FileComparisonContract lee missing.png intencional, LogStreaming failed-read; no otra. Handle8561 y UE39676 TERMINADOS, no reiniciar. Clone sigue CLEAN, metadata91c/dirty=false.
-- PROCESO ACTUAL: wrapper secuencial ignorado `Artifacts/C018H_CleanCandidate1/RunCleanPackaging1.ps1` YA INICIADO19:24:26.372746UTC, owner PowerShell PID30728/StartTime19:24:25UTC, handle Codex4789, receipt `CleanPackaging1.json`. Generate PASS; actual IWYU, después Development/Shipping automáticamente solo si cada etapaPASS y SHAclean igual. Logs `CleanPackaging1-{Generate,IWYU,Development,Shipping}.log`; outputs en clone Artifacts/Packages/{Development,Shipping}. NO relanzar wrapper/otro UBT/cook: consultar MISMO PID/receipt/log. Wrapper guard de replays/exact91c/clean/busyengine/disk8GB/parsePASS. No player ejecutado/VM ni release approval. Si termina failed, inspeccionar etapa concreta; no borrar estado ni reiniciar ciego.
-- BASE/EVIDENCIA: HEAD0726de2, índice vacío al inicio, 286 entradas status; todos corresponden al slice, tooling, docs o assets revisados. Security gate353 textos/0findings/0policyFailures. Primer filtro de rutas paró antes de stage por no incluir M7_TRUSTED_PLAYER_QA.md en la lista; es el documento de QA ya conocido, incluir explícitamente. No archivos omitidos ni escritos por ese fallo. C:32.12GiB libres observados.
-- REUTILIZAR: SaveDisk10 y SaveGame2 limpios, gates anteriores y hashes en los reviews C018I/J; sin runtime nuevo. No claim de CI remoto/playerQA/licencias/securityHold resueltos. Clon local demostrará solo checkout/LFS y checks realmente ejecutados, no aislamiento de runner remoto.
-- NEXT: terminar candidato/checkout y guardar SHA real, pruebas, procesos y cualquier pendiente antes del switch a CLAUDE. Documentar aquí la evidencia vigente; el bloqueo histórico debajo NO es estado actual.
+APROBACIÓN7x6+salida recibida: no pedir tamaño otra vez. No es release/QAfinal.
+Private Author01PID40948 TERMINAL0: único delta193Content=Data/Buildings/
+PDA_Building_Barracks.uasset. Camp03real/5PBRslots/7x6/translation(-78.2,12,-199.5),
+escala1. RootContent/Config/descriptor yotros192privateContent intactos.
+Producer06PID29892 TERMINAL0/1cleanSuccess/0errors/warnings/stderr0: reclutareal
+xlocal442/radio42/margen50,navFULL,yCommandMoveTo físico314.483cm/rest35.517cm/
+HasMoveCommandfalse. NOteleport/dilation/heldpose. Producer04solo path;05criterio
+movimientomásdébil no son gatesfinales. RootBuild14PID39316 yTest11PID41428 TERMINAL0,
+familia4cleanSuccess; todoshandlesconsumidos, no job niEditor propio pendiente.
+Artifacts/C018H_Camp03Integration1/verified01.json closurePASS: parity10runtimefiles
+yEditorTestRules Root/privado, fixtureSourceSHA yrecibos,rooty192privatefilesintactos.
+BackupsOldSource/DLL/PDA están enPreparation01; no reauthoring/import/DCC/cook.
+Read FIRST M6_CAMP03_FUNCTIONAL_INTEGRATION_REVIEW.md yfixture
+Tools/ArtProbe/Native/CampBuildingIntegration.cpp; NO reauditar ni repetir fuente.
 
-### Bloqueo de autorización archivado — superado por respuesta explícita
+Cambios Root: Barracks.h/.cpp resolver SOLOopt-in (legacy conserva300/AlwaysSpawn);
+suelo basadoBoxBase±MaxStep+10,nav+overlap+DontSpawnIfColliding/refund existente.
+Core/RomanEmpireGameMode.cpp omite SOLOdecoración generada cuyo techo invade
+huella authored: antes proyectaba recluta sobre casa a150cm (fallos02/03 reales).
+EditorTestBuild.cs añadeprivateJson (NO runtime/Shipping); BuildingPresentationTests
+fallbacknullexplícito independiente decatálogo. Nuevosfixture/review/plan/HANDOFF.
+No RootAsset/map/config/SourceArt nuevo ni stage/commit/push. Repo0M1warnings/
+diffcheck/LFSfsckPASS. IWYU/Shipping/fullsuite nuevos AÚNPENDIENTES porruntime nuevo.
 
-- ESTADO OBJETIVO: API devuelve BLOCKED tras la tercera revalidación consecutiva POST-C018J (2026-10-16), no COMPLETE ni PAUSED. Mismo límite de autorización/entorno: todavía falta permiso explícito de commit local, y los otros gates M7 requieren runner/QA/vendor/owner. Tercera comprobación: HEAD0726de2,286dirty,index0, hashes de fuente y reporte C018J intactos. No progreso desde C018J ni proceso propio vivo por esperar; no hubo otra prueba, operación VM ni escritura Git. Reanudar cuando el usuario aporte autoridad/evidencia o una nueva tarea independiente autorizada; no más bucles de consultas. Una reanudación explícita reinicia el conteo de bloqueo.
+NEXT C-018H_Camp03ExitMatrix / Claude: mismoGamePreview, mantenerPDA7x6adoptado.
+Añadir4orientaciones (0/90/180/270) ysalidaobstruida/refundsinGhost sobrecápsula/
+Actor reales; placementválido-inválido+selección medianteautoridades existentes.
+No reemplazar estosgates con máscubos ni AABBteóricas. No relajarNavIsPartial,
+forzarspawn/teleport oeliminar obstáculos deltest para hacerlo pasar. Después
+vistasRTSFPS delEDIFICIOFUNCIONAL (no fixtureestático anterior), gates decompile/
+regresión afectados yadopciónRoot; M7seguridad/QAplayer/CI/rights abiertos, M8depende.
+User dirige switch; servicioGoal conservaestadoBlockedhistórico sinAPIresume,
+pero decisiónfitYA resuelta ytrabajo deesta solicitudautorizado; no reciclarcontador.
 
-- TAREA/MODELO: GPT, C-018J_SavePayloadValidation, terminado2026-10-16 16:06 local; último test19:05:25UTC. Nueva prueba Editor-only con15 fixtures malformados de CRC correcto y comparación completa/atómica de salida. No defecto runtime hallado; no reescribir codec correcto.
-- ARCHIVOS: `Source/RomanEmpireGameTests/Private/CampaignTransferTests.cpp` agrega PayloadValidation; `BuildProject.ps1` exige su nombre (21 anchors); `M5_CAMPAIGN_SAVE_ARCHIVE_REVIEW.md` y plan registran evidencia, este relevo sustituye siguiente tarea anterior. Sin staging/commits/push; HEAD0726de2/286dirty al inicio, trabajo previo preservado. Skill ue-testing-debugging: aserciones sobre valores completos y fixtures deterministas acotados; no logs como proxy ni fuzz ilimitado.
-- PRUEBAS: Editor4 acciones/5.30s/exit0. `Artifacts/Automation/C018J_SavePayload1` y `.log`: EnvelopeRoundTrip+PayloadValidation2/2 limpias/exit0, validador exige ambos nombres. Report SHA256 `69f94a4963f9a723658db8235a99eb838fbf97947ef0fe9b28f9f39dfae04e6b`, source SHA256 `f9e3b9b716e6149182283c875e72001e0b7a86d946a17b6c0f6cbb09d2492e24`. PS report25/negative child1, BuildProject parse/repo/LFS/diff PASS. Reutilizar SaveDisk10 de C018I; no runtime/assets/engine changes, Shipping/cook/full-suite/render no repetidos. Todos los procesos propios terminales, sin último error pendiente.
-- DECISIONES/PENDIENTES: fixtures con cabecera/CRC válidos llegan a deserialización y validación semántica; prefijos/terminadores incompletos, bytes sobrantes, generaciones inválidas, schema/fase/mapas inválidos rechazan sin cambiar entrada ni estado anterior. Esto no autentica archivos ni prueba todos los archivos hostiles. Mantener VM aparcada, no consultas ni reintentos automáticos. Gates reales pendientes: clean candidate/runnerCI protegido/playerQA-01–10/securityQUIC-SSL-curl/atribución-derechos/presupuesto rendimiento; estas pruebas no los cierran ni habilitan M8.
-- NEXT/MODELO: C-018H_CleanCandidate / CLAUDE cuando el usuario cambie modelo (GPT si pide continuar aquí). Solicitar autoridad explícita para crear commit LOCAL del candidato verificado, sin push; aún no concedida. Si autoriza, revisar y seleccionar SOLO archivos de implementación y assets LFS pertinentes, preservar ajenos, nunca git add -A; no prometer cleanCI sin runner licenciado/aislado y ejecución real. Si no autoriza, conservar checkpoint: no inventar más tareas/tests para aparentar cierre, no volver a Windows/VM ni repetir gates externos sin cambios de autoridad/entorno. Nada se marcó completo en la API goal.
+## Aprobación vigente — 7x6 + salida/nav con pruebas, 2026-10-30
 
-- REVALIDACIÓN POST-C018J 1: primer turno sin progreso tras cerrar la regresión. API goal comprobada ACTIVE, no complete/paused/blocked nuevos. Sin autorización de commit recibida; HEAD0726de2/286dirty/index vacío y hashes de fuente/reporte C018J exactos, sin cambios del candidato. No repetir pruebas, inventar tareas ni interpretar la continuación automática como permiso. No operación en marcha que justifique verified-wait; se necesita respuesta del usuario. Auditorías históricas VM/C018H no cuentan como estas nuevas consecutivas.
+Usuario respondió «Ampliar a7x6 yajustar salida con pruebas». Ya no pedir tamaño
+ni usar contador3/3 anterior como bloqueo vigente. No equivale aQAplayer/release.
+Primero integración privada deCamp03 real, luego adopción tras gates afectados.
+Code en curso: Barracks.h/.cpp añade resolver de salida SOLOpara opt-in: distancia
+según box/cápsula real+margen50cm, proyección nav, control postproyección fuera
+dehuella+capsule yoverlap delperfil real, DontSpawnIfColliding. Si falla: camino
+existente de refund, no forzar spawn. Legacy nullmesh conserva lógica antigua.
+SourceOfTruth sigueDefinition/Placement/Barracks/canonicalwallet; no otroowner.
+MCPno disponible; usarcommandlets existentes, no instalar/conectar servicios.
+Root Build11 preflightfallóincludeCollisionQueryParams faltante, corregido con
+includesdirectos; Build12 PID9340 TERMINAL0/session27689 consumida,39.96s/7acciones.
+Build13 PID15944 TERMINAL0 añadefallback test explícito nilmesh para funcionar
+también trasadopción (sin exigir quecatalogosigaprototipo). Test10 PID40116
+TERMINAL0/session39095 consumida:4cleanSuccess/0errors/warnings,protectedfilesintactos.
+Tools/ArtProbe/Native/CampBuildingIntegration.cpp NUEVO: authoring privado opt-in
+PDAreal yproducerPIE real conMesh/PBR/7x6/entrenamiento+cápsula/path. Todavía SINRUN.
+Artifacts/C018H_Camp03Integration1/Preparation01 tiene backups verificables de
+sources/DLLs/descriptor/PDAprevios y193Content snapshots;9runtimefiles+fixture
+sincronizados alGamePreview existente, assetsTODAVÍAintactos. SinDCC/reimport/cook.
+Private Build01 wrapperPID50408 TERMINAL6/session68007 consumida,299.29s:
+sourcecompila, linkfixturefalla11símbolos Json faltantes enmódulotests. Añadido
+Json privateDependency SOLOmódulo Editor tests (Root yprivado); backup privado
+enPreparation01/PrivateTests.Build.cs. No RuntimeModule/Publicdep/Shipping changes.
+Build02 wrapperPID53016 TERMINAL0; fixlink3acciones, verlogs/exit.json.
+Author01 PID40948 TERMINAL0/session93288 consumida,1cleanSuccess/0errors/warnings,
+stderr0; SOLOPDAprivado cambió,otros192Contentfiles+RootContentConfigdescriptor
+intactos. Receipt author.json:MeshCamp03real/5slots,transform(-78.2,12,-199.5),7x6.
+NO repetir authoring: YA GUARDADO. Producer01PID51436 TERMINAL255/session23636
+consumida,2asserts reclutaNoEncontrado,0warnings/protectedfilesintactos. Mesh/PBR/
+huella/transformPASS ylog «Trained unit:Legionary_25»: elfixture usabaOwner==producer,
+inválido trasposesiónAI. SnapshotProducer01.NativeSource.cpp conservado. Fixture
+ahora comparaFObjectKey antes/después deTick síncrono, cuentaexactamente1nuevo;
+añaderecruit_owneralreceipt. Build03 PID47948 TERMINAL0; runtimeNOcambió.
+Producer02 PID26452 TERMINAL255/session62946 consumida: SOLOpathassert falla,
+1error/0warnings/protectedfilesintactos. Recluta REALx442/cápsula42,OwnerAIController
+confirmado,Mesh5slots/7x6/transform/debito PASS. Path2puntos pero no full-valid.
+SnapshotProducer02.NativeSource.cpp conservado. Build04PID49580 TERMINAL0 añade
+diagnóstico: valid/partial/last/startcenter/startfeet ysegundaqueryfeet sin cambiar
+laassert original. Producer03 PID48912 TERMINAL255/session44730 consumida;
+1pathassert/0warnings/protectedfilesintactos. Causa medida: recruitZ248.15,feet152.15,
+navpathparcial termina(-114,-760,160),tantoqueriescentercomofeet. Era TECHOde casa
+decorativa: GameMode casas hx=-150,hy=-700,wall2x2.5x1.5m ocupa exit(-158,-800),
+nav elegía150cm porqueryDesiredZ=actorcenter200/extent500. No simplefallodefeet.
+FixruntimeRoot+privado: resolverbusca cerca basedelbox, verticalTolerance=MaxStep+10
+yrechaza pisosaltos. GameMode enramaauthored omite SOLOmarkers decorativosgenerados
+cuyotechointersecta footprint real (legacy nulo sigue8casas). NoActor/terrain test
+hackni destruir playerstructures. GameModeoriginalprivado respaldado/hashigualRoot
+enPreparation01/OriginalGameMode.cpp. Build05 wrapperPID11904/session54920 enmarcha;
+observarBuild05/log/exit. RuntimeSourceCore/RomanEmpireGameMode.cpp NUEVOarchivo
+afectado además9anteriores. Build05 TERMINAL0/session54920 consumida/13.16s.
+Producer04 PID14540 TERMINAL0/session16074 consumida,1cleanSuccess/0errors/warnings:
+recruitX442/Radius42,Z97.65,feet1.65,pathFULL2puntos hasta(192,-800,0),no roofs.
+Receiptcenter/feetAmbosValidNotPartial. TODOSlosprotectedfilesintactos.
+SnapshotProducer04.NativeSource.cpp preservaeste gate. Build06 PID9496 TERMINAL0
+añadeCommandMoveTo real ywaitlatente (15smax), exige>250cm yresto<60cm, sinteleport/
+dilation/heldpose. Producer05 PID8264 TERMINAL0/session33850 consumida,1cleanSuccess:
+dist291.148cm/rest58.852cm, prueba salida física pero NO fin deorden. Snapshot
+Producer05.NativeSource.cpp conserva ese criterio anterior. Build07PID50064
+TERMINAL0 añadecriterioestricto resto<45cm YHasMoveCommandfalse; fixture sin
+cambiosruntime. Producer06PID29892 TERMINAL0/session79704 consumida,1cleanSuccess/
+0errors/warnings/Contentintacto:314.483cmrecorridos,rest35.517cm,ordenfinalizadafalse
+HasMoveCommand,feetZ1.65/pathFULL. Esteesgatecanónico, no Producer05 másdébil.
+Root Build14PID39316 TERMINAL0/session15177 consumida,40.87s/7acciones/ stderr0.
+Root familia4 Test11PID41428 TERMINAL0/session92017 consumida:4cleanSuccess/
+0errors/warnings/stderr0/protectedfilesintactos. CierreIntegration1/verified01 PASS,
+todojobterminal. NO reauthoring. Aún4rotaciones/busy-refund/placement/
+vistasRTSFPS yregresionesRoot nuevas pendientes; runtimeRootGMnuevo requiereBuild14.
+SinDCC/import/SourceArtchanges. User7x6YAaprobado, no otra pregunta de fit.
+Aplicar soloPDA_Building_Barracks privado (backup) meshCamp03+7x6+transform calculado
+desde bounds reales, verificarreadback. Luego testsactualplacement/producción/nav
+(0/90/180/270 +obstrucción/refund) yvistasRTS/FPS. NoRootAsset/mapchange todavía.
 
-- REVALIDACIÓN POST-C018J 2: segundo turno consecutivo sin progreso, mismo límite de autoridad/entorno. HEAD0726de2/286dirty/index vacío siguen iguales; AGENTS.md:26 exige petición explícita para commit local. La continuación del objetivo no la concede. No staging/commit/push, VM ni reejecuciones. Los otros gates externos siguen requiriendo runner/QA/vendor/owner, no hay nueva evidencia o autorización para actuar sobre ellos. Goal se mantiene activo hasta aplicar el umbral de bloqueo si persiste en un tercer turno.
+## Último bloque — C-018H_EditorPresentationValidation VERIFICADO / GPT
 
-- Confirmación pendiente: se presentó una pregunta interactiva «¿Autorizás crear un commit local ... sin push ni configuración remota?» con opciones sí/no. Ninguna respuesta recibida al cierre. La continuación automática volvió a mostrar goal ACTIVE sin nueva decisión del usuario; se restableció BLOCKED por el mismo límite ya revalidado tres veces, sin afirmar progreso ni iniciar otro ciclo de escaneos/VM/tests. No interpretar un aviso automático del objetivo como autorización de Git.
+CorregidoIsDataValid individual deURomanBuildingDefinition: llama MISMA política
+de presentación usada enregistro/actor, con1diagnóstico. Include+llamada solo
+WITH_EDITOR. Archivos: RomanContentDefinitions.cpp,BuildingPresentationTests.cpp,
+M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md,IMPLEMENTATION_PLAN.md,HANDOFF.md.
+No assets/mapas/footprint/spawn/propiedades ni cambios Game/Shipping.
+Build08 native0,Test06 native255 reproduce exactamente8fallos poromisión delhook.
+Build09 native0/Test07 familia4cleanSuccess; Test08 Content.Definitions3cleanSuccess
+(19assets cross-valid). Build10 native0/Test09 nuevo testcleanSuccess además
+valida seis PDA guardados individualmente. PIDsfínales28160/52252/46168 TERMINALES0;
+handles22405/88772/59152 consumidos. No proceso nativo pendiente ni DLLmutante.
+Artifacts/C018H_BuildingPresentation1/verified03.json: fingerprints de2sources/DLLs,
+6runtimefiles previos byte-intactos,Content/Config/descriptor intactos,closurePASS.
+Validator0M1warnings/diffcheckPASS. No fullsuite/IWYU/Shipping/cook/GPU/player nuevo;
+fullsuite histórico142, no144. No commit/stage/push ni reauditoría.
+Sigue pendiente respuestaasync:4x4compacto vs7x6+salida/nav. No asumir selección.
+Relevo siguiente: leer solo esta sección y«Siguiente — C-018H_CampFitDecision».
 
-### Checkpoint C018I archivado — evidencia reutilizable, no tarea vigente
+## Auditoría de bloqueo histórica — 3/3, fit RESUELTO por aprobación7x6 posterior
 
-- TAREA/MODELO: GPT, C-018I_SaveStorageConflicts, cierre 2026-10-16 16:01 local (resultados nativos hasta19:00:57UTC). Petición vigente: seguir otra implementación, no insistir con Windows/VM. Nueva regresión Editor-only de conflictos entre generaciones; runtime ya cumple esos casos, no se reescribió.
-- TERMINADO/ARCHIVOS: `Source/RomanEmpireGameTests/Private/CanonicalUIIntegrationTests.cpp` agrega caso StorageConflicts; `BuildProject.ps1` exige su nombre exacto (20 anchors); plan y `M5_CAMPAIGN_SAVE_RUNTIME_REVIEW.md` registran evidencia. Solo cambios aditivos sobre el trabajo previo sin commit; no staging/commit/push ni cambios motor/assets/seguridad. Skills C++ y testing guiaron el uso de contratos públicos y pruebas aisladas; imports privados iniciales fueron rechazados y retirados.
-- PRUEBAS: Editor final4 acciones/8.74s/exit0; dirigido1 limpio, final familia SaveDisk10/10 limpia/exit0 en `Artifacts/Automation/C018I_SaveDiskFamily1`, log homónimo `.log`. Validador exige los10 nombres; index SHA256 `371d4cd82165589664912fcb6e59552e8f144854067682f50b34121ae81e5f97`, source SHA256 `4fbc944fe85e0a60829a906892f0a2e8c4f40744ebb1a411ccdcc702ab35a721`. Suite PS report25 checks/negative child1, BuildProject parse/repo/LFS/diff PASS. Sin full-suite/Shipping/cook/render reruns innecesarios; todos los procesos propios terminales.
-- DECISIONES/PENDIENTES: Manual0/1 conflictivos o incompatibles se conservan byte a byte; clones idénticos sí rotan; generación máxima no desborda. Captura de igualdad completa por API pública escribe SOLO el otro slot Autosave aislado, no lectura privada ni archivos personales. VM/playerQA-01–10/seguridadQUIC-SSL-curl/cleanCI/atribución/derechos/performance siguen pendientes; no reinterpretar estas pruebas como esos gates. NO retomar ni consultar VM automáticamente. Último estado VM conocido de00:48UTC está archivado debajo; no es comprobación actual.
-- NEXT/MODELO: C-018J_SavePayloadValidation / CLAUDE cuando el usuario cambie modelo (GPT si pide continuar aquí). Leer solo codec `World/CampaignSave.cpp`, su contrato público y test EnvelopeRoundTrip en `CampaignTransferTests.cpp`; añadir casos acotados de payload con CRC correcto pero archivo reflejado inválido/truncado y verificar fallo explícito/salida atómica. Inspeccionar solo la rutina exacta del lector UE si hace falta; no fuzz ilimitado ni suponer defecto. Ejecutar primero prueba EnvelopeRoundTrip dirigida; ampliar únicamente si hay cambio runtime. No nuevas operaciones Windows/VM ni gates externos repetidos. Reutilizar las 10 pruebas aprobadas de este bloque si no cambia persistencia.
+Primer turno de auditoría = NO_PROGRESS tras agotar opciones seguras; el turno
+de implementación anterior sí fue PROGRESS (hook yregresión cerrados).
+Segundo turno consecutivo = NO_PROGRESS, no verifiedwait. Revalidado HEAD344c29b,
+99entradas deworktree preservadas, fingerprints de2sources/DLLs deverified03
+intactos y0procesos Unreal/UBT/Blender. Sin nueva respuesta/autoridad al fit.
+Tercer turno consecutivo = NO_PROGRESS, misma condición revalidada: HEAD/99paths/
+fingerprints intactos,0jobs nativos, sin respuesta de fit ni nuevo estadoexterno.
+update_goal devolvióBLOCKED; NOcomplete, NOpaused. Reanudar solo al recibir
+decisión/autoridad nueva y conservar íntegro el objetivo ytodos sus gates.
+Sin respuesta al fit; ninguna nueva instalación/candidato distinto: soloUE_5.8
+5.8.2/CL56702186,MsQuic2.2.0.359654. No UE/UBT/Blender propios activos.
+Se releyeron únicamente gatesM6/criterios finales, límites dehandoff, protocolo
+QAplayer yacciones deatribución: integración requiere4x4compacto vs7x6+salida/nav;
+QAreal siguePENDING/VMdiferida/no bypass; CIaislado/licenciado, candidato corregido
+yrights/ATR requierenowner/estadoexterno. M8dependeM7, no víaalternativa.
+Los trabajos independientes del adaptador/inicial/validador ya están cerrados.
+No generar otra variante ni cambiar reglas/seguridad para ocupar el turno; no
+repetir suites ni recocinar cohortes aprobadas. Goal BLOCKED, NOcomplete.
+Al reanudar, comprobar respuesta/estado que elimina bloqueo antes de escribir.
+Un nuevo resume empieza auditoría fresca; no heredar contador3/3 por inercia.
 
-### Checkpoint Windows/VM archivado — no tarea vigente
+## Instrucción vigente — continuar con criterio propio, 2026-10-30
 
-- TAREA/MODELO: GPT, C-018H_LocalVMSetup, cierre2026-10-15 21:48 local / Oct16 00:48:37.1980838UTC. Terminado: cerrar Run/DxDiag por COMmouse verificado; abrir consola con texto lento COM; consulta CIM readonly UNA vez completada. VM_3DOff_LicenseResult2.png a00:44:38.323385UTC muestra QA_LICENSE_BEGIN/DONE, Windows(R),EnterpriseEval edition, LicenseStatus1(Licensed), GracePeriodRemaining128112min (~89d). No claves/IDs/activación/rearm/fecha/red/contratos cambiados. Licencia técnica postboot cerrada, NO derechos de distribución.
-- ESTADO/DECISIONES: mismo backend33044/creation2026-10-16 00:03:36.1861210UTC/UUID90bafe9d.../RunLevel3/3DOFF/NIC1null+cableoff/2–8none. StateChangeTime AHORA00:36:34.609UTC por resume, no otro boot. Log actual registra HostSuspend aelapsed00:25:37.428792 y HostResume00:32:57.212528; Windows Kernel-Power42/107 a00:29:16.0411826/00:29:17.8059435UTC corroboran suspensión/reanudación pero tiempos no mapean al intervalo completo (no asumir correlación exacta). Esto explica AL MENOS una pausa, NO todos los cuelgues/ni causa3D/WHP. Log anterior .1 solo demuestra lags, no atribuirle HostSuspend ausente en búsqueda dirigida. Mantener PC despierta durante QA; no cambiar energía/seguridad/WHP/VBS/clock automáticamente. C:20.58GiB libres al comprobar, no limpieza autorizada.
-- ARCHIVOS/EVIDENCIA: seisMD de estado actualizados; ignorados SendQaText_3DOff1.ps1 (guard UUID/PID33044/creation/3DOFF/isolation, texto≤600, log create-only, COM ReleaseKeys+PutScancodes con retorno1 por código,20ms make/80ms entre teclas, Shift/LAA-hyphen) e InvokeQaLicenseProbe1.ps1 (payload readonly498chars). OpenConsole1 worker0/texto completo visto antes de Enter. License1 observer42600 TERMINAL0/entrada completa00:43:24.3898420UTC, VM_3DOffText_License1.log; salida guest verificada después, NO solo transporte. Capturas/2logs/hashes en VM_3DOff_LicenseVerification1.json. Cleanup helper endurecido DESPUÉS del probe con nested finally para Unlock/StopTranscript aunque ReleaseKeys falle; hash fuente al cierre, no hash previo exacto de ejecución; parsePASS. TestQaTextCleanup1.ps1 ejecutó bloque finally real extraído por AST contra fakes: releaseFailure/unlockFailure/nullKeyboard/notLocked/success cincoPASS, sin VM/COM ni fallo nativo inducido. No cambios producto/motor/paquetes/commits; HEAD0726de2/286dirty/indexempty preservados.
-- PRUEBAS/PENDIENTES: payload ValidateOnly0/498chars; helpers parsePASS, receipt/capture/log/source hashes y diff dirigidoPASS; pruebas/build/cook de producto previos reutilizados. Guest en prompt PowerShell idle tras consulta completada, sin propio worker/monitor vivo pendiente; STATEready, no verified-wait indefinido. Licencia resuelta, driver/apto3D/playerQA-01–10/securityQUIC-SSL-curl/cleanCI/attribution/rights/performance siguen OPEN. No ejecutar Unreal suponiendo aceleración por featurelevels reportados en3DOFF, ni sustituir baselineDX12/fullM7.
-- NEXT/MODELO: C-018H_LocalVMSetup / CLAUDE cuando owner cambie modelo. Verificar MISMO backend/config. Planificar apagado NORMAL de invitado y restauración del baseline3Don temporalmente desactivado, luego calificar dxdiag/driver/respuesta con PC despierta antes de existingarchives -dx11. No otro apagado forzado sin nueva autoridad; no repetir NAT/activación/ISO/instalación ni helpers one-shot. Usar texto COM controlado desde prompt confirmado en vez de keyboardputstring masivo; receta y hashes en VM_SETUP/recibo. Si host vuelve a dormir, no confundir VM pausada con crash ni reiniciar por timeout; consultar mismo PID/log/estado. API goal último estadoBLOCKED documentado, sin marcar complete ni inventar active.
+El usuario indicó «segui la tarea no importa» después de pedir más ajustes.
+Se continúa una variante privada v3 con criterio artístico delegado; ya NO está
+bloqueada por falta de detalles. NO equivale a adoptar Camp02 ni aprobar footprint/
+spawn/mainmap/release. Nuevo brief Artifacts/VQ02_CampRevision3/BRIEF.md:
+bandas óxido/gable visible RTS, rack real de equipo bajo porche y herrajes, suelo
+menos moteado/paleta más contenida. Misma envolvente/puerta/layout,3meshes/6mat,
+atlas2K/65ktri, sin nuevas fuentes externas ni cambios en gameplay/cámaras.
 
-### Historial de bloques anteriores (no estado actual)
+Nuevos Tools/create_semireal_camp_v3.py,semireal_camp_revision3_recipe.py,
+tests/test_semireal_camp_revision3_recipe.py; runner añade -Revision3 con default2
+intacto; verifier fuente acepta schema/filename2/3 explícitos, default2 preservado.
+20pure tests PASS (6recipe3/6GLB-envelope/8legacyrecipe),Pythoncompile/PSAST,
+repository0M1warnings/diffcheck PASS. SourceArt semireal_v3 YA publicado14files;
+El import/preview/cook posterior ya está cerrado en las secciones siguientes.
+Fuentesv1/v2 de14files cada una hash-intactas.
+Autor01 PID52504/Readback01 PID1808 terminales0/receipttrue/stderr0;4GLB reimports
+yroofcoverage pasan.2PNGs author inspeccionados. Se detectó pequeño hueco geométrico
+punta/astil; se corrigió con socket solapado y sexto test recipe. Snapshots exactos
+del autor/recipe deAttempt01 en Author01Sources; no reescribir ese output.
+Author02 PID7208 y Readback02 PID2696 TERMINALES0/receipttrue/stderr0; handles2708
+y89813 consumidos, no transferir ni esperar. Fuentes finales en Attempt02,
+reimportación independiente real4GLB en Readback02. BOTHauthor2PNG yBOTHreimport2PNG
+inspeccionados: renders BLENDER, no vistas Unreal. Tejas4410centroides(area≥.006m²)
+roughnessmin=max.8313726186752319; no prueba completa de texels/mips/GPU.
+PublishSource01.py create-only entregó13generatedfiles idénticos+README14th.
+Source manifest SHA b1403c940209438f18a7addd6c4afbb7e2f725471f68e66a1e2c49f82f8e83e5.
+Readback02 SHA c6617cb27f37c98ced1019e66b04787bf412f4cc524b7a4c9cece4005d505d26.
+SourceDelivery01 SHA7dff2ba59a493f9d55285d31c9cafa0ea13b3261dfd36a2357f3b7262aab5e31.
+Actual tri1152/3704/30554,total35410/65000,1UV/6slots/atlas2K. Barrackbounds
+6.686x5.73x3.815m unchanged; palisade seedheight varía milímetros, nofootprint nuevo.
+BLEND/reference character existente no se exporta; no rig/LOD/nav/colisión/interacción.
+LFSfilter confirmado GLB/BLEND/PNG. Ver M6_SEMIREAL_CAMP_REVISION3_REVIEW.md.
+Todo dirty previo conservado; sin commit/stage/push ni acceso .env/claimmix.
 
-- VIGENTE RECUPERACIÓN3DOFF — 2026-10-16 00:09:39.1211691UTC / 2026-10-15 21:09 local: owner «dale si autorizo» autorizó poweroff SOLO VM + diagnóstico temporal sin3D. VM_3DOffRecovery1.ps1 verificó firma/name/UUID/VDI08d4ac74.../DVD47612f43.../aislamiento/EFI-SecureBoot antes; poweroff00:02:47.731191→verificado00:02:48.317056UTC EXIT0. Primer modify detenido por VBOX_E_INVALID_OBJECT_STATE0x80bb0007 (sesión liberándose); script TERMINAL1, NO start emitido. Consulta0 a00:03:05 confirmó poweroff/3Don y backend32772 AUSENTE; NO repetir helper inicial/poweroff. Continuación VM_3DOffRecovery1_Resume.ps1/log nuevo create-only: modify3DOFF0, verificado00:03:35.0896659UTC, startGUI UNA vez0, observer27716 TERMINAL0/fin00:03:44.2921502UTC, running/StateChange00:03:44.229UTC. Backend NUEVO33044/creation00:03:36.1861210UTC ligado por VBox.log+CIM; nunca reutilizar guard viejo32772. Invariantes comparados antes/después, solo3D cambió; 8GiB/4CPU/VBoxSVGA256MiB/VDI-DVD/aislamiento/clipboard-dragdrop-USBoff/EFI-SecureBoot intactos; host/WHP/VBS/SAC/Defender/CI no tocados. Old VBox.log ahora .1 histórico, no usar tail como log actual.
-- RESULTADO DIAGNÓSTICO: Boot2 escritorio/RunLevel3/7.2.20r175154; Run1 muestra WinR respondiendo. dxdiag abierto una vez, diálogo WHQL contestado NO para mantener offline, NO política de seguridad modificada. Carga lenta: CtrlTab/conhost intentados no demostraron cambio inmediato; no asumir estabilidad. Log nuevo registra heartbeat recuperado tras8.848753795s; no3D no garantiza cura ni descarta WHP/otras causas. Canal útil NUEVO: COM VirtualBox.VirtualBox7.2.20→FindMachineUUID→sesión propia LockMachine1→Console.Mouse.AbsoluteSupported1/PutMouseEventAbsolute(int,int,int,int,int), finally UnlockMachine; metadatos nativos corroboran firmas. Click preciso Pantalla(236,143) press1/release0 a00:08:39UTC sí cambió vista y mostró Run aún abierto detrás. No nuevo servidor/MCP/GuestControl/credenciales/cambio de foco/seguridad. SDK webfetch402, no inferir documentación inexistente ni instalarSDK. Receta en VM_SETUP; operaciones secuenciales y validar captura antes de cada click.
-- DXDIAG VISIBLE en VM_3DOffRecovery1_AfterMouse.png: VirtualBox Graphics Adapter(WDDM), driver7.2.20.25154/fecha9-21-2026, WDDM1.3/DDI12, niveles visibles12_1/12_0/11_1/11_0/10_1... (lista recortada, no inventar resto), VRAM0MB y tipo display-only recortado. DirectDraw/Direct3D/Textura Habilitado, UltimateDeshabilitado, Notas sinproblemas. Es reporte EN3DOFF: NO prueba aceleración hardware/payload Unreal/featurelevel de player; SystemDX12 tampoco. Licencia CIM postboot NO consultada y juego NO ejecutado. API/fullM7/DX12baseline aún OPEN; no recook ni reinterpretar sin3D como aceptación de QA.
-- NEXT C-018H_LocalVMSetup: misma VM33044 running intencional/3DOFF/aislada, DxDiag Pantalla foreground y Run detrás (texto dxdiag), posible entrada previa pendiente; no Enter ciego ni otro start/reset. Cerrar Run por Cancel con mouse confirmado y DxDiag Salir, recuperar consola una vez y consulta offline CIMGPU/licencia con transporte controlado (no reutilizar helper antiguo con PID32772/log ya consumido). No otro payload largo sin verificar foco. Control mouse COM permite integrar QA futuro pero aún no hay player calificado; antes de juego restaurar/qualificar aceleración apropiada dentro de nueva ventana de apagado/arranque acordada, no hacer otro ciclo aquí. Mantener investigación de pausas, sin desactivar WHP/VBS. Recibo VM_3DOffRecovery1.json/logs/capturas y seisMD actualizados; helpers parse/diff/hash PASS, HEAD0726de2/286dirty/indexempty preservados, sin suites/build/cook innecesarios. Ayuda nativa modifyvm --help/help modifyvm devolvió1 antes de acciones; segundo mostró sintaxis --accelerate-3d=off, no efecto de estado. Ningún worker propio pendiente (todos terminales); STATEready=contexto, no M7 completo. Historial de recuperación no autorizada y PID32772 debajo superado.
+### Terminado — C-018H_CampRevision03Preview / GPT
 
-- VIGENTE CUELGUE OWNER — 2026-10-15 23:53:50.9648523UTC (20:53 local): owner «se colgo» sustituye prueba teclado pendiente; no insistir en echo QA mientras no responde. Query0 mismo UUID90bafe9d.../backend32772/creation23:25:08.7968170UTC running, VBoxSVGA256MiB/3Don/RunLevel3/aislamiento intactos. Nueva VM_OwnerHang1.png SHA bce053f8866d58d052a1e3b1c4f48145b9c0be65ec2a429e3bce31195d965289 muestra SOLO fragmento de comando, sin sentinel/resultados; transporte anterior0 NO ejecución guest. VBox.log159933bytes/lastwrite23:52:45.2778142UTC: heartbeat flatlined luego Guest is alive, brecha652.202919863s y TM catch-up lag671.998993916s; prueba retrasos, NO muerte terminal ni causa 3D/WHP probada. Host consulta acotada Kernel-Power42/107/506/507 desde23:25 devolvió0eventos (no prueba global de ausencia de suspensión); FreeMemory4807/Total32189MiB/VMworking5833MiB/CPU1827.296875/RespondingTrue no descartan presión o colgado guest. No más teclado/reset/restart/poweroff/3D/security/red/credenciales ni juego. Propuesta owner: autorizar APAGADO FORZADO SOLO VM y un arranque de diagnóstico con3D temporalmente OFF; riesgo estado sin guardar, no prueba Unreal/API ni baseline sustituido. No ejecutar sin respuesta; permiso viejo de apagado/arranque ya consumido no cubre nuevo ciclo. Primary Oracle7.2 Troubleshooting reconoce posible conflicto Hyper-V pero NO diagnostica este caso; su workaround de desactivar seguridad/VBS/WHP es FUERA DE SCOPE y NO se hará. GuestAdditionsdoc actual no dice experimental: no afirmarlo de memoria. HANDOFF/VM_SETUP/plan/QA/external/checklist y recibo VM_OwnerHang1.json preservan evidencia. Sin worker propio pendiente; STATEready=contexto, M7 OPEN. NEXT decisión recuperación; si autorizada guardar config3Don/UUID/VDI/DVD/isolation antes de poweroff, luego cambio3Dúnico offline y arranque único, comprobar driver/UI/licencia y restauración/entorno apto antes de cualquier QA de juego. Notas previas de mouse y keyboard probe históricas.
+Perfiles v3/Camp03 añadidos a policy/importer/runner y
+fixture/capture.10policytests PASS; Pythoncompile/2PSAST PASS. Native autoría
+camp03-author01 PID24912 TERMINAL0,12assets nuevos y181Content files conservados.
+Reapertura camp03-readonly01 PID50908 TERMINAL0,193Content files conservados.
+Build privado wrapperPID47440 TERMINAL0,4acciones/18.61s,handle31653 consumido.
+Snapshot NativeFixtureCamp02.cpp preservado; solo sync fixture Editor-only privado.
+Camp03GPU01 PID46596 TERMINAL0,handle65586 consumido;2Success/0errors/1warning
+conocido r.MotionVectorSimulation. ActualD3D12/SM6/1280x720/cámaras canónicas,
+7PNGs realmente inspeccionados; no FOV/luces/pose hacks. Ver journals/log en root3;
+report en GamePreview/Reports/Camp03GPU01, PNGs en GamePreview/Artifacts/Camp03GPU01.
+Camp03PoseMutation01 PID4636 TERMINAL255,handle27829 consumido,1ExpectedFail por
+actor que cae/se mueve. Mismosource/DLL;193Content hashes intactos; sinrestauración.
+Witnesspixels ground35824/wall4058/barrack25809/FPS840823;FPSCameraZ165.904;
+artdiagnosticposeheld, NO físico/nav/combat/performance/player/adoption.
+private-camp03-cohort01.json SHA b5f8b27a22052716eecf279e76e12dbb2869326cfbd65c0d281a722ddda7ff3a;
+ClosePreview01.py crea solo nuevo receipt, liga193files/7PNG/native identities,
+source/stagedGLB BIN geometry/images iguales tras dedup deJSON únicamente.
+Repo0M1warnings/diffcheck PASS. Sinfullsuite/Shipping/RootCPP/config/module changes.
+Skills UEgameplay/data/testing/MCP guiaron separación de autoridad y evidencia;
+MCP no disponible, fallbackcommandlets sin instalar/conectar servicios nuevos.
+No repetir DCC/import/build/GPU/mutation por cambio de cliente. Goal ACTIVE.
 
-- VIGENTE UI OWNER / CONSULTA ENVIADA — 2026-10-15 23:47:07.2721710UTC (20:47 local): owner «Sí, Inicio abre» y «esta la maquina virtual pero no esta haciendo nada, abrio una cmd nomas». Mouse funcional confirmado por owner, NO freeze de Windows demostrado. Captura23:42:00 VM_OwnerUIResponse_20261015_2334.png sí cambió: prompt PowerShell idle, SHA40819a...; _2334 es nombre, timestamp real23:42. Tras foco visible se quitó DISABLED del helper PostbootDiagnostics_20261015_2328.ps1 y se ejecutó UNA vez con guard mismo UUID/PID32772/creation/aislamiento y log create-only PostbootDiagnostics_20261015_2342.log. Observer87407 TERMINAL0, entrada completa23:45:09.3086206UTC/transcript terminado; transport0 NO prueba ejecución guest. Captura VM_PostbootDiagnostics_20261015_2345.png sigue byte-idéntica a prompt anterior, SIN QA_POSTBOOT_BEGIN/DONE ni CIM/driver/licencia. No repetir payload (log impide nuevo intento); posible comando pendiente/no recibido, no determinado. RestoreWindow True, ForegroundRequest False: NO fingir foco adquirido ni forzar políticas Windows. Captura SOLO client de VM vía helper CaptureQaWindow_20261015_2346.ps1/PrintWindow EXIT0 a23:46:08, VM_WindowClient_20261015_2346.png también muestra consola sin salida; no captura desktop host/otras apps. Pregunta async nueva: clic dentro consola, escribir echo QA y Enter, ¿sale QA? Pendiente; no más teclas ciegas. RunLevel3/running/NIC1null+cableoff/2–8none aún verificados0; sin reset/reboot/red/security/3D/credenciales/player. NEXT respuesta teclado manual y luego resolver foco/canal antes de diagnósticos reales; owner mouse resuelto, no volver a preguntarlo. Helpers/log/capturas/VM_OwnerUI_InputAttempt_20261015_2347.json ignorados; seisMD guardados, HEAD0726de2/286dirty/indexempty preservados, sin builds/suites innecesarios. Goal API BLOCKED histórico aún, trabajo PROGRESS por evidencia owner/canal; no marcar objetivo completo. Ningún worker propio vivo pendiente; footerready=contexto guardado, no gate aprobado. Notas helper nunca ejecutado/DISABLED y mouse pendiente debajo son HISTÓRICAS.
+### Terminado — C-018H_CampRevision03Cook / GPT
 
-- AUDIT RESPUESTA3/3 — 2026-10-15 23:32:57.1794573UTC (20:32 local): tercer turno consecutivo NO PROGRESS por misma comprobación física UI/captura pendiente del owner, revalidada23:31:33/23:32:21/23:32:57UTC. Query0 mismaUUID/PID32772/creation23:25:08.7968170UTC running/RunLevel3/aislada; VM_PostbootResponseAudit3.png byte-idéntica SHA05e9f6d... aAudit2/1/capturas anteriores. Ningún diagnóstico/monitor propio en marcha, no verified-wait meramente por VMviva. update_goal BLOCKED confirmado; objetivo intacto y NO completo. No seguir sondeos/entrada ciega ni forzar reset/restart/3D/security/red/GuestControl/credenciales; helper CIM permanece DISABLED/nunca ejecutado. Owner confirma si abre Inicio con mouse en ventana real; si responde, verificar captura/foco antes de diagnósticos, si no, solicitar decisión de recuperación. Sin alternativa autónoma segura restante que califique UI/API/player desde imagen invariable; demás gates externos intactos. HEAD0726de2/286dirty/indexempty, NEXT/STATEready preservados; HANDOFF/captura3 ignorada y diff dirigido. Al reanudar goal iniciar audit nuevo y comprobar mismo proceso/estado antes de actuar; no repetir autorización de arranque ya concedida.
+Perfiles Camp03/v3 agregados a cook/verifier/dump runner,
+defaults anteriores intactos; legacy acepta193Content files coexistentes.
+17verifier tests PASS,Pythoncompile/2PSAST PASS. Cook NUEVO Camp03Cook01 PID46116
+TERMINAL0,tool-session43908 consumida,193Content/source/config/descriptor intactos;
+log Artifacts/VQ02_CampRevision3/Cook/Camp03Cook01/cook.log,process/exit.json allí.
+DumpRuntime PID45716 yDevelopment PID16056 TERMINALES0,log0errors/0warnings,
+stderr0,registry input SHA iguales. Verifier3 PASS:12assets/35hardGame/0missing,
+6materialSM6/4Global+game SM5+SM6archives;537cooked/7skip/544total,0incremental.
+Cooklog0errors/0warnings;193Content/14source/Config/descriptor sin cambios.
+cohort01.json SHA65c9887635090960ed34a8215c213f6f07698348df0b48aa1247cf07bf9afdc9
+en Artifacts/VQ02_CampRevision3/Cook/Camp03Cook01, con verified01.json/dumps/journals.
+CloseCook01.py liga preview+helpers+nativeDump identities. No job/handle vivo.
+17verifier tests/Pythoncompile/2PSAST/repository0M1warnings/diffcheck PASS.
+No fullsuite/Shipping/player package/VM ni cambios engine/config/Zen/defaultmap.
+Skill packaging mantuvo cook privado separado de QAplayer/adoption/release.
+Archivos de este bloque: cook_semireal_camp.ps1,dump_cooked_camp_registry.ps1,
+verify_cooked_camp.py,test_verify_cooked_camp.py,reviewCook/review3/plan/brief/inventory/
+HANDOFF; outputs+CloseCook01.py ignored. Dirty previo intacto; no commit/stage/push.
+No usar resultados Cook2 para Camp03 ni tocar config/engine/Zenservice/maps.
 
-- AUDIT RESPUESTA2/3 — 2026-10-15 23:32:21.9496635UTC: NO PROGRESS por misma comprobación física owner pendiente. Query0 mismo UUID/PID32772/creation/estado running/RunLevel3/aislamiento; captura VM_PostbootResponseAudit2.png byte-idéntica/SHA05e9f6d... aAudit1/escritorio original. No diagnóstico en marcha ni verified-wait útil; proceso vivo no justifica sondeos indefinidos. Sin teclas/reset/3D/red/security/GuestControl/credenciales ni suites/builds repetidos. Goal ACTIVE, dos turnos consecutivos sin progreso de este bloqueo; no complete/BLOCKED todavía. HEAD0726de2/286dirty/indexempty, NEXT y STATEready preservados; solo HANDOFF/captura ignorada.
+### Terminado — C-018H_BuildingPresentationAdapter / GPT
 
-- AUDIT RESPUESTA1/3 — 2026-10-15 23:31:33.0563142UTC: turno anterior PROGRESS por nueva evidencia de entrada no verificada; este turno NO PROGRESS. Query0 confirma misma VM32772/creation23:25:08.7968170UTC running/RunLevel3/aislada; VM_PostbootResponseAudit1.png tiene mismo SHA05e9f6d... que cinco capturas previas. No respuesta owner sobre Inicio con mouse todavía; no worker de diagnóstico en curso, no verified-wait por proceso VM meramente vivo. Sin alternativa autónoma segura para validar canal/UI a partir de capturas invariantes: parar entrada ciega, no GuestControl/credenciales/reset/3D/security/red. Pendiente misma comprobación física; demás gates externos documentados sin cambios. Goal ACTIVE, primer turno consecutivo sin progreso de este bloqueo, no complete/BLOCKED aún; HEAD0726de2/286dirty/indexempty preservados, solo HANDOFF/captura ignorada. NEXT y STATEready intactos.
+Implementación y gates de código/lógica VERIFICADOS. Cambios reales Root BuildingBase.h/.cpp,Public/Building/BuildingTypes.h,
+nuevos Public/Building/BuildingPresentation.h yBuilding/BuildingPresentation.cpp,
+Content/RomanContentRegistry.cpp yTests/Private/BuildingPresentationTests.cpp.
+Campos opcionales hardref mesh+transform, defaultsnull; bounds/grounding/scale guard
+en registro eInitialize, materialesPBR intactos con placa state/faction separada,
+origen deconstrucción persistente, arte noCollision/noNav. NO assets/mapas adoptados.
+Build01 wrapperPID48332 falló SOLO preflight validador: test importaba headerprivado.
+Reescrito víaAPIreflejada/factory real, sin abrirheaders ni relajarvalidación;
+helpertemporal BuildingPresentationProbe.h eliminado (era de este bloque, no deluser).
+Repository0M1warnings ahoraPASS. Build02 wrapperPID45152 TERMINAL6 (UBT),session74922
+consumida: errores solo en nuevo test (FindFPropertyChecked no existe, punterosconst
+enTestEqual). Corregido con FindFProperty+error decontrato y comparación bool.
+Opt-in ahora inicializa también su box canónico para factories BeginPlay, sin cambiar
+defaults/prototype rules. Build03 wrapperPID43460 TERMINAL0/session69038 consumida,
+7acciones/7.78s. Test01 PID8728 TERMINAL0/session98572 consumida;2Success/0errors/
+0warnings,Content/Config/descriptor hash-intactos,stderr0. NullRHI, no render/player.
+Después se agregaron negativos reales de registro/factory fuera de footprint y
+salida de placement con colisión canónica, y diagnóstico de validación más preciso.
+Build04 wrapperPID52888 TERMINAL0/session89078 consumida,7acciones/8.93s.
+Test02 PID41904 TERMINAL0/session17030 consumida,2Success/0test errors/0warnings,
+stderr0,Content/Config/descriptor hash-intactos. Un error de factory inválida es
+EXACTAMENTE el esperado por el test negativo, no un error ignorado globalmente.
+Artifacts/C018H_BuildingPresentation1/Test02/process.json,exit.json,native.log,Report.
+IWYU01 wrapperPID52072 TERMINAL0/session72429 consumida,115acciones/598.24s,stderr0;
+Artifacts/C018H_BuildingPresentation1/IWYU01/process.json,exit.json,native.log.
+Shipping01 wrapperPID53424 TERMINAL0/session86072 consumida,10acciones/76.40s,
+stderr0; player NO ejecutado. Regression01 wrapperPID17484/native31648 TERMINALES0,
+session85931 consumida. BuildProject Test -DisableFab:142passed(141clean+1warning),
+0failed/not-run/in-process,stderr0. Report Artifacts/Automation/20261030_141712_395/
+index.json. Única advertencia: missing.png deliberado deVisualRegression.
+FileComparisonContract (VisualRegression.cpp:192); ambos tests nuevos cleanSuccess.
+verified01.json comprueba siete fingerprints source yContent/Config/descriptor
+intactos también DESPUÉS de suite completa. Validator0M1warnings/LFSfsck/diffcheck PASS.
+No procesos Unreal/UBT/Blender pendientes, handles consumidos; NO esperar/reiniciar.
+NO repetir outputs existentes. Nuevo review
+M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md; contrato y límites de integración reales.
+Existing Artifacts private3 intactos. Nuevo test usa factory real/BeginPlay y
+reflexión de APIs públicas; no helper-subclass con headers privados del runtime.
 
-- POSTBOOT / ENTRADA NO VERIFICADA — 2026-10-15 23:30:06.3765813UTC (20:30 local): turno previo PROGRESS por arranque/escritorio; este bloque obtuvo evidencia nueva de falta de cambio visual, NO dxdiag/licencia. VM32772/creation23:25:08.7968170UTC sigue running, RunLevel3/7.2.20r175154; facility Base/System/Desktop/Seamless/Graphics raw50 con timestamps de boot, LoggedInUsers1. Native keyboard WinR/conhost, otro WinR, Escape/CtrlAltDel EXIT0 pero no consola ni pantalla de seguridad observadas; no confundir transporte0 con ejecución guest. Cinco capturas desde desktop (_3) hasta VM_PostbootSecureAttention_20261015_2329.png byte-idénticas758077bytes/SHA05e9f6d600d0d8d94ddb31ed5f3255ea9e0c8d36f4219a21f53b1c69c756d796, reloj visible20:26. BackendCPU286.515625→311.75→372.578125s/RespondingTrue muestra proceso vivo, NO escritorio funcional/causa de bloqueo demostrados. VBox.log157509bytes/lastwrite23:26:05.1099077UTC; no rootcause/driverAPI inferidos. Pregunta async al owner: comprobar con mouse si abre Inicio; pendiente. NO seguir enviando teclas a ciegas ni repetir comandos posiblemente pendientes. Helper PostbootDiagnostics_20261015_2328.ps1 preparado/parsePASS pero NUNCA ejecutado y ahora throw inicial DISABLED hasta verificar foco; sin CIMlicencia/dxdiag/player realizado. Receipt VM_PostbootInput_20261015_2330.json y4capturas nuevas ignorados; no reset/restart/3D/security/red/credenciales/GuestControl ni instalación. VM viva intencional, ningún worker propio pendiente; no verified-wait indefinido. NEXT owner confirma respuesta de UI física; si responde comparar canal de captura/foco antes de única consulta readonly, si no responde requerir decisión de recuperación, no forzar. M7 OPEN, HEAD0726de2/286dirty/indexempty preservados; seisMD/receipt/parse verificados, sin suite/build innecesarios. STATEready=contexto guardado, no gate aprobado.
+### Terminado — C-018H_InitialPresentationCoverage / GPT
 
-- ESCRITORIO CONFIRMADO — 2026-10-15 23:26:40.8087911UTC (20:26 local): captura VM_AuthorizedStart_20261015_2325_3.png muestra escritorio Windows tras el arranque autorizado; consulta0 running/GuestAdditionsRunLevel3/version7.2.20r175154 y aislamiento conservado. Boot y desktop verificados; sin teclas, credenciales, segundo arranque o player. Watermark dice evaluación89d pero NO sustituye CIM de licencia ni demuestra versión OS (winver previo26300.9457). NEXT ya no esperar bienvenida: verificar driver/dxdiag featurelevels/licencia offline, luego archives existentes -dx11. No watcher propio pendiente; VM32772 viva intencional, STATEready. Recibo de inicio conserva observación histórica Welcome/RunLevel1; nueva captura prueba posterior escritorio/RunLevel3. SeisMD diff y JSONreceipt PASS; no builds/tests producto repetidos, M7 sigue OPEN.
+VERIFICADO tras continuación del goal: soloBuildingPresentationTests.cpp ampliado.
+InitialCampPIE carga catálogo real víaAssetManager, instala mesh transitorio2slots
+ANTES de PIE enL_VerticalSlice; RAII+StrongObjectPtr restauran definición incluso
+si falla arranque. Busca producer delGameMode real; compruebaComplete/transform/
+footprint/materiales/GC yTrainUnit/TryCancelTraining con débito/refund canónicos.
+Sin cambios persistentes runtime/assets/mapas. Build05 wrapperPID52272 TERMINAL0,
+5.99s (Artifacts/C018H_BuildingPresentation1). Test03 PID53512 TERMINAL0/session53526
+consumida,3Success/0testerrors/0warnings,stderr0,Content/Config/descriptor intactos.
+MUTACIÓN CONTROLADA ya cerrada: soloBuildingBase.cpp::CompleteInitialConstruction
+cambia SetRelativeLocation(authoredTranslation-or-zero) aSetRelativeLocation(ZeroVector).
+Build06 wrapperPID2964 TERMINAL0. Source YA RESTAURADO byte-idéntico al cierre
+anterior antes de Test04 (aplicado conapply_patch); DLL sigue mutante hastaBuild07.
+Mutation01.json liga sourceSnapshot/DLLruntime/DLLtest, NO modificar esa evidencia.
+Test04 PID47340 TERMINAL255/session16754 consumida: EXACTAMENTE1fallo deInitialCampPIE
+portransform,2Success/0warnings/ContentConfigdescriptor intactos. DLLmutante mantuvo
+hash registrado durante test. Build07 wrapperPID50796 TERMINAL0 restaura DLLbuena;
+Restored01.json liga DLLs yconfirma6runtime source byte-idénticos a verified01.
+Test05 PID43480 TERMINAL0/session64665 consumida,3cleanSuccess/0errors/0warnings,
+stderr0/ContentConfigdescriptor intactos. verified02.json comprueba restauración
+exacta6runtime files/DLLs yfallo negativo preciso. Sin job/handle vivo; NO repetir.
+Código runtime yDLL YA NO son mutantes. Repo0M1warnings/diffcheckPASS.
+Wrapper Test01.ps1 mantiene default2; usarExpectedCount3 para nuevosruns.
+NO iniciar otroUE/UBT mientras proceso vivo ni repetir outputs. Decisión de fit
+4x4compacto vs7x6+salida consultada async; no aplicar cambios sin respuesta.
 
-- VIGENTE ARRANQUE AUTORIZADO — 2026-10-15 23:25:51.7153883UTC (20:25 local): usuario «enciende la VM si». VBoxManage Valid/Oracle America, Inc.; guard nombre/UUID/poweroff/NIC1null+cableoff/NIC2–8none antes de startvm GUI UNA vez solicitado23:25:07.6858404UTC, EXIT0; observer12601 terminal0. Postconsulta0: running/VMStateChangeTime23:25:17.955UTC, mismo UUID90bafe9d-68f9-4d02-8521-5f66a6a60b83/aislamiento. Backend PID32772/CIMcreation23:25:08.7968170UTC confirmado por cabecera VBox.log; otros VirtualBoxVM36816/45248 son procesos acompañantes, no identificar backend por nombre solo. Captura VM_AuthorizedStart_20261015_2325.png splash y _2.png Windows «Te damos la bienvenida» sin interacción/credenciales. Additions7.2.20r175154/RunLevel1 todavía NO prueba API/driver3D/licencia o QA. VM viva intencional; sin watcher de fondo ni otro start/reset/NAT/instalador/cambios host. NEXT observar misma VM hasta escritorio, comprobar driver/dxdiag/licencia antes de existingarchives -dx11. Evidencia de apagado anterior inmutable; notas de permiso de encendido pendiente/apagada debajo HISTÓRICAS. M7 OPEN, HEAD0726de2/286dirty/indexempty preservados, no builds/suites por arranque. STATEready significa contexto guardado, no QA aprobado.
+### Siguiente — C-018H_CampFitDecision / Claude
 
-- REANUDACIÓN1/3 — 2026-10-15 23:24:38.4569214UTC (20:24 local): get_goal ACTIVE tras continuación automática; nuevo conteo, no reutilizar audit anterior como tres turnos nuevos. Consulta nativa0: mismo UUID/poweroff desde03:10:37UTC, NIC1null/cableoff/2–8none; HEAD0726de2/286dirty/indexempty. NO PROGRESS, no worker vivo ni verified-wait. Ninguna respuesta concreta a pregunta de encendido; preservar última petición de apagado. Falta confirmar intención owner para arrancar aislada y continuar QA; no repetir apagado ni gates correctos, demás dependencias externas intactas. Solo HANDOFF actualizado/diff dirigido, sin producto/red/seguridad/startvm. NEXT y footerready vigentes; goal no completo.
+Bloque GPT ya TERMINADO mientras falta decisión de fit: IsDataValid individual
+enRomanContentDefinitions.cpp NO llama política de presentación (registro/actor sí).
+Se agregóEditorAssetValidation enBuildingPresentationTests.cpp: null/fitting pasan;
+overhang/floating/mirrored/empty debenInvalid con1diagnóstico. Build08PID9512
+TERMINAL0; Test06PID40272 TERMINAL255/session16382 consumida reproduce EXACTAMENTE
+8assertions deesaomisión (4resultados+4diagnósticos),0warnings yarchivos protegidos
+intactos. Ahora fix enRomanContentDefinitions.cpp llama MISMO helper Validate en
+IsDataValid einclude soloWITH_EDITOR; sin duplicar límites/reglas ni tocarShipping.
+Build09 wrapperPID53720 TERMINAL0,13.21s; session38471 consumida (comando de rg
+posterior falló porquoting, búsqueda corregida; buildreceipt0/logSucceeded).
+Test07 PID28160 TERMINAL0/session22405 consumida:4cleanSuccess/0errors/warnings,
+stderr0/ContentConfigdescriptor intactos. Test08 PID52252 TERMINAL0/session88772
+consumida:3cleanSuccess/0errors/warnings,19assets cross-validation intacta.
+El test existenteDiscovery NO llamaIsDataValid individual; por eso se añadieron
+los seis assets reales aEditorAssetValidation (snapshot test anterior preservado).
+Build10 PID5912 TERMINAL0; Test09PID46168 TERMINAL0/session59152 consumida,
+1cleanSuccess incluido chequeo individual6PDA. verified03.json closurePASS.
+Include nuevo enWITH_EDITOR9-12 yllamada bajoWITH_EDITOR74-188;
+ningún nuevo comportamientoGame/Shipping ni cambios físicos deassets/mapas.
+No mutación runtime temporal deeste bloque ni assets/footprint/spawn nuevos.
+Observar outputs nuevos bajo Artifacts/C018H_BuildingPresentation1; no repetir.
 
-- REVALIDACIÓN POSTAPAGADO3/3 — 2026-10-15 21:00:25.3428161UTC (18:00 local): tercer turno consecutivo NO PROGRESS por misma decisión de arranque pendiente, tras controles20:59:33/21:00:05/21:00:25UTC. Consulta nativa0 confirma mismo nombre/UUID/poweroff/StateChangeTime03:10:37UTC, NIC1null/cableoff/2–8none; HEAD0726de2/286dirty/indexempty preservados. No worker vivo ni verified-wait. update_goal BLOCKED confirmado, objetivo completo intacto y no achieved; no continuar sondeos indefinidos ni cambiar consentimiento de apagado por autoridad de arranque. Sin alternativa autónoma segura restante para QA dentro de VM apagada; gates externos de seguridad/CI/derechos/hardware continúan requiriendo autoridad/evidencia documentada. Owner debe confirmar si quiere volver a encender VM aislada; solo entonces comprobar mismo UUID y poweroff y arrancar una vez, luego escritorio/driver/API/licencia y QA archives existentes -dx11. No start/reset/red/seguridad/producto ni builds efectuados. HANDOFFready, M7 OPEN; al reanudar goal reiniciar conteo de bloqueo y verificar estado actual antes de actuar. Notas GoalACTIVE anteriores son históricas.
+1. Leer respuesta a preguntaasync de fit si existe. Todavía no recibida al cierre:
+   mantener4x4 yrediseñar barraca compacta, oampliar7x6 yverificar salida/nav. La
+   delegación artística NO aprueba footprint/spawn/mainmap/release automáticamente.
+2. Mantener todos los gates cerrados del adaptador ysu InitialCampPIE. No añadir
+   más tests de cubos como sustituto de integrar la malla real. Fullsuite anterior
+   fue142; el nuevo test solo tiene evidencia dirigida (familia3 PASS). No atribuir
+   un fullsuite143 ni render/player a estas pruebas NullRHI.
+3. Para integrar Camp03 REAL, considerar fit6.686x5.73m natural frente4x4. Si se
+   conserva4x4, preparar brief de arquitectura compacta paraGPT antes de generarla.
+   Si se aprueba7x6, Claude integra yprueba spawn/nav/placement/producción/selección
+   en privado antes de adopción. Sin cambios automáticos mientras falta decisión.
+4. Fixture privado anterior tiene DLL antigua sin adaptador; sus GPU/cook prueban
+   arte congelado, no la nueva ruta. Preservar cohortes previas al preparar runtime
+   nuevo. No repetir DCC/import/cook solo por cambiar de modelo ni tocar seguridad.
 
-- REVALIDACIÓN POSTAPAGADO2/3 — 2026-10-15 21:00:05.7732779UTC (18:00 local): turno previo y actual NO PROGRESS, misma decisión de arranque pendiente del owner. Consulta nativa0 confirma mismo UUID/poweroff/StateChangeTime03:10:37UTC y aislamiento sin cambios; HEAD0726de2/286dirty/indexempty. No proceso vivo que observar ni nuevo consentimiento; no startvm/reset/NAT ni repetición de gates correctos. Goal ACTIVE, aún no cumple tres turnos consecutivos de bloqueo tras el progreso del apagado. Sigue NEXT=C-018H_LocalVMSetup; responder a pregunta de arranque aislado ya formulada, sin completar M7/objetivo ni duplicar monitor.
+Archivos de este bloque: BuildingPresentationTests.cpp yreview/plan/HANDOFF.
+Seis runtimefiles byte-idénticos al cierre anterior (mutación solo temporal).
+Wrappers/evidencia nueva ignorada: Build05/06/07,Test03/04/05,Mutation01 source+JSON,
+Restored01.json,CloseInitial01.ps1,verified02.json. Native0 salvo negativo esperado255.
+Skills UEtesting/data/C++ guiaron RAII/GC yfactory real sin abrir headers privados.
+Sinfullsuite/IWYU/Shipping nuevos por código runtime intacto; noassets/maps/commits.
 
-- REVALIDACIÓN POSTAPAGADO1/3 — 2026-10-15 20:59:33.3272802UTC (17:59 local): turno anterior PROGRESS por apagado autorizado y checkpoint; este turno NO PROGRESS hacia QA. Consulta nativa0 con VBoxManage firmado confirma mismo nombre/UUID y poweroff, NIC1null/cableoff/2–8none; StateChangeTime persistido03:10:37.000UTC (la consulta inmediata original registró03:10:37.290UTC, no sustituir recibo). HEAD0726de2/286dirty/indexempty sin cambios. No VM ni monitor confirmados activos: no verified-wait. Sección M7 revisada de forma dirigida: falta driver/API/postboot y QA real; demás gates externos requieren autoridad/evidencia ya descritas, no repetir builds/auditoría para aparentar avance. Mantener apagada según última petición concreta; preguntar si owner quiere un arranque aislado para continuar. Sin startvm/reset/red/seguridad/producto. Goal ACTIVE, bloqueo de nuevo arranque pendiente de intención owner audit1/3; no marcar BLOCKED o completo en este turno. NEXT y footerready sin cambios.
+Archivos de este bloque sin commit: seis runtime files enumerados arriba,
+BuildingPresentationTests.cpp, nuevo M6_BUILDING_PRESENTATION_ADAPTER_REVIEW.md,
+IMPLEMENTATION_PLAN.md yHANDOFF.md. Wrappers/evidencia ignorados bajo Artifacts/
+C018H_BuildingPresentation1. Dirty previo (incluidos personajes/fuentes/docs) intacto;
+sin stage/commit/push. Últimos fallos Build01/02 resueltos, ninguna operación viva.
+M7seguridad/QAplayer/CI/rights yM8 siguen pendientes; goal ACTIVE, NO completo.
 
-- VIGENTE 2026-10-15 03:10:37.4624104 UTC (00:10 local): usuario «apaga forzxadamente»; apagado forzado SOLO RomanEmpireQA/UUID90bafe9d-68f9-4d02-8521-5f66a6a60b83 solicitado03:10:36.9013634UTC mediante VBoxManage firmado Valid/Oracle America, Inc. Preconsulta nombre/UUID correctos, running/VMStateChangeTime02:42:18.581UTC; NO reutilizar PID31452 histórico. controlvm poweroff EXIT0, postconsulta EXIT0 confirma poweroff/VMStateChangeTime03:10:37.290UTC. VDI08d4ac74.../DVD47612f43.../NIC1null+cableoff/NIC2–8none sin cambios. No startvm/reset/reinicio host ni cambio de seguridad/red; no operación propia pendiente. Posible pérdida de estado guest sin guardar; integridad del disco, escritorio, driver/API/licencia postboot NO verificados. Recibo ignorado VM_ForcedPoweroff1.json. Seis MD de estado actualizados; sin cambios de producto/motor/paquetes, builds o suites innecesarias. Última comprobación git286dirty/indexempty/HEAD0726de2 preservada. NEXT=C-018H_LocalVMSetup: confirmar con owner que desea volver a arrancar antes de startvm; si lo solicita, comprobar mismo UUID/poweroff y arrancar UNA vez aislada, luego escritorio/dxdiag/licencia y archives existentes -dx11. No volver a pedir permiso de apagado ya ejecutado ni repetirlo. QA-01–10 y fullM7 OPEN. STATE=ready significa relevo guardado y VM apagada, NO milestone completo. Todo estado running, espera/permiso de apagado y goal BLOCKED debajo es HISTÓRICO.
+### Receta del cook ya completada — histórica, NO NEXT
 
-### Historial previo al apagado autorizado (no estado actual)
+1. Leer skill unreal-packaging y solo secciones necesarias de cook_semireal_camp.ps1,
+   verify_cooked_camp.py/tests ydump_cooked_camp_registry.ps1. Hoy admiten Camp01/02:
+   agregar perfil explícito Camp03/v3 con SHA/30554tri anteriores, defaults intactos.
+2. Reusar GamePreview/193ContentFILES, SourceArtv3/14files; outputs NUEVOS en root3
+   Cook/<name>, sin copiar cook2.193hashes+source/config/descriptor antes/después.
+   Loosewriter/SM5+SM6 proceso-only, sin cambios engine/config/Zenservice/map.
+3. Native Runtime+Development registry dumps secuenciales de binarios ACTUALES;
+   archivos/clases/tri/tags/DevARhardGameclosure/6materialSM6/SM5+SM6archives reales.
+   Runtime deps stripped no implica ausencia de cargas; no recook para corregir lector.
+4. Preservar Camp01/02/03/sourceold/mainmap/baselines/autoridades. No reinstalarMCP,
+   reiniciarVM/playerbloqueado, cambiarWindows o sustituirDLLs. No preguntas delbrief.
 
-- AUDIT RECUPERACION3/3: consulta0 a2026-10-15 00:29:26.1184925UTC/captura VM_AdditionsRecoveryCheck3.png byte-idéntica a2/1/RebootWatch1 confirma MISMO Reiniciando/RunLevel1. Tres turnos consecutivos NO PROGRESS por misma decisión owner pendiente (00:27:10/00:28:23/00:29:26UTC). update_goal BLOCKED confirmado, objetivo completo intacto y NO achieved; M7 OPEN. VM31452/creation23:39:13.9103300UTC viva, NIC1null/cableoff/2–8none/286dirty/indexempty/HEAD0726de2 preservados. VMviva NO prueba progreso o watcher activo (28392 terminó), tampoco estado terminal por timeout. Sin alternativa autónoma segura restante dentro del invitado en shutdown; demás gates externos documentados requieren autoridad/evidencia. Owner elige seguir esperando o autoriza apagado forzado SOLO VM+arranque/riesgo estado guest no guardado; ningún reset/poweroff/otrostart/reinstall/red/security efectuado. Solo nota y captura3 ignorada/diffdirigido; no repetir suites/ISO/NAT ni sondeos indefinidos. Al reanudar comprobar MISMO UUID/PID/log/pantalla y resetear audit si goal fue reanudado. Footerwaiting refiere guest sin resolver, NO monitor nuevo ni una nueva operación autorizada; hashes MD de VM_GuestAdditionsClosing1 históricos. No actuar sobre consentimiento NAT antiguo como permiso de apagado forzado.
-- CIERRE VIGENTE00:23:30.0441706UTC: monitor74097 TERMINAL0, PID28392 ausente, log terminado00:22:32.6234715UTC/nueve muestras todas VM31452running/RunLevel1/7.2.20r175154; capturaVM_AdditionsRebootWatch1.png AÚN «Reiniciando». No otro worker pendiente, pero operación NORMAL de reinicio guest no completada: mismaVM31452/CIMcreation23:39:13.9103300UTC confirmada viva y aislamiento/DVD47612f43.../clipboard-dragdropoff verificados0. Más de10min desde Finish, NO prueba de proceso muerto ni permiso implícito de reset. Owner debe elegir seguir esperando o autorizar APAGADO FORZADO SOLO VM+arranque (riesgo estado guest no guardado); no ejecutar esa recuperación antes de respuesta. No reinstalar/otrostart sobre VMviva ni desactivar protecciones. Esta fase no verifica driver/API/player ni licencia postreboot, último LicenseStatus1 previo sigue evidencia histórica válida. Goal ACTIVE: progreso fuente/wizard y observación real, no blocked ni complete en este bloque. SeisMD+watcher/log/15capturas/VM_GuestAdditionsClosing1.json;286dirty/indexempty/HEAD0726de2 preservados, pruebasproducto previas reutilizadas/no build/cook/WindowsHost change. Footerwaiting se refiere a VM31452 y rebootguest, NO al monitor28392 ya terminado; siguiente cliente inspecciona MISMO PID/log/pantalla antes de actuar. Todo «watcher activo»/NEXTFinish/instalar de secciones siguientes HISTÓRICO.
-- CHECKPOINT ACTUAL GuestAdditions: ISO oficial7.2.20 y EXE guest verificados, wizard completado (Install6) y Finish/RebootNow normal solicitado00:12:17.6215886UTC. No reset/poweroff ni hostreboot. Al último nativecheck00:19:01.8267576UTC mismaVM31452/creation23:39:13.9103300UTC running, GuestAdditionsVersion7.2.20r175154/RunLevel1/BaseDriver50/GraphicsMode0; NO userland/desktop/driver3D/API aprobados. GUI sigue «Reiniciando», log último00:12:27UTC; CPUvivo no prueba que completó. No declarar terminal/no reiniciar por observación vencida. Watcher READONLY GuestAdditions_RebootWatch1.ps1, PID28392/creation2026-10-15 00:20:29.6189483UTC/session74097/log GuestAdditions_RebootWatch1.log,9muestras15s con captura finalVM_AdditionsRebootWatch1.png; observar MISMO handle/PID antes de otro monitor. Si proceso termina no inferir exit por ausencia, registrar resultado real. STATEwaiting al cierre mientras VM/guest reinicia; no verified-wait por GUIidle sino reinicio específico solicitado/proceso vivo comprobado.
-- SCOPE/DECISION: usar instalación offline firmada y reinicio normal está autorizado por setup VM; APAGADO FORZADO/reset NO autorizado. Si sigue sin completar y requiere recuperación con pérdida posible de estado guest, solicitar decisión owner (esperar o apagado forzado solo VM), no desactivar VBS/SAC/Defender/CI/SecureBoot ni cambiar hardware/3D/downgradear. Primarychangelog webfetch402 no permitió corroborar bug; búsquedas no establecen causa ni parche, no inferir de reportes de otro OS. No duplicar installer8860, no NAT/otraactivación, sharedfolders/clipboard/dragdrop siguen bloqueados. Próximo tras escritorio: dxdiag DISPLAY/featurelevels+driver real y licencia; luego archivesexistentes -dx11, baselineDX12/fullM7 intactos. Goal ACTIVE, PROGRESS por fuente/wizard/baseversion y luego verifiedwait; M7/security/CI/rights/performance OPEN. VM_GuestAdditionsClosing1.json y6MD preservan cierre; evidencia anterior deDVDWindows/PID36464/GoalBLOCKED/«iniciarinstalador» HISTÓRICA.
-- VIGENTE ESPERA REBOOT: Finish/RebootNow enviado0 a2026-10-15 00:12:17.6215886UTC para reinicio NORMAL solo Windowsguest, sin VBoxreset/poweroff ni hostreboot. CapturasReboot1/2/3 siguen «Reiniciando»; última00:15:58.8071643UTC. Misma VM31452/CIMcreation23:39:13.9103300UTC viva, CPU+50.016s en25s; VBox.log160162bytes/lastwrite00:12:27.4867602UTC, últimas líneas WDDM iniciado antes de shutdown/advertencias resolución/VBOXNPdeviceerror2 no diagnostican fracaso completo. GuestAdd/Version y Revision todavía NoValueSet0, no instalador/driver API aprobados por esto. Guard inicialGetProcess.StartTime comparación exacta falló1 protegido por precisión100ns (.9103307Z vs CIM.9103300Z); verificación CORREGIDA usando MISMA API CIM coincide exacto0, no PIDreuso ni guard debilitado. Observer34977/5781 TERMINALES0, ningún monitor duplicado; el backend VM/reboot sigue vivo, NO reiniciar solo por timeout ni llamar idle/dead. NEXT observar misma VM/log/property y recuperar desktop antes de dxdiag/licencia; si requiere recuperación destructiva, pedir autoridad en vez de resetear/sortear protecciones. Datos «NEXT Finish» anteriores históricos; footerwaiting si se cierra mientras continúa esta transición.
-- GuestAdditions installer guest8860/creation2026-10-15 00:08:10.6316441UTC iniciado una vez con hash/firma/publisher/version guards y sin otroinstaller activo; observer37263 TERMINAL0. Wizard Welcome→ubicación por defecto guestC:/Program Files/Oracle/VirtualBox Guest Additions→componentes GuestAdditions y Direct3D CHECKED→Install normal, sin EULA/credenciales/rootcertmanual/security changes. Captura5 mostró VBoxGuest INF/service successful (solo etapa), captura6 a00:11:28UTC muestra Completing/needs restart con RebootNow seleccionado, NO fallo. QueryGuestAddVersion todavía NoValueSet no prueba ausencia. NEXT finalizar Finish para reinicio NORMAL SOLO invitado y luego comprobar versión/driver/API/licencia/aislamiento; no reset/poweroff/restart host, no repetir instalador. GuestAddDVD47612f43... siguemontado; userISO intacta. Handoff previo que dice iniciar instalador ya HISTÓRICO.
-- BLOQUE ACTUAL GuestAdditions offline: mismaVM31452/running/NIC1null+cableoff/2–8none/VBoxSVGA256MiB3Don. ISO local C:/Program Files/Oracle/VirtualBox/VBoxGuestAdditions.iso53151744bytes SHA4c6ba898e37b307cf9088be8ff480d9aec13bb0e395aaf31c78d564bb35916e7 coincide EXACTAMENTE con fila oficial VBoxGuestAdditions_7.2.20.iso de HTTPS download.virtualbox.org/virtualbox/7.2.20/SHA256SUMS(nativeGET200/2959chars); no nueva descarga ISO. webfind no mostrófila pero nativeGETsí, no ausencia inferida. TarISO listing1/Rockridge no soportado, sin extracción/mount/installer en HOST/instalar otro lector. DVD SATA1 reemplazado0/query0 a2026-10-15 00:03:06.1359276UTC por GuestAdditionsUUID47612f43-7f5a-4a00-a943-f31d9d4f5a38; WindowsISO995cb764... permanece intacta en Downloads y ya NO está montada. No repetir guard viejo de mediaUUID Windows como estado actual.
-- Provenanceguest completa: VM_AdditionsSource2.png/QA_ADDITIONS_SOURCE_DONE, D:/VBoxWindowsAdditions-amd64.exe FileVersion7.2.20, AuthenticodeValid/Oracle America, Inc., SHA12b0658d1b66c70502e8c5e707597ea38fc3c6192fb04751c7232b5808c17b7c. Observer21044 TERMINAL0; captura1 era parcial ANTES de hash, captura2 completa. Pantalla negra inicial fue display dormido, Shift normal recuperó MISMA consola Admin sin login/credenciales, NO crash/reboot. NEXT inmediato: iniciar SOLO instalador guest con esos guardhash/firma/publisher/version y observar wizard; no EULA/credenciales ni certificados/rootstore manual/MemoryIntegrity/VBS/Defender/SAC/CI cambios. No reconectar red ni ejecutar juego. Al cerrar sustituir por resultado real, guardar PIDguest/log/capturas/driverreboot si hay proceso vivo. Todo NAT/GoalBLOCKED posterior en este documento histórico.
-- VIGENTE/CERRADO NATAUTORIZADO: owner «si dale autorizo» permitió NAT temporal/activación oficial/restaurar aislamiento. Única ventana23:44:27.2553423→23:45:32.4461757UTC,65.19s observados en3capturas20/40/60, NAT sin bridge/hostonly/port-forward/localhostreach. Restauración nativa0: nic1NULL + cableOFF, NIC2–8NONE, VMGUIrunning; esto AISLA pero NO es bit-idéntico a nic1none inicial (NIC hardware ahora presente). Verificar mismoestado, no exigir none ni reconectar por error. Worker39804/creation23:44:19.1733177UTC ausente/transcript final normal; último handle82663 Unknownprocessid DESPUÉS de salida completa de limpieza, exitcode del worker NO capturado/no inventar0. Nativecommands guardados pasaron; no proceso de activación/NAT propio en marcha.
-- LICENCIA TECNICA VERIFIED OFFLINE: VM_NATStatus1.png23:51:21.6515648UTC, consola Admintrue, EnterpriseEval1registro, LicenseStatus1(Licensed), Reason1074068484 sin interpretación adicional, GraceMinutes129594(~90d), EvaluationEndDate1600/1601 no útil. QA_ACTIVATION_STATUS_DONE confirma consulta completa MÁS DE5min después de cortar NAT. Activación automática por Windows durante ventana; NO método Activate/slmgr llamado por agente ni claves/cuenta/contratos/servidor custom/rearm/date/seguridad cambiados. NAT_OfficialActivation2.ps1 fue preparado PERO NUNCA EJECUTADO, sin log2/capturaresultado2; ahora throw inicial DISABLED para impedir segunda conexión innecesaria. No tomar reason no-cero o watermark26100 como fallo de estadoLicensed/versión Winver26300.9457; seguir registrando valores sin inferir derechos comerciales o90d ya consumidos.
-- ENTORNO ACTUAL: mismaUUID90bafe9d.../ISO995cb764.../VDI08d4ac74..., PID31452/VirtualBoxVM.exe/creation2026-10-14 23:39:13.9103300UTC/log+CIM. Bootoffline88824 TERMINAL0; captura24810 y consulta83093 TERMINALES0. UAC normal Verified Microsoft Windows/Hostventanaconsola aprobado dentro del permiso de activación, sin credenciales ni bypass; retraso de UAC y overlays Start/Run/QuickEdit produjeron aparente falta de entrada, NO guest crash/protección bloqueando PowerShell demostrados. AltTab/Esc restauró foco; transporte LAA/B64 alfanumérico como antes. Consola QA queda idle y VMintencionalGUI running, no job esperando ni verified-wait indefinido.
-- NEXT VIGENTE=C-018H_LocalVMSetup: licencia técnica ya resuelta; NO volver a pedir permiso NAT ni ejecutar helper1/2/activar/rearmar/recrear/reinstalar/reverificarISO. Mantener nic1null/cableoff/NIC2–8none, clipboard/dragdrop/sharedfolders/USB y seguridad intactos. Siguiente: verificar medio GuestAdditions instalado con VirtualBox y procedencia, instalar driver/additions apropiados offline por flujo firmado/UAC normal si corresponde; comprobar versión real/driverD3D11/featurelevel y luego existingarchives -dx11, SIN recook/baselineDX12 sustituido. Antes de acción comprobar mismoUUID/estado/PID/log, no repetir start/reset sobre VMviva. No player todavía ni aceleración calificada (último BasicDisplay10.0.26100.1); M7/securityQUIC-SSL-curl/CI limpio/derechos/performance OPEN. SeisMD de estado yhelpers/log/capturas/VM_ActivationClosing1.json ignorados;286dirty/indexempty/HEAD0726de2 preservados, no cambios producto/engine/paquetes/hostsecurity/remoto. Datos previos debajo HISTÓRICOS, incluidos permisos NAT pendientes y GoalACTIVE anteriores. Footerready=contextoguardado, NO driver/player/M7/objetivo completos.
-- NAT1 REAL terminado: user autorizado, nic1nat/linkon23:44:27.2553423UTC→aislamiento23:45:32.4461757UTC (65.19s, tres capturas20/40/60). Worker39804/creation23:44:19.1733177UTC ya ausente, transcript final normal. Session82663 último wait dio Unknown process id después de mostrar limpieza completa, NO inventar exitcode0 ni reanudar/repetir helper1; aislamiento actual native0 nic1null/cableoff/NIC2–8none. UAC tardío Verified Microsoft Windows/Host de ventana de consola aprobado normalmente dentro del intento oficial autorizado, sin credenciales/securitybypass; consola Admin confirmada. Superposiciones Start/Run y selección QuickEdit corregidas por AltTab/Esc, no guest crash probado. Se prepara NAT_OfficialActivation2.ps1 one-shot separado, método oficial SoftwareLicensingProduct.Activate solo registro EnterpriseEval único y Admintrue, timeout25s, captura+finallyaislar; NO ejecutar hasta confirmar consulta readonly/prestatus de consola admin. APIgoal sigue último BLOCKED; nuevo permiso permite este bloque, no redefinir objetivo ni falsear ACTIVE.
-- NUEVA AUTORIZACION owner «si dale autorizo»: NAT temporal + intento de activación oficial + restaurar aislamiento, sin claves/credenciales/servidores alternativos/rearm/date/security changes. APIgoal devolvió BLOCKED previo al bloque, no existe setter active; NO afirmar get_goal ACTIVE hasta producto lo reanude. Trabajo actual autorizado por mensaje nuevo. VM encontrada poweroff20:58:06UTC; preparación offline nic1null/cableoff/nat-localhostreachableoff y startGUI0/query0 a23:39:37.8755255UTC, observer88824 TERMINAL0. PIDACTUAL31452/creation23:39:13.9103300UTC/log+CIM, antes36464 histórico. Capturas Before2 escritorio/expiry; después reloj20:41 no avanza y WinR/CtrlEsc no muestran respuesta aunque host process Respondingtrue, NO guest-UI-ready probado. No credenciales ni EULA tocadas. Se prepara one-shot NAT_ActivationWindow1.ps1 con try/finally: una ventana nominal60s en3observaciones20s, luego cableoff+nicnull (o nicnone si poweroff), consulta autoritativa; NO activar éxito inferido de red. Script/log/capturas bajo Artifacts/VMSetup/WHP_Enable_1 ignorados. No ejecutar player ni dejar NAT activo al cerrar; observar mismo worker/log antes de otra ventana. Al terminar sustituir esta nota por resultado real, conservar permiso y limitaciones.
-- VIGENTE/GPT PROGRESS: al reanudar VM poweroff desde2026-10-14 19:01:51UTC; firma Valid/Oracle y guard poweroff, UNA puesta en marcha de mismaUUID0/query0 a19:07:48.3127698UTC, observer61476 TERMINAL0. VM_LocaleScreen1.png a19:10:34.7466992UTC muestra ESCRITORIO Windows, NO OOBE: el agente NO eligió región/teclado/cuenta/condiciones. Winver1 confirma26H2/build26300.9457, coincide con ISO; watermark contiene build26100 antiguo y NO es versión autoritativa. PIDACTUAL36464/VirtualBoxVM.exe/creation19:07:39.5138140UTC, VBox.log/CIM; PID12900/32756 anteriores históricos. MismaUUID90bafe9d.../ISO995cb764.../VDI08d4ac74.../NIC1–8none. Goal ACTIVE/freshstreak0 por nueva evidencia, M7/security/CI/rights/performance OPEN; owner tuvo progreso externo, no asumir aceptación/licencia válida solo por escritorio.
-- Diagnóstico readonly guest COMPLETO (VM_ReadOnlyDiagnostics1.png19:20:57.9032534UTC, QA_DIAGNOSTICS_DONE): OS Windows11EnterpriseEvaluation10.0.26300; un registro EnterpriseEval, LicenseStatus5(Notification), Reason3221549065=0xC004F009, GraceMinutes0. EvaluationEndDate informado12/31/1600 21:00:00 (local): NO fecha útil de vencimiento ni prueba de90d consumidos. Driver «Adaptador de pantalla básico de Microsoft»10.0.26100.1; no VBoxWDDM/feature-level/RHI/GuestAdditions efectivo aprobado. Eventquery1074 completo (VM_ShutdownDiagnostics1.png19:28:11.0562840UTC, QA_EVENT_QUERY_DONE): dos eventos guest UTC13:48:26.7304785/12:41:38.8326496, proceso basenamewlms.exe, reason0x80000000, comentario contiene licencia/expiry; solo campos permitidos, sin identidad/claves/comentarios raw. NO correlacionar esas horas directamente con últimos poweroffhost19:01/17:42. Microsoft EvalCenter advierte apagados horarios por falta de activación o evaluación expirada; no atribuir automáticamente todos los cierres al owner ni tratar reinicio repetido como reparación.
-- Transporte corregido: WindowsguestESP/LAA, VBox keyboardputstring USA convierte '-' en apóstrofe; primeras aperturas PowerShell/NoLogo etc se cerraron por flags mal escritos, NO Windowssecurityblock demostrado. Run capturado lo confirmó. Conhost.exe powershell.exe sinflags abre; consultas propias solo lectura enviadas UTF16LE/Base64 validado ALFANUMÉRICO sinpadding y guiones LAA scancode35/b5. No SetExecutionPolicy, teclado/layout cambiado, Clipboard habilitado, elevación, activación/rearm/datechange/seguridad. Nativeinput/capturas0; observers57191/48032/7883 TERMINALES0, guest sentinels completos; consola QA queda idle, NO job automático. Captura8/Resume6 no creadas por poweroff guard, no reintentar ver archivos ausentes.
-- NEXT VIGENTE=C-018H_LocalVMSetup, TO=CLAUDE cuando owner cambie: pedir autorización para NAT TEMPORAL de esta VM y solo vía oficial de activación de evaluación; éxito/eligibilidad NO garantizados, no comprar/aceptar nuevos contratos/usar credenciales por owner. NO conectar red ni activar/rearmar/cambiarreloj antes de respuesta. Si autoriza, comprobar mismaUUID/estado/PID antes de actuar y restaurar aislamiento antes de TODO QA; si apagada mientras licenciaHOLD, no bootear repetidamente sin nuevo input. Tras licencia legítima verificada, GuestAdditions/driver3D firmado+APIreal y -dx11 existingarchives antes de recook, baselineDX12 intacta. VMGUI36464 running al cierre para owner; no juego, Additions/install/NAT, reinstalar/formatear/rehashISO, motor/cook/paquetes/remoto alterados. SeisMD de estado y9capturas/VM_DesktopQualification1.json ignorados;286dirty/indexempty/HEAD0726de2 preservados. Datos OOBE/audits siguientes HISTÓRICOS, no heredar bloqueo3 tras progreso real; footerready=contexto guardado, NO Windowslicenciado/driver/player/M7/objetivo aprobados.
-- Audit vigente OOBE3/3: 2026-10-14 17:52:58.7670545UTC, consulta VM0 y captura VM_ResumeScreen5.png byte-idéntica a capturas4/3/2 (SHA761dcae1eecbe8679cc8f481832af566ba7651da96e8ecef1d5725240b7dd391) confirman MISMO OOBE país/región. Tres turnos consecutivos NO PROGRESS (observaciones17:51:30/17:52:16/17:52:58UTC) por mismo input personal owner, NO verified-wait/job por GUIidle. update_goal BLOCKED confirmado, objetivo intacto/no completado; M7 OPEN. MismaUUID/running/ISO/NIC1–8none/286dirty/indexempty/HEAD0726de2. PID12900/VirtualBoxVM.exe/creation17:47:40.0822230UTC confirmado vivo; VMGUI intencional abierta, ningún instalador automático o comando pendiente. Solo nota y captura5 ignorada; no teclas/restart/reset/red/cuenta/terms/seguridad/player/tests/build/cook ni alternativa autónoma autorizada; gates externos documentados sin cambio. NEXT owner elige país y teclado, avisa si pide red/cuenta sin credenciales; no sondear indefinidamente ni crear trabajo cosmético. Al reanudar comprobar MISMA VM/pantalla/proceso y resetear auditoría si goal fue reanudado. VM_OobeResume1 hashes MD históricos anteriores a estas notas; footerready significa contexto guardado, no Windows/QA/M7/objetivo aprobados.
-- VIGENTE: PROGRESS2026-10-14 17:49:07.2975734UTC, VM_ResumeScreen2.png confirma Windows OOBE «¿Es el país o región correcto?» (España seleccionada), NO pantalla WinPE de idioma anterior. Al reanudar, misma VM estaba POWERED OFF desde17:42:04UTC/proceso antiguo ausente y VDI64GiB crecido a17899MiB físicos (antes casi vacío); esto NO probaba instalación completa. Sin recrear/resetear nada, VBoxManage Valid/Oracle verificado y startvmGUI autorizado SOLO después de poweroff guard confirmado; native/query0 a17:47:55.3859015UTC, observer99527 TERMINAL0. Se dejó expirar CD gate SIN teclas y se observó boot Windows→OOBE; capturas1/2 nativas0, observer40727/97172 TERMINALES0. PIDACTUAL12900/VirtualBoxVM.exe/creation17:47:40.0822230UTC asociado por VBox.log ProcessID y CIM; PID32756 de bloques anteriores NO reutilizar. MismaUUID90bafe9d.../ISO995cb764.../VDI08d4ac74.../NIC1–8none. Guest OS/Product y Additions/Version cached properties «No value set» NO prueban ausencia ni driver. Ninguna región/teclado/cuenta/términos elegidos por agente, sin NAT/OOBEbypass/Additions/player/seguridad/paquetes/motor/UE changes. Goal ACTIVE/freshstreak0 por nueva evidencia real; M7/security/CI/rights/performance OPEN. Envoltorio inicial intentó ver captura8 inexistente después de guard poweroff que omitió captura: error local observado, no native failure/ISO defect; captura8 NO creada. Nuevos: VM_ResumeScreen1/2 ignoradas, cierre VM_OobeResume1.json y4MD de estado;286dirty/indexempty/HEAD0726de2 preservados.
-- NEXT vigente C-018H_LocalVMSetup, TO=CLAUDE cuando owner cambie: preservar VMGUI RUNNING/PID12900+creation/log, NO reset/otrostart/reinstalar/formatear/rehashISO. Owner completa país/región y teclado reales, revisa condiciones/cuenta personalmente; no pedir credenciales ni capturar campos personales. Si OOBE exige red, pedir decisión sobre vía legítima antes de conectar NAT; no bypass ni cambios de seguridad, aislar ANTES QA. Al llegar al escritorio, verificar versión/estado real del guest y GuestAdditions/driver/API con procedencia; después -dx11 existing Dev/Ship archives antes de recook, sin sustituir baselineDX12. No owner aprobación de licencia/QA ni Windows listo inferidos de OOBE. VM_PostRebootBoot1 y VM_BootRecovery1 conservan evidencia histórica; no usar sus capturas como estado vigente. Resto de auditorías debajo HISTÓRICAS; no heredar blockedstreak3 tras progreso actual.
-- Audit de bloqueo3/3, 2026-10-14 16:15:15.2385688UTC: consulta nativa0/captura VM_InstallerScreen7.png confirma mismo Windows11 Setup en idioma, SIN avance ni job de instalación. Proceso32756/VirtualBoxVM.exe/creation15:25:20.4916270UTC vivo; UUID90bafe9d.../ISO995cb764.../NIC1–8none/286dirty/indexempty/HEAD0726de2 intactos. Tercer turno NO PROGRESS por el mismo input owner pendiente, NO verified-wait por GUIidle. update_goal BLOCKED aplicado; objetivo completo no achieved ni redefinido. No alternativa autónoma autorizada restante: QA necesita invitado instalado/condiciones personales; candidato motor real/CI limpio/derechos/hardware requieren evidencia/decisiones externas ya documentadas. VMGUI queda abierta, no reset/relaunch/terms/security/player/build/tests/cook/ISO checks. Nuevos solo captura7 ignorada y cierre HANDOFF. NEXT owner pulsa Siguiente/elige teclado/revisa condiciones personalmente y envía pantalla posterior; al retomar comprobar misma VM/pantalla/proceso antes de actuar y resetear audit de bloqueo si objetivo reanudado. Footerready=contexto guardado, NO objetivo/Windows/M7 completos ni una operación desatendida en marcha.
-- Audit de bloqueo2/3, 2026-10-14 16:14:18.1585156UTC: consulta VM0/captura6 confirma MISMA pantalla idioma, sin instalación en curso; mismaUUID/ISO/NICoff y286dirty/indexempty/HEAD0726de2. Anterior y actual NO PROGRESS; input owner pendiente sigue siendo el mismo bloqueo, no verified-wait. Goal ACTIVE (umbral aún no alcanzado), M7 OPEN. No hay alternativa autónoma restante autorizada: player necesita invitado instalado/condiciones personales, actualización motor real/CI limpio/derechos/hardware siguen decisiones externas documentadas. No generar tareas cosméticas ni repetir suites/ISO/cook/firmware. Solo HANDOFF y captura6 ignorada; NEXT owner Siguiente/teclado/condiciones/avisar. Preservar VMGUI running; no reset/startvm.
-- Observación vigente2026-10-14 16:09:01.6006495UTC: VM_InstallerScreen5.png confirma idioma Win11 Setup SIN avance desde captura4; consulta nativa0 mismaUUID/running/ISO995cb764.../NIC1–8none. Turno anterior PROGRESS (recuperación); ESTE turno NO PROGRESS, primer turno consecutivo de input owner pendiente, NO verified-wait de instalación (GUIidle no job), goal ACTIVE. Sin teclas/restart/reset/terms/player/build/test/remote changes;286dirty/indexempty/HEAD0726de2 preservados. Próxima acción requiere owner: Siguiente→teclado→revisar condiciones personalmente y avisar pantalla posterior; no afirmar instalación ni contar el relevo como progreso. Nuevos: captura5 ignorada y esta nota; checkpoint anterior VM_BootRecovery1.json conserva hashes históricos anteriores a esta nota. No repetir sondeos sin nueva interacción salvo audit de bloqueo requerido.
-- Reanudación GPT: PROGRESS por recuperación de arranque comprobada. Consulta16:00UTC confirmó misma UUID, ISO995cb764..., NIC1–8none y proceso32756/creation15:25:20.4916270UTC; captura VM_InstallerScreen3.png mostró firmware/CD timer vencido, NO el instalador de la observación anterior. No atribuir causa ni tratar captura histórica como pantalla actual. Enter→BootManager→UEFI VBOX CD-ROM→Space, comandos nativos0, sin reset/startvm/bootorder/format/términos; VM_InstallerScreen4.png a16:06:37.7789404UTC confirma Windows11 Setup Español abierto de nuevo. Observer79279 TERMINAL0; no instalación desatendida ni player. Owner continúa Siguiente/teclado/condiciones personalmente; si modal host reaparece, Cancelar solo aviso, no montar/reintentar. VMGUI queda RUNNING, preservar disco/ISO/aislamiento y comprobar pantalla actual antes de inyectar cualquier tecla. Gates M7 OPEN y bloqueo de seguridad/CI/derechos/rendimiento intactos; no repetir verificadores ISO/builds/tests del producto.
-- Aviso GUI owner revalidado15:47:13.9432980UTC: captura enviada muestra modal host VirtualBox de primer timerCD vencido; consulta actual0 prueba VMrunning/ISO995cb764adjuntada y VM_InstallerScreen2.png confirma WinPE idioma YA abierto. Indicar CANCELAR solo ese aviso obsoleto, NO montar/reintentar/otrostart/reset. Luego configuración idioma/teclado y condiciones por owner. Sin cambios/inyección de teclas ni aceptación términos en esta comprobación; no diagnóstico de ISO faltante ni otro reinicio necesario.
-- Último bloque post-reinicio/GPT PROGRESS: hostBoot2026-10-14 08:19:55.500UTC (ya posterior a WHPenable), WHP1/hypervisortrue; NO pedir otro reinicio ni repetir enable/mediahash/attach. VMexistente90bafe9d-68f9-4d02-8521-5f66a6a60b83 GUI iniciada0/query0 a15:25:29UTC, ISO995cb764... conservada; WinPE Windows11 Setup idioma Español visible en VM_InstallerScreen1.png a15:30:12UTC, NO Windows instalado/licencia aceptada/player. TimerCD inicial venció, navegación legítima UEFI BootManager→CDROM→unaSpace, sin reset ni security/bootorder/diskformat/terms changes. VM INTERACTIVA permanece RUNNING para OWNER, PID32756 VirtualBoxVM.exe/creation15:25:20.4916270UTC, log Artifacts/VirtualMachines/RomanEmpireQA/Logs/VBox.log/ProcessIDline13, NEM HypervisorPresent1/partition created; último check15:35:39UTC. CIMCommandLine no disponible en3procesosVBoxVM (guardinicial1); asociación corregida por log propio+PID/CIM0, sin elevar/relaunch. Nativeboot/screenshot helpers TERMINALES0, no copy/install job automático; pantalla observada espera input del owner, NO contar GUIidle como verified-wait/progreso indefinido. Configactual4fff03910e0e60997f118f77e3aea86f3f7aa4445778fbadb9c93d2aee28a553;8GiB4CPU/NIC1–8none/clipboard-dragdropdisabled/C63.62GiB. VM_PostRebootBoot1.json y6capturas nuevas/closing ignorados,6MD estado; pruebasproducto anteriores reutilizadas. GoalACTIVE/streak0 por reinicio/boot real; M7/security/CI/rights/performance siguen OPEN. Footerready=contextoguardado/bootopterminada, NO VM apagada; preservar ventana actual, no StopProcess/otrostartvm/reset ante input pendiente.
-- Último bloque ISO/GPT PROGRESS TERMINADO (2026-10-13 local/2026-10-14 UTC): Español x64 EnterpriseEval NO LTSC en Downloads/26300.9457.260913-1737.26h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_es-es.iso,8228114432bytes/SHA8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584 estable. Comparación COMPLETA oficial:4rangos contiguos HTTP206/ETag fijado con SHA256local=remote para TODOS los8228114432bytes+hash local final estable; observer23577 TERMINAL0/614.05s a02:30:34.6666689UTC. ISO_FullCoverage1.json + transcript ISO_ParallelVerify1.log prueban contenido igual al CDN Microsoft, NO checksummanifest separado/ETag-as-SHA/licencia/OSruntime. Script SHA73a91797a7888c4d9185312a162ed317f26c30f2cdf66ed2fb0a7440cdfcb126, parent32680/child29392-16160-7948-25524; no reanudar verificador completo ni descargar otra copia. Primera lectura secuencial30396/session34763 cancelada de forma explícita por lentitud/bound15min; stop0/observer-1/última1734958215bytes322.9s, ISO_SequentialCancelled1 conserva error; VerifyWindowsISO HEAD timeout1 después de HEADISO200 conservado en ISO_LocalAndSource1. ISO ADJUNTADA a VMexistenteUUID90bafe9d-68f9-4d02-8521-5f66a6a60b83, SATA port1/device0, mediaUUID995cb764-5469-4450-912b-f9982418ca3c, storageattach0/query0 a02:32:18.3363565UTC/VMpoweroff. Configguardantesdfb5375f...→actualed50a0ad73cae5ef1adacb1534a866e2b286f2bd461b382bfc549503ac8227c4; ISO_Attachment1.json. No mover/borrar ISO Downloads mientras esté adjuntada; no VM/disco recreados, OS/player/terms/registro ejecutados, reboot/security/motor/game/config/cook/archive/remoto cambiado. Último host boot2026-10-10 21:04:22.500UTC/WHP1, reinicio MANUAL pendiente. Streak0/nuevo progreso real; M7/patches/CI/rights/performance OPEN. Tools/recibos/log ignored,4MD de estado actualizados; no tests/build/cook de producto por cambio de medios. Cerrar con ISO_SetupClosing1.json; procesos terminales, no handles/jobs en marcha.
-- Bloque ISO2026-10-13 19:12:20UTC/GPT: owner «podes conseguir la ISO?» autoriza buscar/obtener medios oficiales, NO registrar sus datos ni aceptar condiciones. Vía oficial Enterprise encontrada hasta formulario REAL https://info.microsoft.com/ww-landing-windows-11-enterprise.html (enlace DownloadISO del EvalCenter redirige allí); Microsoft exige registro previo/evaluación90dias orientadaIT-organizaciones. PROGRESS solo resolución de ruta/siguiente acción, NO ISO descargada/licencia aprobada; streak0 por evidencia nueva. Abrir navegador con Start-Process URL rechazado por policy ANTES de ejecutar, sin PID/exit nativo; no workaround. Owner debe abrir enlace/completar registro si corresponde y avisar (no claves/credenciales), luego obtener Español x64 por enlace oficial y verificar identidad/tamaño/hash disponible; no confundir hashes Home-Pro con Enterprise. Preflight shell0 C64.27GiB libres/boot2026-10-10 21:04:22.500UTC;286paths/HEAD0726de2/indexempty. Goal ACTIVE/M7 OPEN; no download/job/verified-wait/VMboot/install/reboot/security change. Recibo nuevo Artifacts/VMSetup/WHP_Enable_1/ISO_SourceSelection1.json. Históricos previos conservados; NEXT registro owner + ISO/verificación y reinicio manual, no re-enable/terms/OOBE bypass.
-- Último bloque C-018H_LocalVMSetup/GPT, PROGRESS: HypervisorPlatform habilitado2→1 mediante DISM firmado Valid/Microsoft Windows y UAC normal, SOLO esa función (/NoRestart /LimitAccess, sin /All). PID42500 iniciado16:09:10.7396016UTC, TERMINAL native3010 capturado del Process original, shell0. Reinicio MANUAL pendiente; NO auto-reboot/re-enable. Consulta16:09:58.2875831UTC shell0: feature1/hypervisortrue/boot2026-10-10 21:04:22.500UTC, PIDgone/VMUUID existente poweroff/DVDempty. Recibo Artifacts/VMSetup/WHP_Enable_1/EnableFeature1.json; log3bytes no prueba independiente. No guest/player/ISO/license acceptance/security-protection disabling/game-engine-config-cook-archive-remote change. Goal ACTIVE/M7 OPEN; progreso real, streak0; sin operación propia viva.
-- Último bloque C-018H_VMGraphicsQualification/GPT, PROGRESS (previoVM tambiénPROGRESS/no blockedstreak). ShaderQualification1 SHA00928136b2b6b7dd9a595064dbbf0ba551f5f9d0a1af77963d8f69c3ff5d0a71:31inputhashesbeforeafter/freshrevalidation0 y10containers actuales coinciden pinnedQAmanifests; Dev/Ship YA contienen Global/proyectoSM5libraries109728/41696bytes,2IOlibraries+566ShaderCode/1210rows, Globalcache+2stinfo Pak1737/1730, packagedBaseEngine targetsSM5 D3D11Y12. Nuevaacción: calificar EXISTINGarchives con -dx11 en guestaprobado/driverD3D11 ANTES de considerar otrocook; no defaultRHI/config/archiveschange ni prueba de runtime/defaultDX12/performance/rights/security. WHP2/VMpoweroff a15:59:46UTC; evaluaciónISO/licencia owner siguependiente. Collector28350 TERMINAL0; primeraexportJSON truncada por metadatosGetContent/Providergraph, NO rawpersisted; solo31scalarrecords recuperados, resumen scalar0/revalidation0/recibo create-only. No handle/job pendiente. Skill unreal-packaging completa aplicada: cook!=player. DetallesVM previos siguientes son reutilizables/históricos, no rerun.
-- Bloque actual: C-018H_LocalVMSetup, GPT, PROGRESS. VirtualBox7.2.20 INSTALADO/signatureValidOracle/--version0+registry7.2.20; minimal sinUSB/networkdriverkeys/ExtensionPack. RomanEmpireQA registradaUUID90bafe9d-68f9-4d02-8521-5f66a6a60b83, poweroff/8GiB4CPU/64GiBVDIdynamic(UUID08d4ac74-5db6-40ea-a124-a7e1e265e785,2MiBreal)/EFI-TPM2-SecureBoot/NIC1–8none/clipboard-dragdrop-disabled/no sharedfolders. Ruta Artifacts/VirtualMachines/RomanEmpireQA, ignorada. NO ISO/OS/player run. User ISO/licencia: «no, creo que no». VM_SETUP.md identifica evaluación oficial Enterprise90dias/registro/eligibility/terms/expiry, propuesta NO autorizada/descargada/registrada/activada. WHP últimoInstallState2 a00:52:23UTC; GUIOptionalFeatures40832cerrada, manager1036abierto usuario/list runningvms vacío. Download/installer terminales; no job/handle pendiente, no streak no-progress confirmado.
-- NEXT=C-018H_LocalVMSetup, TO=CLAUDE cuando el USUARIO cambie modelo: preservar VMGUI YA RUNNING; comprobar mismaUUID/PID32756+creation/log antes de actuar, NO otrostartvm/reset/reboot/enable/verifISO/attach. Owner elige idioma/teclado y lee/acepta condiciones si corresponde personalmente; pedir estado/captura posterior sin claves/credenciales, no aceptar términos/OOBEbypass por él. Disco para instalar SOLO VDI64GiB dedicado ya creado; no tocar Windows/discos host ni reinstalarVirtualBox/recrearVM. PreservarNICoff/clipboard-dragdrop-USBoff/no sharedfolders; si instalación exige red legítima resolver con owner y aislarANTES QA. GuestAdditions verificadas/GPUAPIreal y luego -dx11 existingarchives antes de recook; no modificarbaselineDX12. MantenerVBS/HyperV/SAC/Defender/CI y M7/securityQUIC-SSL-curl/cleanCI/rights/performance OPEN; QA-01–10PENDING. No repetirPDB/imports/source/114tests/nativegates correctos.
-- QUIC: conservar y evaluar actualización compatible. Usuario respondió VERSION+RUTA con la instalación ACTUAL UE5.8.2/CL56702186 en C:\Program Files\Epic Games\UE_5.8. Build.version y DLL hash/version coinciden con baseline, MsQuicOwnerBaselineConfirmation1.json; no otra distribución/parche verificable disponible todavía. Integración disponible según owner, repositorio completo del motor no confirmado. No repetir auditoría de ese payload. No desactivar, instalar/migrar motor o sustituir DLLs. Header/API-prefix/nota de hotfix no prueban payload parcheado, ABI/TLS ni player confiable.
+Archivos de ESTE bloque no comprometidos: Tools/semireal_camp_import_policy.py,
+tests/test_semireal_camp_import_policy.py,import_semireal_camp.py,
+run_semireal_camp_import.ps1,capture_semireal_camp.ps1,
+ArtProbe/Native/SemirealCampPreview.cpp;review3,plan,brief,inventory,HANDOFF.
+Sourcefixture sincronizado SOLO a Source Editor-test PRIVADO y12uassets C03 nuevos
+en Artifacts (ignored). Sin commit/stage/push. No código de gameplay Root editado.
 
-## Trabajo terminado y evidencia reutilizable
+### Receta de importación ya completada — histórica, NO NEXT
 
-- QA local preparado2026-10-12: M7_TRUSTED_PLAYER_QA.md y enlaces de plan/checklist/package/external-gates, sin cambios producto/paquetes/motor. Manifests freshhash Dev28f9b941.../Ship4773d3fa...,48/30files/revision0726de2/dirtytrue/bootstrapRomanEmpireGame.exe, exit0. Preflight2readonlycommands exit0; no VM identificada ni installation/launch. Perfil Config/DefaultEngine.ini:28 DX12; hostIntelGraphics/RTX5070TiLaptop noGPUguestproof. Sin D3D11TargetedShaderFormats explícitas enesearchivo noausenciaSM5 global, noforzar -d3d11/cooknuevo. Cinco gh api GETs exit0 en segmento anterior de este mismo bloque: remote main89d8d66e/protectedfalse,runners/workflows/environments0/readinessausente; no rulesets refresh ni writes. Signaturemetadata NotSigned ambos; PS combinado previo terminó1 por Get-Process sin coincidencias, no signature failure/QA. Motor5.8.2/CL56702186/MsQuic2.2.0hashbaseline freshcheck0; no candidato/parche nuevo. Microsoft Sandbox oficial noHome; virtualizedCPUfalse flags noBIOSdiagnosis. Cierre dirigido guardado abajo, no suite nativa por docs.
-- PeImportReview1 SHA2c32d6f2b3194fa21eed7d6464accbc802c95ddc468d4d50edb7a807e40549ed: todos38QAEXE+DLL(23Dev/15Ship), manifests/images/inputhashesbeforeafter; normal/delay DLL names +named/ordinal counts solo, sin symbols/privatepaths/rawcopies/PDBreparse/nativeexecute/disassembly/install. MainDev47/15→packagedtbbmallocnormal+PIX/Ogg/Vorbis/VorbisFile/Aftermath/DirectML/DbgHelpdelay; Ship41/13→Vorbis/VorbisFile/Aftermath/DirectML/DbgHelpdelay. Graphsame-basename edges13/10 NOactualDLLpathversionABI/runtimeproof. AmbosVorbis+VorbisFile importOggnormal; VorbisFile→Vorbisnormal. ShipnoGameOgg/PDBpositive noexemption. No descriptorMsQuic/tbb12 en38images pero siguenpackaged/noabsence/securitymitigationclaim. Ship7noexplicit:MsQuic/XAudioRedist/ORT/Agility2/tbb12/tbbmalloc; Dev13inclVulkan7yexcltbbmalloc. Source MicrosoftPElayouts reviewlink; scriptcorrected0~2.88s/6malformed+normal/delay/named/ordinal syntheticPASS. Initialfixtureexpectedwrongerror1 before nativeinputs/receipt, fixedexpectedcode only/no guardweakening/no enginefailure.
-- PdbContributionReview1 SHA4857a6a85625cbf679a38c2cc222f82770c760126373f26edc2431e0acfdbf83: EXEs native hashes QA333110272/63330b9e...Dev y166856704/3e3da2b7...Ship; PDBinfo/PE-RSDSGUID+age=1/DBIage matches Dev190d9779-d627-46c2-bba6-dea38fec61c0 yShipb6415375-daad-9d2e-e4e1-03b3bae73ba1. Sectionheadersbytes equal/noOMAP, modules3581/3494/contributionrecords2756003/1065743todos dentroPEsections.54Dev/46Ship librarynames engine-relative-suffix,54/45 con intervalos positivos, cero basenamefallback; NO archivehashinsidePDB/fullobjects/notice/legal/runtimeproof. SSL/crypto/curl tienen .text ambos; importwrapper/folding/LTO/transitivos separados, no reachableCVE claim. Devnoassoc7:tbb12/dinput8/xapobase/OpenEXRUtil3_4/speex_resampler/websockets_static/msquic; Ship añadeITTnoassoc, liboggnamed/0positive, tbbmallocrdata-only. No ausencia/removal/QUICmitigación inferida. DevDetours/DirectShow/JumpToSelf positive butrightsopen.
-- PdbReaderAssertions1 SHAeb4f685ce4a309d5b0d9bec003212129463d21563f891a972421061191935f88: script0/validdiscontiguousMSF+module+PE-RSDS,4malformedMSF+2module+15PE/readbounds rejected. Source reader initial64MiBcap exit1 BEFOREreceipt; diagnosticDBIDev78642145/contribution77168088,Ship31266794. Corrected128MiBcap+per-module aggregates script0/hashbeforeafter, no millionsofpersistedrecords or private module/symbol/sourcepaths/rawcopies. Metadataonly/no instruction disassembly/DLLload/gameexecution/install/native mutation. PrimaryLLVMMSF/PDB/DBI+writer andMSPE references inreview; ancillary NativeEnumModules webcachefailednotglobalabsence, noprivateaccess. Existing114Python/native reused.
-- AttributionActionCoverage1 SHA77c46f7e8784b597ddeab17e3b6801d6e3d1be230a5617436036a6d4de2af735:28recibos verificados antes/después yJSONpointers exactos resueltos a61identidades/54Ship,11grupos disjuntos/actualnativeowners; DLL21/13en11familias y gradedproof separados/no countsum. RELEASE_ATTRIBUTION_ACTIONS.md ATR-00–14 registra qué evidencia/decisión falta y cómo cerrar para candidato limpio, sin avisos/contratos copiados ni ownerapproval. Script0/noGET/no engine scan/native/QA/security mutation.
-- RetainedMetadataAvailability1 SHA9c1780e54ec18bc8025fa057924d821b0ea95b5ffb6bde04cb57a27f577da154: Dev Binaries/Win64/RomanEmpireGame.pdb383250432/SHAddab13eca7d70c6574341222e875b5ecf2b93ce1a4d70d9c66bffab4322427c5; Ship RomanEmpireGame-Win64-Shipping.pdb237268992/SHA423e089aa719ed65c40c01dabb42955decf8911959c13a041f0141914244332f. AmbosMSF7/freshhashbeforeafter, .rsp hashes Inventory2 intactos /DEBUG:FULL/expected PDBbasename/noMAP/VERBOSE flags. No .map SOLO response/bin dirs, no globalabsence. llvm-pdbutil PATH+3scopedpathsfalse, noinstall/run. Script0; PDB–EXE GUID/age y contribuciones NO analizados/retainedobjectsUNVERIFIED, no rawcopy/debug/sourcepaths persisted. Próxima tarea concreta/acotada antes de pedir decisiones de alcance al owner.
-- DeclarationReviewCoverage1 SHA54ce9d2abfd0c518e7b82c651b4658ba4d6eeb63f7a9af831b99aad73511604c: baseline49/61Dev,46/54Ship identidades exactas en nueve selected review bodies (no input/index references). CompanionImportBinding1 SHAeaca76d8b70f1dbf87e0f212d907914dc8a28d2e15187785fd69ef07fc50fada suma9Dev/8Ship; AMD64 short-import DLL names y actual PublicLibraries owners en ambos exports. Mapa en review, familia DLL/hashreceipt reutilizados sin refetch. Cada lib3otros miembros sin clasificar; no pure-import/ABI/retention/runtime/rights claim. Parser synthetic valid/BigObj2 exclusion/five malformed rejections PASS, script0.
-- DevTailSourceReview1 SHA27831e36a0ac6748ec194c01a48817ff8f50dd2e8822121debd465d7d4a7d68c:3últimas identidades Development-only/uniqueowners/noShip declaration. Detoursheader/TPS4.0.1/0x4c0c1 fuente difiere; dosMIT permission bodieswhite-match primaria, copyright/intro/fullfiles diferentes, notice5.3 no binaryversion. DirectShow Windows7/.NET4 license12233bytes strictUTF8reject→CP1252candidate soloese archivo/rawpreservado; exactREDIST/markedsample/conditionalMedia-credit/owneragreement pendientes; publicsamplecommit434f6002...combaseheaderCRLF-only/streamswholewhitefalse no exactbuild. LC_JumpToSelf.asm212bytes/MolecularMatters2011–2020allrightsreserved; neighboringxxHashTPS NO licencia esa lib.6boundedGET200/59855bytes memoryonly/no rawcopies/redirect/auth; script0/hashguards. TOTAL61Dev/54Ship identity-reference presence PASS, no source/retention/rights/fullnotice/security approval. Índices/TPSstatuses/NOTICES111bytes intactos.
-- M0–M6 y C018A–G: avances preservados, detalles en sus reviews enlazados desde el plan. C018F raster/UI mínimos locales cerrados; C018G escaneo/política local aprobado. Gates de release independientes siguen abiertos.
-- GpuDeclarationReview1 SHAe51761ab024e675e1fd36134523e29a57e34b185181c08d97c40a2419097490a +Supplement1 SHA94a4f2b31f70878258458fa722e9a89dacaa5e7df2a7ad4a87e712037191658c:12libhashes BOTH exports. GPU4uniqueowners; DirectX8 DIRECTORY association is NOTnativeowner, actual DX11/DX12/DirectSound/DX11Audio/XInput maps verified/scoped table in review/index unchanged. AGS6.0.1 publisher.lib214264/SHA89e1e6ba and NVAPI R570 commitce6d2a18... lib978386/SHA3b33fdf3 EXACT rawhash matches; selectedheadersCRLF. NVAPI publisher explicitly licenses libs underMIT, local/publisher BOTHSPDX bodiesCRLF-only match aftermetadata/applicability-introduction exclusion, fullfilesfalse/intro retained. LegacyAftermath/Epiccontract not replaced. IntelExtensions2025MIT-SPDX/complete notice+exactbuild unknown; ITTAPI3.0/GPL2 ORBSD3, local5b8a7d7README (notlicense) resolvesfullcommit...35b42 butheader/lic/READMEwhitefalse/branch OPEN. DXSDKJune2010/EOL/None/customheaderMIT not8lib rights; no installer/OSDLLcopy. Scriptinitialowner-guard1 BEFOREGET, corrected nativeowner-map guard0/beforeafter hashes; NVAPI guessedR5703URLs404 resolvedpubliccommit, no globalabsence. Bounded public source/lib bytes memoryonly/no rawcopies/private/install/exec/native changes; finalretention/rights/security stillOPEN.
-- ImageHttpSourceReview1 SHA f787c8d7df321d11bf19f96856c2d51cd71989ada85cb7a6af585cb5b41928ce +Supplement1 SHA95adeed20e248232d20dd1d1d734dfa116c0142cb2bf15ac641753d073504148:10libs/uniqueowners BOTH exports, six notice families. nghttp1.64/legacyMIT CRLF/versionbodywhite; JPEG3.0headerCRLF/centralold2020vsprimary2023/fullnoticefalse, CP1252candidate/rawpreserved. IJG+BSD3+zlib components noORchoice, binary IJGcredit/TurboJPEGnotice applicability OPEN; otherIJG6b1998no substitute. APVlabel0.2.0.1/firstheadercommentCRLF butWHOLEheader+wrappedlicensefalse, doubledquotes/TPSmalformed untouched. Imath3.2.2/OpenEXR3.4.3 configversions/notice bodiesCRLF after explicitmetadataexclusion notwholefile/build match. SeparateOpenJPH0.24.5 versionheaderCRLF/BSD2/3copyrights, UNSWSydneyrootvsheader distinct; notcoveredbyEXRBSD3.10GET200/151418bytes +2hash-checked diagnosticGET31458bytes, no rawcopies/private/native/engine/license changes. Script/followup terminal0 after isolated reader fix; no retention/exactbuild/owner/finalbundle/security approval.
-- AudioVideoSourceReview1 SHAcbbc0e3d8bf22ba671317eebf57aa29c8273dd3f0e9d269a210cb4ae80e6de9b +Supplement1 SHA6d861b9e0f9a7091d8aab5bef273d695c77dea0af8adbf954b3924b9fbc22f4c:5declared libhashes/uniqueowners BOTH exports (libOpus3/Vpx1/WebM1). Opus path1.3.1-12/bannner libopus unknown no binary-version/commit proof; header v1.3.1 CRLF-only/rootlicwhite match, APIheaderBSD2-style vsrootBSD3 candidates distintos; newer1.4/1.5 no substitutes. Speex2007JeanMarcValinBSD3 noticewhite match/pinned1.2.1 NOTactualversion, wholeheaderfalse/local old+current rawsame. VPX1.14.1/banner/bothheadersCRLF-only; WebMpath1.0.0.27 sourceLicense/headerCRLF-only, copyrightGoogle2010/WebM2012 distintos. Exact old central3TPSfilenames absent, not global absence/violation. WebM PATENTS404 exactURL only, PATENTS.TXT2001436/SHAcc3273e0 equalsVPX grant; scope/further-modification exception/patent-enforcement termination +Opus3IETF links notownerclearance.8initialGET200/112985bytes +1exact404 +1followup200/1436bytes; no raw copies/private/native/code/license mutation. Source scriptterminal0/hashbeforeafter; reuse114Python/native. No retention/rights/finalbundle/security approval.
-- HashTangentTiffSourceReview1 SHAe21cc069213f384d5ac8106fa68b0543392a544a81077aaaf59f26a4ef03f279 +Diagnostics1 SHA7d1ea6e56fcc7c2dbd047f39eb6488d3d477dbe7151bebe3dc2f8899f290f2c5:3library hashes/declarants exactos ambos exports. BLAKE3 1.3.1 headerCRLF-only/fullnotice whitespace-only match, CC0-1.0 OR Apache-2.0 noMIT. Mikk1.0 copyrightcomment CRLF-only/localcentral noticewhite match, WHOLEheader diferente: SOLO inserción local m_bIgnoreDegenerates+comment después normalizaciónwhite; pinned authorcommit3e895b49..., no binary/source revision/ABI proof. Source-origin/altered-source/notice restrictions, acknowledgement appreciated no obligación; TPSgenérico +ComputingTangentSpace None no grant. TIFF4.2.0/date20201219 headers/fullcentrallicense CRLF-only match, notice/names restrictions +TPSstaticzlib/turbojpeg actualretention/versions pendientes.7GET200/58978bytes +1hash-checked diagnosticGET8209bytes/no redirects/raw copies/privado/native cambios. No retención/derechos/mitigación/finalbundle approval; no repetir queries.
-- C018H inventario local: DependencyInventory1/Inventory-Development2.json y Inventory-Shipping2.json, NativeFamilyCoverage1 y reviews de fuentes. ALL21Dev/13Ship DLLs en11familias tienen recibos graduados; no cobertura completa de código estático/proveedores/fonts/derechos.
-- LinkIndexReview1:94Dev/87Ship declaraciones =61/54 bibliotecas concretas +33 nombres de importación de plataforma. TPS/declaraciones no prueban formato static/import, objetos retenidos ni licencias aplicables. Tool/test14 aprobadas; Python114total/113pass/1capability skip real-symlink. Reutilizar LinkIndexPythonFull1.log/.exit.json, actual0.
-- StaticGapSourceReview1 SHA3926cd858bdcb3afe67bbc6b224fddb24431c7bdeba4686bd489f5f9c15098e2: siete bibliotecas con hashes intactos y módulo declarante único en AMBOS exports. DevProfilerSourceReview1 SHA89791ac128c5f47368a1518c29aa3984c4723d408cb6ab9c2d18cfb93d57f748: tres profilers adicionales solo en el índice Dev. No rehacer esta resolución.
-- Avisos candidatos:22libpasUE headers BSD-style/Epic2023/2023-2024/2025, fork WebKit original pendiente; Draco1.5.6/Apache header; Epic codecs/Oodle9/16 copyrights no equivalen a contratos. UEJpeg ZIP declara stb_image implementation/MIT2017SeanBarrett OR Unlicense; elección/retención pendiente. Oodle9/13 bundled distinto de SDK9/16. Nada copiado al bundle final; packaged NOTICES111bytes/FreeType-only intacto.
-- CompressionFontCoreReview1 SHA3cc511ccb7cef75284413455f331d8fb96b1021fd22689084f07ed7622f39bfe:3bibliotecas hash-intactas en ambos índices; headerszlib1.3/png1.6.44/FT2.14.1 +sourcePNGlicense/FTL match primaria solo CRLF→LF, NO builds/retención. CentralPNG copyright2tokens2025vs2024 source, no reparación. FTL/GPLv2-or-later choice/root alternate component notices, owner applicability OPEN.431620bytes primaryGETs/no redirects/raw copies, script ignorado terminal0;111byteShipFreeTypecredit hash-manifest match/intacto, no año no implica automáticamente incumplimiento del crédito requerido. Ver review para fuentes/detalles; no repetir GETs.
-- NetworkSourceReview1 SHAe4aab2cad9a8ef8a7759afd038fe1221f8c1c3f13c47ee4a4ed6ac16c59b20b5:3library hashes/banners/declarantes exactos en ambos exports; OpenSSL1.1.1t header/license CRLF-only match; legacy OpenSSL AND SSLeay, no Apache. Curl8.15 released header vs tag8.15.0-DEV/[unreleased] solo2macros; oldCOPYING2020vs2025/email, body whitespace-only.195866bytes primaryGET8fuentes; scriptterminal0/no raw copies/probes. Publisher1.1.1 estándar sin soporte (contrato extendido/Epic patches desconocidos); curlJSON43version-level advisories29Low/14Medium, no43game-CVE claim, solo2condition sets revisados. Features/backend/retention/patches/trusted runtime y derechos OPEN, release/security HOLD independiente de MsQuic.
-- TextWebSocketSourceReview1 SHA6e60d961470a7db0328fe13f6760f9e3f298ff251f3a4c09c911344d9dae8734 +Diagnostics1 SHAbe1423ab...:3hash/declarants intactos ambos exports; ICU64.1/HB2.4/lic candidates encontrados por basename exacto, TPSdepot //UE4/Main nuncaUNC, índices sin reparar. RawCP1252 candidate notices preservados; ICUlic whitespace match,6package-wide sections no6retained claim; headerCRLF-only. HBcopyrightGoogle2019/localFacebook2019 vsprimaryGoogle2012, bodywhite match/no equivalencia completa; UCDN separado/templateheader scoped. WSheader3.0 vsTPS1.7.3/205byteUE4credit+locator; LGPL2.1+4static-link exceptions no game-source mandate automático, modified library source fulfillment/retention/rights OPEN.6GET200/60821bytes +2hash-checked diagnosticGETs; no raw copies/privateEpic access/modificaciones. Scripts terminal0; primeros2UTF8reader queries1 antes recibos/GET, no fallo engine.
-- Último cierre de producto: StaticGapClosing1 at20:06:48UTC, repository0/security349texts/0findings/0policyFailures/diff0,282paths/indexempty/HEAD0726de2/namedNativeJobs0/five toolhashesmatch. Son observaciones de comandos, no logs inexistentes. Runtime/herramientas sin cambios posteriores; no repetir suites/builds/cook/player para documentación.
+1. Reusar GamePreview EXISTENTE y181ContentFILES (179Unrealassets+2designJSON),
+   NO nuevo clon ni repetir Blender/SourceDelivery por cambio de cliente.
+2. Extender perfiles explícitos importer/source-policy a semireal_v3/Camp03, pin
+   SHA anterior/tri reales/schema3; defaultv1 yCamp01/02 conservados. Ajustar enum
+   del runner/logroot3. Nueva namespace /Game/ArtCandidates/Camp03,12assets si se
+   mantiene pipeline3SM/6mat/3tex; no reescribirlos existentes.181hashes antes;
+   esperado193files después (191uasset/umap+2JSON), no193assets.
+3. Native fixture/capture deben admitir Camp03 explícito y30554barracktri sin
+   cámara/FOV/luces/pose hacks. Leer skills UE correspondientes y comprobar MCP
+   real (antes no disponible), fallback commandlet ya utilizado sin reinstalar.
+   SourceCppEditor-test en Tools/ArtProbe/Native y copia privada, NO runtimeRootCpp.
+   Build/test/gpu secuenciales, primero import+reopen guards y luego vistas reales.
+4. Nueva fuente requiere gates pertinentes propios; no atribuirle cook/fit2 ni
+   aprobar mainmap/footprint/spawn/release. No bloquear esperando brief: fue delegado.
 
-Todos los recibos anteriores están en Artifacts/C018H-DependencyInventory1; son locales/ignorados. Resumen versionable: M7_PACKAGED_DEPENDENCY_REVIEW.md, M7_FONT_ATTRIBUTION_REVIEW.md y THIRD_PARTY_NOTICES.md. Guardar nuevos recibos create-only, jamás sobrescribir los anteriores.
+Archivos de ESTE bloque sin commit: nuevos Tools/create_semireal_camp_v3.py,
+semireal_camp_revision3_recipe.py,tests/test_semireal_camp_revision3_recipe.py;
+cambiados run_semireal_camp_source_revision.ps1/verify_semireal_camp_source_v2.py,
+SourceArt/Environment/RomanCamp/semireal_v3(14files),nuevo review3,
+IMPLEMENTATION_PLAN.md,M6_VISUAL_QUALITY_BRIEF.md,ASSET_INVENTORY.md,HANDOFF.md.
+Artifacts/VQ02_CampRevision3 contiene brief/4jobs/logs/PNGs/manifest/deliveryScript;
+ignored. No nuevo UEbuild/fullsuite/cook requerido todavía por source-only.
 
-## Pendientes que requieren propietario/evidencia externa
+## Decisión anterior del owner — histórica, antes de delegar criterio
 
-1. MsQuic2.2.0: MsQuicUpdateEvaluation1 registra seis avisos del publisher, incluido Critical RCE; HOLD de seguridad SIN mitigación. Se necesita candidato Unreal real/parcheado y compatibilidad verificada INCLUYENDO OpenSSL/curl source-version/support flags de NetworkSourceReview1 (no asumir43CVEs aplicables al juego). El escáner de texto limpio no elimina CVEs.
-2. Revisión limpia/commit local explícitamente pedido (sin push), runner aislado/protegido y política de rama. No activar remotos ni hacer commits/staging automáticos.
-3. Player Dev/Ship confiables: ISO oficial completamente verificada y adjuntada; WHP1/reinicio host comprobados, misma VM RUNNING con Windows11 Setup Español (última captura VM_InstallerScreen4.png). Instalación/condiciones/licencia del invitado, driver/API gráficos y todos los viajes QA-01–10 siguen PENDING. No repetir reboot/enable/hash/attach ni retryunsignedhost/Windowssecuritybypass; VM/WinPE no prueban playerpass ni derechos de distribución.
-4. Hardware/FPS/carga VISIBLE/version/canal acordados; métricas Editor/proyección/cook no sustituyen FPS real ni prueba del player. Derechos Epic/SDK/assets, avisos aplicables y bundle final aprobado siguen OPEN.
+Respuesta real a la revisión de las vistas Camp02: **«Pedir más ajustes visuales»**.
+Camp02 NO aprobado para integración funcional. Ya NO esperar una respuesta a esa
+pregunta ni volver a pedir aprobación del mismo resultado sin cambiarlo.
+Falta el contenido concreto del ajuste, no la elección entre integrar o revisar.
+Se mantiene la dirección romano semirrealista y el encargo previo de arquitectura
+Y materiales; no volver a preguntar estilo ni esas dos áreas ya decididas.
 
-## Cambios del bloque y límites
+NEXT G-VQ02_CampRevision03Brief / GPT: pedir qué no convence del Camp02 actual,
+idealmente una captura marcada o referencia con cambios concretos. Registrar
+criterios de aceptación antes de generar v3; no inventar preferencias ni tocar
+geometría/materiales todavía. Claude no integra la versión rechazada. La propuesta
+de footprint7x6/adaptación de salida sigue SIN aprobar y puede cambiar con v3.
+Camp01/Camp02, fuentes y pruebas permanecen como evidencia histórica; sus gates
+NO aprueban una futura revisión03. No nuevos jobs/builds/cooks/capturas/commits.
+Solo documentación actualizada; dirty anterior preservado. Auditoría NUEVA: 3/3
+turnos consecutivos con el mismo bloqueo de brief concreto ausente, sin contar
+la auditoría histórica. El turno anterior y este fueron SIN PROGRESO de
+implementación (solo comprobación/checkpoint), no verified wait. HEAD344c29b y
+los86paths dirty son idénticos a la comprobación anterior; sin conflictos/borrados,
+nuevas indicaciones, job vivo ni trabajo independiente habilitado por gates externos.
+Se llamó update_goal y devolvió BLOCKED; objetivo íntegro conservado, NO complete
+ni paused. Para avanzar hace falta describir qué cambiar del resultado actual,
+una captura marcada o una referencia. No reabrir la misma pregunta de aprobación
+de Camp02: ya se pidió revisarlo. Sin builds/capturas/arte03 especulativos.
+Si el usuario reanuda, iniciar contador NUEVO; no heredar este3/3 automáticamente.
 
-Cierre post-reinicio: nativeboot0/screenBootManager0/WindowsSetup screenshot0, PID/log association0 (guard inicialCIMCommandLine1 protegido y preservado), mismoVMrunning intencional/idioma observado, owner modal obsoleto se cierra con Cancelar. Repository0/0M1warnings/security0/353texts/0findings/0policyFailures y diffdirigido6MD0 ejecutados en este bloque; no tests/build/cook de producto por boot de entorno. VM_PostRebootClosing1.json sella Boot1/7capturas/6MD y checks; VBox.log continúa vivo, no fijar su hash como inmutable. APIgoalActive/PROGRESS/streak0/M7OPEN; no instalación desatendida, EULA/registro/credenciales por agente ni player. Footerready significa contexto guardado y bootcommand terminado, VMGUIrunning para interacción owner: comprobar mismoUUID/PID/log antes de actuar, no relaunch/reset/stop. Preserve286dirtypaths/indexempty/HEAD0726de2; source/engine/configUE/archives/security/remoto intactos, solo VMboot/NVRAM/runtime y artefactos diagnóstico autorizados.
+## Auditoría de bloqueo anterior — histórica, no contador nuevo
 
-Cierre ISO2026-10-13 local/2026-10-14 02:37:39.2564758UTC: FullCoverage1 SHA9b14489bf3d3664cb3813e7e0e7704a380a332afecf82c698d19be2e4a1d96d7; Attachment1 SHAe1d474316958b40af6eee74ea35f17a38bd881d291920cb2fb429afb7d804533. Consulta readonlyDVD/mediaUUID/path correcto0, VMpoweroff0; parent/4workerPID+creation matching0 vivos, metadata ISO estable, WHP1/bootOct10/C56.77GiB. Repository0/0M1warnings/security0/353texts/0findings/0policyFailures/diffdirigido0.286dirtypaths/indexempty/HEAD0726de2 preservados; no commits/staging/push.4MD (HANDOFF,IMPLEMENTATION_PLAN,VM_SETUP,M7_EXTERNAL_GATES_REVIEW),4recibos create-only+helper/transcript ignorados, config de VM generado/DVDregistro actualizado; NO Config de Unreal/juego/engine/assets/cook/archives/remoto/security alterados. ISO_SetupClosing1.json registra hashes finales/estado/checks. No handles/procesos propios en marcha, footerready real. ISO permanece en Downloads, no copiar/mover/borrar. Siguiente único paso inmediato owner guarda/reinicia MANUALMENTE host/avisa; instalarWindows por UI después de comprobarboot/WHP, no aceptación términos por agente. M7 completo/QA/defaultDX12/performance/security/CI/rights NO aprobados; gatesPython/nativos anteriores reutilizados, no suites/builds/cook nuevos.
+La misma decisión de adopción Camp02 sigue pendiente durante tres turnos de goal:
+cook completado, encaje read-only completado y esta comprobación final. El turno
+anterior fue PROGRESO (medición nativa/9tests y receta corregida); este turno es
+SIN PROGRESO de implementación, no una espera de proceso vivo. Receipt Fit01
+confirma native0/protected_unchanged y finalización; no hay job propio pendiente.
+HEAD344c29b y dirty coinciden con el relevo, sin nueva aprobación del owner.
 
-Bloque WHP2026-10-13: modificados HANDOFF,VM_SETUP,IMPLEMENTATION_PLAN,M7_EXTERNAL_GATES_REVIEW,RELEASE_CHECKLIST (estado verificado, no rediseño). Nuevos ignorados Artifacts/VMSetup/WHP_Enable_1/dism.log y EnableFeature1.json SHA7006955678b8b85b40e991a6e913e1a22e472be998f896ee8a6973a20c3f9c6a; cerrar con EnableFeatureClosing1.json en el mismo directorio. Cambio host limitado a HypervisorPlatform, ninguna protección deshabilitada ni reinicio automático; VM/VDI/packages intactos. Native3010→reinicio MANUAL, shell0/freshCIM+poweroffDVDcheck0. Sin operación en marcha; goal ACTIVE/M7 OPEN/streak0. Tests114Python/native reutilizados por ausencia de cambios de producto; no suite/build/cook. Preservados286paths/indexempty/HEAD0726de2; ningún commit/remoto.
+Se revisaron los límites/global gates y salidas M6/M7 pertinentes: no continuar
+adopción/mainmap ni inventar arte03, repetir pruebas ya aprobadas, reabrir VM,
+eludir bloqueo de player, sustituir DLLs o ampliar M8 para simular progreso.
+QA confiable/CI aislado, candidato de motor corregido y derechos siguen externos.
+Objetivo íntegro conservado, marcado BLOCKED, nunca complete ni paused.
 
-Cierre WHP: validate_repository.ps1 exit0/0M1warnings; security_gate.py exit0/353texts/0findings/0policyFailures; diffcheck dirigido5MD exit0. Recibo EnableFeatureClosing1.json create-only registra estado final/hashes de5MD y recibo nativo. Las verificaciones de texto no prueban patches del motor, licencias, player ni M7. Pregunta owner vigente: evaluación oficial Windows11Enterprise90dias con registro/condiciones/eligibilidad, o ISO con otra licencia válida. Reinicio manual todavía no observado; no repetir instalación/enable ni arrancar guest vacío.
+Entrada que habilita el siguiente bloque: decisión real sobre las vistas Camp02
+y, para probar el encaje natural, autorización explícita de la propuesta privada
+7x6/adaptación de presentación y salida. Eso NO aprueba mainmap ni M7/release.
+Si pide cambios visuales, su brief habilita una nueva revisión GPT en vez del swap.
+Al reanudar un goal bloqueado, iniciar una auditoría de bloqueo NUEVA; no heredar
+estos tres turnos como contador de la nueva ejecución.
 
-Cierre vigente shaders2026-10-13 16:02:54UTC: ShaderQualificationClosing1.json en Artifacts/VMSetup/VirtualBox_7_2_20_1 SHAde0fa6abb479f32f8075db020977079fdcb31495bb00b43d55b6eb7507e5e7c0; JSON/qualifiedreceipt hash/count/assertions0. Repository0/0M1warnings,security0/353texts/0findings/0policyFailures,diff0;286dirtypaths/indexempty/HEAD0726de2preservados. Solo HANDOFF,VM_SETUP,M7_TRUSTED_PLAYER_QA,IMPLEMENTATION_PLAN y2recibosignored nuevos; no scriptsproducto/game/engine/config/cook/VM/Windowsfeatures/security/remoto cambiados. Build/tests114Python/native reutilizados no rerun. Shaderqualification=DATOS/no runtime; bloquear no, PROGRESS freshstreak0. PróximoownerISO/evallicense/WHPmanual/guestdriver y -dx11 existingarchive qualification; defaultDX12/M7gates intactos. Sin trabajo nativo/handle en marcha; no reiniciarcollector28350 ya terminal0.
+## Ruta de integración futura — solo después de una muestra aprobada
 
-Bloque VM actual: nuevo VM_SETUP.md; cambios HANDOFF,IMPLEMENTATION_PLAN,M7_TRUSTED_PLAYER_QA,M7_EXTERNAL_GATES_REVIEW,RELEASE_CHECKLIST. Instalador final/downloadfailedreceipt Artifacts/VMSetup/VirtualBox_7_2_20_1 ignorados; VM/VDI/NVRAM generado bajo Artifacts/VirtualMachines/RomanEmpireQA ignorado. Instalación local VirtualBox mínima autorizada; WindowsFeatures diálogoabierto/luegocerrado pero WHP2 sigue/ningúnfeature/security/rebootautomático. Preservar285dirtyprevios/indexempty/HEAD0726de2; no cambiojuego/assets/config/build/paquetes/motor/remoto/seguridad. Bloque QA anterior TrustedPlayerQAPreparationClosing1.json intacto, sus cincoMDhashes son históricos antes de updatesVM. Imports/PDBreceipts intactos/no repeatparse.
+El owner eligió cambiar arquitectura Y materiales; v2 ya tiene fuente y previewUE
+verificados. La respuesta actual pide MÁS AJUSTES VISUALES: preparar el brief03
+indicado arriba. NO adoptar Camp02 ni mainmap, ni repetir decisiones de estilo/área.
 
-Cierre VM vigente2026-10-13 00:55:05UTC: Artifacts/VMSetup/VirtualBox_7_2_20_1/SetupClosing1.json SHAf1d3ea5f0b768eab40fa65de6b4c7e8a15671c00ac5057d31346a7e44f243232; JSON/5MDhashassertions PASS0. Repository0/0M1warnings,security0/353texts/0findings/0policyFailures,diff0;286dirtypaths(solo+VM_SETUP respecto285startup),indexempty/HEAD0726de2sincommits. VBoxManager1036 esUIintencional del usuario, no job pendiente; guestapagado/list runningvms vacío,features40832gone/WHP2 últimaobservación. NO reanudarinstaller/download/monitores terminados, NO guestboot/ISOdownload/OSQA/Windowssecurity/reboot automático. Pregunta siguiente: ¿evaluaciónoficialWindows11Enterprise90dias conregistro/eligibility/ownerterms oISOlicenciada distinta? Mantenergates114Python/native reutilizados sin repeticiónpor docs/VM. Footerready=contextoguardado, no Windowsguest/player/M7 listo.
+1. El cook Camp02 YA está verificado, abajo; NO repetir fuente/import/readback/
+   build/GPU/mutation/cook por cambiar de modelo. No tratar el cook Camp01 como v2.
+2. Concretar los cambios solicitados y asignar fuente03 a GPT; no generar una
+   revisión especulativa. Luego habrá nueva revisión visual de la muestra resultante.
+3. Si aprueba una muestra futura: Claude prepara integración funcional privada primero,
+   reutilizando GamePreview/181Content files, sin sustituir mainmap/autoridades
+   ni reescribir assets históricos. Consultar solo clases/datos exactos necesarios.
+   Leer M6_SEMIREAL_CAMP_FIT_REVIEW.md: preflight YA medido; NO repetir la consulta.
+   Fuente natural6.686x5.73m NO cabe en definición4x4.7x6 es propuesta NO aprobada;
+   adaptar escala/origen/grounding, construcción/outline, slot0 y salida real antes
+   de swap. No copiar BP_Barracks.design.json como autoridad: difiere de datos reales.
+4. UE/UBT secuencial; no reinstalarMCP/skills, abrirVM/playerbloqueado ni cambiar
+   seguridadWindows. Los jobs de este bloque ya acabaron: no hay handles pendientes.
+5. Una aprobación visual no aprueba
+   automáticamente footprint/nav/inputs/gameplay/seguridad/player/distribución.
+   Sourcebarrack6.2x3.6m exige evaluar encaje/offset/origen compartido antes de swap
+   ontoABarracks; no crear otraautoridad decolocación ni alterar contratos en silencio.
 
-Cierre QA anterior2026-10-13 00:35:06UTC: TrustedPlayerQAPreparationClosing1 SHA2fd9feb79caa783e9002335365776d5bb9dc0a1de47695bede047fca5e4ef49c, cincoMDhashes/JSON/assertions PASS0. Repository0/0M1warnings;security0/352texts/0findings/0policyFailures;diff0.285dirtypaths (solo+runbook), indexempty/HEAD0726de2 intactos, no ownedjob lanzado/pendiente. Gates114Python/native anteriores reutilizados; no suites/builds/cook por docs. QA-01–10 todoPENDING; M7/goal no terminados. Próximo: resolver setup/licencia/ISO/graphics viable con owner, no repetir checks sin nuevo input. Footerready=contextoguardado, no entorno/player listo.
+## Terminado — C-018H_CampRevision02Fit / GPT
 
-Cierre anterior PE: PeImportClosing1.json SHA07ece33093e4792c4b57ed7a15c635fa550ba4a8d6d6f0be1c06e2801469c084: repository0/0M1warnings; security0/351texts/0findings/0policyFailures; diff0; JSON/script/hash/AST/imageCounts/graph/Ogg assertions0. Startup/cierre284paths/indexempty/HEAD0726de25b05f84736b421480a1f1d633f87ac29c intacto; preservar todos los dirty previos/sin commits/staging/push. Existing114Python/native gates reutilizados, no reejecutados por research/docs. PdbContributionClosing1 SHA7661fcda60ce676ccfab72e974fb586bee69a4316e9795bcf0248478e5cf43a4 y cierres anteriores/owner-baseline intactos; no nuevo motor ni mitigación QUIC/OpenSSL/curl. No rehacer compactación/GETs/gates anteriores. Ningún proceso/handle propio vivo.
+El turno anterior fue progreso: cook privado cerrado. Este bloque avanzó el encaje
+sin asumir aprobación visual: nueva consulta nativa read-only DataAsset/CDO/mesh.
+PID43828 TERMINAL0,log0errors/0warnings,stderr0. No handles/jobs propios pendientes.
+Ruta Artifacts/VQ02_CampRevision2/Fit/Camp02Fit01/{readback,process,exit}.json,
+native.log/native.stderr.log.181Content/14sourcev2/Config/descriptor sin cambios.
+readback SHA f3b51f5a5eaccf94f97e98624109e9394f44dfe3f4c1bb2bdd6b8e519b7743d6.
 
-Un único escritor, sin subagentes/commits/push/reset/install/security changes. Cola GPT assets: ninguna petición nueva, no agregar Blender. Skills opcionales por cliente: leer solo las aplicadas; no reinstalar por switch. No imprimir/copiar/subir Saved/Cooked/Windows/ue.projectstore, caches/credenciales ni valores secretos. MCP solo sesión Editor/loopback intencional/secuencial, nunca Shipping.
+Datos actuales de PDA_Building_Barracks (no designJSON):footprint4x4,
+PrototypeScale2.5/2.5/3,CDOspawn(300,0,0),BoxhalfZ200,capsuleCDO42.
+FactoryBarracks y fuentes/DA coinciden root/privado; receipt liga DLL y fuentes.
+MeshBounds668.600006x573x381.5cm,centroXY(78.199997,-12). Escala natural NO cabe;
+7x6 propuesta sin aplicar. Offset centrado/apoyado candidato(-78.2,12,-199.5)cm.
+Swap ingenuo bajoPrototypeScale daría16.715x14.325x11.445m/baseZ198.5cm.
+Spawn+300 tiene clearance XY AABB−76.3cm tras centrado; mínimo tangencia+X376.3cm
+o392cm para boxpropuesto7x6. Soloenvolvente/CDO, NO contacto real/nav/player.
+Construction borra offsets, outline usaPrototypeScale, UpdateVisuals pisa solo
+slot0(Wood): adaptar explícitamente, no reescribir autoridades/coste/contratos.
 
-## Último error y proceso
+9tests puros PASS; Pythoncompile/PSAST,repository0M1warnings ydiffcheck PASS.
+Advertencias CRLF previas sin cambios. No fullsuite/build/cook/GPU repetidos.
+Nuevos archivos de ESTE bloque no comprometidos:
+Tools/{semireal_camp_fit.py,inspect_semireal_camp_fit.py,run_semireal_camp_fit.ps1},
+Tools/tests/test_semireal_camp_fit.py,M6_SEMIREAL_CAMP_FIT_REVIEW.md;
+actualizados HANDOFF.md,IMPLEMENTATION_PLAN.md,M6_SEMIREAL_CAMP_REVISION_REVIEW.md.
+Dirty anterior preservado, sin commit/stage/push. Skills gameplay/data/MCP usados
+para respetar componentes/definiciones existentes; no meta-tools MCP Unreal reales
+disponibles, fallback a consulta commandlet en proyecto privado, sin instalar nada.
+Owner adoption decision sigue pendiente; no repetir estilo/ambasáreas por silencio.
 
-Vigente: recuperación de CD boot nativa0, captura WinPE idioma0, observer79279 TERMINAL0; VMGUI32756/creation15:25:20.4916270UTC intencionalmente viva para owner, no job de instalación/player automático. La pantalla había vuelto a firmware pese a seguir VMState=running; no inferir pantalla actual del estado running ni de capturas previas. WHP3010/reinicio pendiente de párrafos históricos ya resueltos por hostBoot2026-10-14 08:19:55UTC/WHP1. Próximo: input personal del owner, sin reset/relaunch/enable/aceptación de términos por agente. No bloqueo confirmado de tres turnos; goal ACTIVE/M7 OPEN.
+## Terminado — C-018H_CampRevision02Cook / GPT
 
-Último bloque shaders: exportJSON original expandió metadataProvider de stringsGetContent y se truncó, sin rawpersisted/paquetesmodificados. Se recuperaron SOLO31inputrecords simples completos validados y se descartó raw del store; resumen escalar corregido0/freshhash31check0, nativeassertionscollector0 antes de export. No decoding/execution/retestnative. Búsqueda demasiado amplia ShaderCode produjo salida excesiva, corregida a PCD3D_SM5/libraries y conteos, no repetirla. D3D11Private cpp no disponible en ruta puntual consultada (rg1), no source-repo completo/engineerror; BaseEngine y primaryEpicflags bastan para calificación de datos, no runtime. Pendiente REAL noISO/licencia/evaluationowner/WHP2/driver/runs, no wait ficticio.
+Tools/cook_semireal_camp.ps1 y verify_cooked_camp.py admiten Camp02/v2 explícito;
+defaults Camp01/v1/output previo preservados. Nuevo dump_cooked_camp_registry.ps1
+exporta registries reales secuencialmente, sin recook ni sobrescribir evidencias.
+Testverifier agrega3guards: defaults/rutas separadas, perfiles inválidos y rechazo
+de shader mappings Camp01 como evidencia Camp02.15verifier+8source-policy PASS.
 
-Bloque actual: DownloadAttempt1 shell1/curl28 protegido; resume0/finalSHApin exact178192488/AuthenticodeValidOracle. Primera publisherguard1 por quotedSubject, corregida a GetNameInfoSimpleName EXACT Oracle America, Inc. y firma/hash intactos antesexec0. InstallerPID12544gone, exitcode NO capturado (monitorattach tardío1); instalaciónCLI/registry/signature aprobadas, noinventarexit0. PrimeraVMcreation1:--default ya creóSATA, VDIpersistido; resumeidentidadUUID/poweroff/SATA/VDIcheck reutilizóSINrecrear, storageattach/NVRAM/verify0. showmediuminfo--machinereadable unsupported1 corregido a salida real0. Helpdiagnostics nonzero no mutation. Fallos de apply_patch de cierre por contextos no encontrados no cambiaron archivos, patchescorrectos posteriores aplicados. Última limitación REAL: noISO/licenciaaportada/WHPdisabled/GPUcompat; ningún player retry/trustchange/motorparcheado.
+Salida NUEVA Artifacts/VQ02_CampRevision2/Cook/Camp02Cook01:
+- Cook PID42856 TERMINAL0,537cooked/0incremental/7platform-skipped/544total;
+  log0errors/0warnings,stderr0.181Content/14sourcev2/Config/descriptor intactos.
+- Runtime dump PID35304 TERMINAL0; Development dump PID53456 TERMINAL0.
+  Ambos logs0errors/0warnings,stderr0,input registry SHA sin cambios.
+- verified01.json:12actual assets,35hard-Game identifiers,0missing,6SM6material
+  mappings y4Global/game SM5+SM6 shaderarchives. Tri1152/3704/28130,1LOD,
+  0simple collision primitives;3textures2048,SRGB/compression correctos.
+  RuntimeAR dependencies stripped; DevAR closure NO prueba soft/dynamic loads.
+- cohort01.json SHA8839824ea41b73e0d4f51b1483d98af61422796daf5722cabeb3d5cb947d006a.
+  Bind verified receipt/previewcohort/tools/nativeDump journals/logs. CloseCook01.py
+  create-only existe ahí. Cocinado NO significa player/mainmap/nav/performance.
+- Una preflight del NUEVO dump runner falló antes de lanzar UE/crear outputs por
+  FileInfo.Parent; corregido a Directory antes de ambos dumps0. Sin job fallido vivo.
 
-## Lectura mínima al retomar
+Pythoncompile,2PSAST,repository0M1warnings,diffcheck PASS. Advertencias CRLF previas
+en .gitattributes/UnitBase.cpp no se tocaron. No nuevo build/fullsuite/Shipping/VM.
+Sin commit/stage/push. Nuevos cambios no comprometidos de ESTE bloque:
+Tools/{cook_semireal_camp.ps1,dump_cooked_camp_registry.ps1,
+verify_cooked_camp.py,test_verify_cooked_camp.py}; IMPLEMENTATION_PLAN.md,
+M6_SEMIREAL_CAMP_COOK_REVIEW.md,M6_SEMIREAL_CAMP_REVISION_REVIEW.md,
+M6_VISUAL_QUALITY_BRIEF.md,ASSET_INVENTORY.md,HANDOFF.md.
+Salidas/CloseCook01.py ignorados en Artifacts; dirty previo permanece sin cambios.
+Guía unreal-packaging usada: cook privado separado explícitamente de package/player.
+No nuevo asset/procedencia/licencia/QA/seguridad/owner approval. Ver reviewCook actual.
 
-AGENTS.md → este relevo → git status --short/git log -3 --oneline → sección exacta del plan y archivos necesarios. MODEL_WORKFLOW.md solo si primer switch; contexto UE por sección. HANDOFF_HISTORY.md indexa históricos (incluido el snapshot de hoy); no cargar todo ni ejecutar sus CURRENT/NEXT/PID. No reiniciar auditoría o cambiar definición de éxito.
+## Terminado — C-018H_CampRevision02Preview / GPT
 
-HANDOFF_READY | FROM=GPT | TO=CLAUDE | NEXT=C-018H_ExternalRunnerActivation | STATE=ready
+Selector explícito semireal_v1/v2 en importer/runner; defaultv1 preservado,
+ambosmanifests pinned y3GLBhashes/geometry-profile verificados antes deimportar.
+Newsource metadata revision/SHA, legacy Camp01 se lee sin reescribir.8policytestsPASS.
+Tools nuevos semireal_camp_import_policy.py ytests/test_semireal_camp_import_policy.py.
+Cambiados import_semireal_camp.py/run_semireal_camp_import.ps1, nativefixture
+ArtProbe/Native/SemirealCampPreview.cpp ycapture_semireal_camp.ps1(-CampCamp02).
+RootCpp/Build.cs/config/mainContent/sourceart NOmodificados en este bloque.
+
+Nativeimportcamp02-author01PID41172 yreadonlyPID49864 TERMINAL0:12assetsCamp02
+(3SM/6mat/3shared2048tex),169previos y181actuales ContentFILES hash-intactos.
+Precisión181=171uasset+8umap+2designJSON;179Unrealassets, NO181assets.
+Triangles1152/3704/28130,1UV/LOD,cm bounds1200x1000x2.17644/925x37.75x259.9696/
+668.600006x573x381.4999999;sourcev2SHAaa936...; PBR/color/compression/greenflip reales.
+Native simplecollision0 NOequivaleausenciadecomplexcollision; componentesNoCollision/
+Navfalse. Source/currentContent se protegieron; no gameplay/nav acceptance.
+
+Privatebuildcamp02-build01(wrapper50276) TERMINAL0:4actions/18.82s/strictNoUnityNoPCH.
+Nativefixture admiteCamp01default/46602 yCamp02/28130 explícitos, rechaza traversal/
+unknown/indexinvalid; guards pose/camera/visibility no relajados. BackupNativeFixtureCamp01.cpp.
+Camp02GPU01PID35808 TERMINAL0:2nativeSuccess,0errors/fails/pending,1known
+r.MotionVectorSimulation render-threadwarning. RealD3D12/SM6/1280x720,7PNG INSPECCIONADOS
+en GamePreview/Artifacts/Camp02GPU01:RTSAll/hiddenGround/Wall/Barracks,FPSAll/
+FPShiddenCamp,RTSReturn. Realcontroller/RTS/soldier/possess/exit, heldsourcepose.
+Witnesspixels36156/4205/26453/FPS840399 con cámaraidéntica,FPSz165.904.
+No camera/FOV/SceneCapture/imagegen/baseline substitution; no physicalinput/perfclaim.
+
+Camp02PoseMutation01PID51256 TERMINAL255 esperado: SAMEfixture/DLL/181hashes,
+ReadbackSuccess/GPUFail1/error1 exacto actorfalling/moving, wrappervalidaexpectedfail.
+No repetir mutation solo para generarverde. Source/staged GLB3BIN hashidénticos,
+textureJSONdedup no altera geometría/accessor/imagepayload.
+private-camp02-cohort01.json enArtifacts/VQ02_CampRevision2 SHA
+d3013ece695d6a40346da9d8469c8ac3770e2407210224c0d7a979bd7c1962aa.
+ClosePreview01.py exitoso; primeraclausula deconteoassets181 fallóantesdeescribir,
+snapshotpreservado; corregido igualdadexacta deTODOS181paths/179assets, sin rerunUE.
+Import/read-only/build/GPU/mutation logs/exit/procesos enRevision2; reportscaptures
+bajoGamePreview/Reports/{Camp02GPU01,Camp02PoseMutation01}. Todos terminales.
+
+Repo validation0M1warnings, PSAST/pycompile/diffcheckPASS;8targetedpolicytestsPASS.
+No fullUE/fullPython/Shippingpackage rerun justificado porfixtureprivado. Skills
+unreal-mcp(no conexióndisponible), ue-testing-debugging/module-build-system y
+unreal-cpp-gameplay aplicadas: assets privados/operacionessecuenciales/buildstrict/
+pruebanativaactual+negative, ningunaactivaciónservicio o dependencia runtime nueva.
+M6_SEMIREAL_CAMP_REVISION_REVIEW.md integrafuente+preview/limits; plan,inventory,
+brief yrelevo actualizados. Sincommit/stage/push. Goal ACTIVE, íntegro/NOcompleto.
+
+## Terminado — G-VQ02_CampRevision02 / GPT
+
+Fuente publicada create-only SourceArt/Environment/RomanCamp/semireal_v2,14archivos:
+BLEND/4GLB/4atlasPNG2048/soil1254reusado/2authorpreviews/manifest/README.
+13generados=74,189,080bytes, SHA-copy iguales a Attempt03; README es14º.
+SourceDelivery01.json enArtifacts/VQ02_CampRevision2 vincula14files/source/tool/
+readback/protected hashes y nativegates; SHA
+b21b4c07975998becc828e8976e082abe9a6860d7c20ffda0a3b3a28bd5c95f8.
+CloseSource01.ps1 ejecutado0; no repetir el nombre create-only.
+Fuente de suelo previa reutilizada BYTE-IDENTICAL; ningún nuevo imagegen/download/
+pack/purchase/install. Original geometry+procedural Blender5.2.2portable, seed2202.
+No MCP vivo ni operaciónUE, root C++/config/Content/gameplay tocados en este bloque.
+
+Barraca nueva6.2x3.6m: fachada con aberturas/contraventanas/puerta, porche/postes/
+arriostres, cubierta longitudinal y zócalo. Terreno transitado/variación, madera,
+revoco/clay revisados. Actual32986tri (1152ground/3704wall/28130barrack), budget65k.
+Ground12x10m; barrack bounds6.686x5.73x3.815m; origen común/metros, no recenter.
+1UVatlas/3embedded2048PNG porGLB, no COLOR_0 exportado/rig/animación/character.
+Legionario existente solo referenciaBLEND/render; derechos previos siguen aplicando.
+No LOD/nav/collision/interactive-door/perf/historical/owner/release approval.
+
+Evidencia final Artifacts/VQ02_CampRevision2:
+- Author03.exit.json native0/receipttrue/stderr0 (PID14332 TERMINAL).
+- Attempt03/source-manifest.json SHA
+  aa9364411a1de6c413041ce3075c2c0a0b3457f4d8260de43d4f0a41a9164546.
+- Readback02.exit.json native0/receipttrue/stderr0 (PID21764 TERMINAL).
+- Readback02/readback.json SHA
+  68f44f23958eacc5a332b8966418e601fb3ad4c58bf6d28efd21e2c60815575e.
+  Actual4GLBreimports/tri/UV/bounds/PNG/extras; source/v1 hashes intactos.
+  Clay coverage4410facecentroids(area>=.006m²), roughnessmin=max.8313726186752319.
+  Muestreo NO prueba todos los texels/caras pequeñas/mips/LOD/GPU.
+- Readback02/{Camp-Overview,Camp-HumanScale}.png AMBOS inspeccionados:
+  son renders reales de GLBs reimportados en BLENDER, NO Unreal RTS/FPS/player.
+  PNGs publicados SourceArt son los de AUTHOR (también inspeccionados), no confundir.
+- NegativeChangedTool01 native73/no receipt/stderr816bytes/wrapper FAIL esperado
+  (PID14260 TERMINAL): rechaza Attempt02 obsoleto por hash de herramienta cambiado.
+  No se modificó fuente histórica ni se relajó el checker para hacerlo pasar.
+
+Historia de fallos queda preservada, no repetir:
+Author01wrappernativeExitnull (no PASS), Author02stripstextura, Readback01native0
+con Pythonexception yreceiptfalse (FAIL). Diagnósticos Roof01normaloff no lo arregló;
+Roof02emission yStats detectaron637/4410caras sinbake, UV~.59px. Se corrigió espacio
+atlas sin subir2K: margenUV.0005/padding2px; v1 defaults.004/6 se conservan.
+ExportvertexcolorNONE evita tintedoble. Runner --python-exit-code73 + handle retenido
++ native0/receipt/stderr gates. Snapshots Author01Sources/OriginalKit conservados.
+
+14pure testsPASS (8recipe/defaults +6GLBenvelope), repository0M1warnings,
+PSAST/diffcheckPASS, LFSfilter confirmado paraGLB/BLEND/PNG (no stage).
+No suite nativa/C++build/cook necesarios para fuente solamente.
+Tools nuevos: create_semireal_camp_v2.py,semireal_camp_revision_recipe.py,
+verify_semireal_camp_source_v2.py,run_semireal_camp_source_revision.ps1,
+tests/test_semireal_camp_revision_recipe.py,tests/test_semireal_camp_source_validation.py.
+Tools/create_semireal_camp.py extensión compatible de2parámetros opcionales de bake.
+Docs: M6_SEMIREAL_CAMP_REVISION_REVIEW.md, M6_VISUAL_QUALITY_BRIEF.md,
+ASSET_INVENTORY.md,THIRD_PARTY_NOTICES.md,IMPLEMENTATION_PLAN.md y fuenteREADME/relevo.
+
+## Evidencia previa autoritativa — reutilizar, no ejecutar históricos
+
+- Camp01 privado:169Content originales/intactos; M6_SEMIREAL_CAMP_PREVIEW_REVIEW.md.
+  Readback/GPU02/7PNG, pose held guard y negative fallingpose ya probados.
+- M6_SEMIREAL_CAMP_COOK_REVIEW.md: Cook02loose/SM5+SM6,12assets,
+  35hardGameidentifiers(34content+NavigationSystem)/0missing/6SM6materials.
+  Cook01Zen/SM5 wrapperfallo preservado. NO normalShippingreachability/player/nav.
+- Legionario: /Game/ArtCandidates/Attempt10_1/LOD01/DA_LODPreview y SK_LODPreview,
+  IntegrationV3/Runtime05PBR. LODs49758/12420/4954tri/17bones/8slots/2UV.
+  Body/ShieldONLYtint, CrestBRASS. No nueva facción/anim/camera redesign.
+- Performance review:50Editor81.99/84.80FPS,p9514.072/13.549;100stretch51.68/65.53,
+  p9521.591/16.930. D-05=60FPS1080p/50 +100stretch separado. EscalaINFERIDA/Editor,
+  escenaSINCamp nuevo; no packaged/performanceapproval actual.
+- C-018H_FontNoticeMap técnico completo, M7_FONT_NOTICE_MAP.md,
+  FontNoticeMap02/verification01,14hashes/15paths porQA/45rawpaths/12testsPASS.
+  Copyright/nameID0/13/14/versions/provenancegaps preservados; ATR-13rightsOPEN.
+  NO reconstruir avisos, reextraer ni repetir upstream/lookups por switch.
+
+## Límites/global gates
+
+M7OPEN: MsQuic/OpenSSL/curl securityHOLD; owner eligió RETENER QUIC/evaluar actualización.
+UE5.8.2/CL56702186 sigue baseline/MsQuic2.2.0, no candidato corregido.
+Migración real requiere candidato verificable/autoridad específica; no swap de DLL.
+Trusted Dev/Shipping QA01–10/CI runner aislado/licenciado pendientes (solo estaPC).
+VM diferida por usuario; no reiniciar ni ejecutar players bloqueados/cambiarWindows.
+Rights/ATR00–14/distribution/finalbundle/owner art/perfplayer pendientes.
+M8 solo DESPUÉS de M7; no ampliar online/facciones para sustituir esos gates.
+Clean91cCheckoutinmutable en Artifacts/C018H_CleanCandidate1/Checkout.
+
+Preservar todos los dirty anteriores, incluidos root Units/character presentation,
+RomanSoldierAnimInstance,UnitBase y CharacterMaterialPolicyTests,SourceArt/Tools/docs.
+No commit sin petición nueva, ni git add-A/push/reset/configremotos/seguridad.
+Un escritor, no cerrarEditor ajeno, no inspeccionar .env/credentials de claimmix.
+Streamdisconnected: Artifacts/CodexStreamDiagnostics/2026-10-21.md; repairNOconfirmada,
+intento extensión26.1007.21434sin cambio. No reiniciarclientactivo/auth/red por inercia.
+
+Archivo exacto previo19022B: HANDOFF_HISTORY_CAMP_REVISION2.md.
+EN_CURSO/blocked/NEXT/PIDs allí son HISTÓRICOS; CURRENT/NEXT solo aquí.
+Todos los jobs propios descritos terminaron; sin handle que transferir ni esperar.
+HANDOFF_READY significa contexto guardado, NOmilestone/goal completo.

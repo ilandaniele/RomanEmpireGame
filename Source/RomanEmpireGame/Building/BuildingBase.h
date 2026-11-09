@@ -35,6 +35,8 @@ public:
 	FBuildingData GetBuildingData() const { return BuildingData; }
 	/** World-space half extent of the authored footprint collision box. */
 	FVector GetPlacementHalfExtent() const;
+	/** True only after a validated, opt-in definition has been applied. */
+	bool UsesAuthoredPresentation() const { return bBuildingInitialized && BuildingData.PresentationMesh != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category = "Building")
 	EBuildingType GetBuildingType() const { return BuildingData.BuildingType; }
@@ -183,6 +185,9 @@ private:
 	bool bBuildingInitialized = false;
 	bool bBuildingEndingPlay = false;
 	bool bPlacementVisualValid = true;
+	bool bAuthoredPresentationApplied = false;
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMesh> PrototypeMesh;
 	void ApplyDefinitionPresentation();
 	void UpdateVisuals();
 };
